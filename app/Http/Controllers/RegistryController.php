@@ -12,6 +12,7 @@ use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
+use Illuminate\View\View;
 
 class RegistryController extends Controller
 {
@@ -19,6 +20,22 @@ class RegistryController extends Controller
 
     public function __construct(private readonly RegistryLifecycleService $registryLifecycleService)
     {
+    }
+
+    public function waitingPayments(): View
+    {
+        $this->registryLifecycleService->expirePendingRegistries();
+
+        $records = Registry::with(['customer', 'arazi', 'agent'])
+            ->where('status', 'pending')
+            ->whereNotNull('due_date')
+            ->orderBy('due_date')
+            ->get();
+
+        return view('registries.waiting', [
+            'title' => 'Waiting Payments',
+            'records' => $records,
+        ]);
     }
 
     protected function resourceTitle(): string
@@ -60,14 +77,14 @@ class RegistryController extends Controller
             ],
             [
                 'name' => 'agent_id',
-                'label' => 'Agent',
+                'label' => 'Broker',
                 'type' => 'select',
                 'options' => Agent::orderBy('name')->pluck('name', 'id')->all(),
                 'value' => $item?->agent_id,
             ],
             [
                 'name' => 'check_by_agent_id',
-                'label' => 'Check By Agent',
+                'label' => 'Checked By Broker',
                 'type' => 'select',
                 'options' => Agent::orderBy('name')->pluck('name', 'id')->all(),
                 'value' => $item?->check_by_agent_id,

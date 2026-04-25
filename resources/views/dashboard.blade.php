@@ -35,7 +35,7 @@
                     <h3>{{ $totalCustomers }}</h3>
                     <p>Total Customers</p>
                 </div>
-                <div class="small-box-footer">{{ $totalAgents }} agents</div>
+                <div class="small-box-footer">{{ $totalAgents }} brokers</div>
             </div>
         </div>
     </div>

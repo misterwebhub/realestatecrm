@@ -1,0 +1,22 @@
+<html>
+<head>
+<script type="text/javascript">
+const options = {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json',
+    Authorization: 'Bearer 240559|2Ux3xsz2HN9jxtxn4lEwFE6Ttx8vbuBf0q8pd4OR'
+  },
+  body: 'false'
+};
+
+fetch('https://panelv2.cloudshope.com/api/click_to_call?from_number=9170746268&to_number=9129822343', options)
+  .then(response => response.json())
+  .then(response => console.log(response))
+  .catch(err => console.error(err));
+</script>
+</head>
+<body>
+<button onclick="fetch()">Click me</button>
+</body>
+</html>

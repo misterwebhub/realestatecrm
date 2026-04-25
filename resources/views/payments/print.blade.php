@@ -158,7 +158,7 @@
                     <div class="col-6 field-label">Installment No.</div>
                     <div class="col-6"><div class="field-box">{{ $payment?->reference_no ?? '-' }}</div></div>
 
-                    <div class="col-6 field-label">BOOK BY / REF. NO.</div>
+                    <div class="col-6 field-label">BROKER / REF. NO.</div>
                     <div class="col-6"><div class="field-box">{{ $agent?->name ?? '-' }}</div></div>
                 </div>
             </div>

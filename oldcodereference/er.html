@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+    
+        <link rel="stylesheet" href="style.css" />
+        <meta charset="UTF-8" />
+        <meta name="viewport" 
+              content="width=device-width, initial-scale=1.0" />
+        <title>Document</title>
+<script type="text/javascript">
+ const options = {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json',
+    Authorization: 'Bearer 240762|L4QdGaR5eXSnLaO4gni1WrxJzvoox1WJ2atOccTm'
+  },
+  body: 'false'
+};
+
+fetch('https://panelv2.cloudshope.com/api/click_to_call?from_number=9129822343&to_number=9170746268&callback_url=from_number%2Cto_number%2Canswer_time%2Cstatus%20', options)
+  .then((response) => {
+    console.log(response)
+    response.json().then((data) => {
+        console.log(data);
+    });
+});
+
+   
+    
+
+
+
+</script>
+
+    </head>
+    <body>
+       <button type="button" onclick="javascript:return fetch();">click me</button>
+    </body>
+</html>

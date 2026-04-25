@@ -119,8 +119,9 @@
                     </li>
                     <li class="nav-item"><a href="{{ route('plots.index') }}" class="nav-link {{ request()->routeIs('plots.*') ? 'active' : '' }}"><i class="nav-icon bi bi-pin-map"></i><p>Plot Location</p></a></li>
                     <li class="nav-item"><a href="{{ route('customers.index') }}" class="nav-link {{ request()->routeIs('customers.*') ? 'active' : '' }}"><i class="nav-icon bi bi-people"></i><p>Customers</p></a></li>
-                    <li class="nav-item"><a href="{{ route('agents.index') }}" class="nav-link {{ request()->routeIs('agents.*') ? 'active' : '' }}"><i class="nav-icon bi bi-person-badge"></i><p>Agents</p></a></li>
+                    <li class="nav-item"><a href="{{ route('agents.index') }}" class="nav-link {{ request()->routeIs('agents.*') ? 'active' : '' }}"><i class="nav-icon bi bi-person-badge"></i><p>Brokers</p></a></li>
                     <li class="nav-item"><a href="{{ route('partners.index') }}" class="nav-link {{ request()->routeIs('partners.*') ? 'active' : '' }}"><i class="nav-icon bi bi-diagram-3"></i><p>Partners</p></a></li>
+                    <li class="nav-item"><a href="{{ route('registries.waiting-payments') }}" class="nav-link {{ request()->routeIs('registries.waiting-payments') ? 'active' : '' }}"><i class="nav-icon bi bi-hourglass-split"></i><p>Waiting Payments</p></a></li>
                     <li class="nav-item"><a href="{{ route('arazi-documents.index') }}" class="nav-link {{ request()->routeIs('arazi-documents.*') ? 'active' : '' }}"><i class="nav-icon bi bi-file-earmark-arrow-up"></i><p>Documents</p></a></li>
                 </ul>
             </nav>

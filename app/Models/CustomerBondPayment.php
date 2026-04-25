@@ -15,6 +15,8 @@ class CustomerBondPayment extends Model
         'entry_no',
         'entry_date',
         'entry_type',
+        'land_size',
+        'witness_name',
         'amount',
         'payment_method',
         'remarks',

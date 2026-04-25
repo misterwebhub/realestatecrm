@@ -1,0 +1,178 @@
+﻿<%@ Page Language="C#" AutoEventWireup="true" CodeFile="datewisepayment.aspx.cs" Inherits="kishan_Bin_datewisepayment" %>
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head runat="server">
+  
+ <link rel="stylesheet" href="//code.jquery.com/ui/1.12.1/themes/base/jquery-ui.css" />
+    <script type="text/javascript" src="https://code.jquery.com/jquery-1.12.4.js"></script>
+  <script type="text/javascript" src="https://code.jquery.com/ui/1.12.1/jquery-ui.js"></script>
+    <script type="text/javascript">
+        $(document).ready(function () {
+            $(".d").datepicker({
+                changeMonth: true,
+                changeYear: true,
+                dateFormat: 'dd/mm/yy'
+            });
+        });
+    </script>
+
+    <style type="text/css">
+        .WrapText {  
+            width: 100%;  
+            word-break: break-all; 
+        } 
+        .style1
+        {
+            width: 252px;
+        }
+    </style>
+</head>
+<body>
+    <form id="form1" runat="server">
+    <div>
+    
+<table style="width:100%;height:100%;" BORDER="1" rules="rows">
+<tr height="45px"><td colspan="4" style="font-size:20PT;text-align:center;">CHECK PAID INSTALLMENT </td></tr>
+ <tr height="45px"><td style="font-weight:bold;" bgcolor="#CCFF33" colspan="4">&nbsp;User&nbsp;&nbsp;
+     <asp:TextBox ID="TextBox4" runat="server" Height="26px" ReadOnly="True"></asp:TextBox>
+     </td></tr>
+ <tr height="45px"><td style="font-weight:bold;" bgcolor="#CCFF33" colspan="4">DATE FROM&nbsp;&nbsp;&nbsp;
+     <asp:TextBox ID="TextBox2" runat="server" class="d" Height="24px" Width="105px">MM/DD/YY</asp:TextBox>&nbsp;&nbsp; DATE FROM&nbsp;&nbsp;&nbsp;
+     <asp:TextBox ID="TextBox3" runat="server" class="d" Height="21px" Width="95px">MM/DD/YY</asp:TextBox>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; ARAZI NO&nbsp;&nbsp;<asp:DropDownList 
+         ID="DropDownList3" runat="server" Height="23px" Width="126px">
+         <asp:ListItem>-----SELECT-------</asp:ListItem>
+     </asp:DropDownList>
+     &nbsp;&nbsp;    <strong>STATUS&nbsp;    <asp:DropDownList ID="DropDownList4" 
+         runat="server" Height="27px" 
+            Width="118px">
+        <asp:ListItem>-----SELECT------</asp:ListItem>
+        
+        <asp:ListItem>NON PAID</asp:ListItem>
+        
+        
+        
+         <asp:ListItem>ALL ARAZI NON PAID</asp:ListItem>
+        
+    </asp:DropDownList>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; </strong>
+     <asp:Button ID="Button1" runat="server" Height="26px" onclick="Button1_Click" 
+         style="font-weight: 700" Text="VIEW" Width="68px" />
+     </td></tr>
+ <tr height="45px"><td style="font-weight:bold;">DATE FROM</td><td><asp:TextBox ID="TextBox1" runat="server" class="d" Height="22px" Width="183px">MM/DD/YY</asp:TextBox></td>
+     <td style="font-weight:bold;" class="style1">ARAZI NO&nbsp;&nbsp;
+     <asp:DropDownList ID="DropDownList2" runat="server" Height="23px" Width="134px">
+         <asp:ListItem>-----SELECT-------</asp:ListItem>
+     </asp:DropDownList>
+     </td><td>    <strong>SELECT STATUS&nbsp;&nbsp;    <asp:DropDownList ID="DropDownList1" runat="server" Height="27px" 
+            Width="182px" onselectedindexchanged="DropDownList1_SelectedIndexChanged" 
+            AutoPostBack="True">
+        <asp:ListItem>-----SELECT------</asp:ListItem>
+        
+        <asp:ListItem>NON PAID</asp:ListItem>
+        
+        
+        
+         <asp:ListItem>ALL ARAZI NON PAID</asp:ListItem>
+        
+    </asp:DropDownList></strong></td></tr>
+ <tr><td style="font-weight:bold;" colspan="2">&nbsp;</td>
+    
+    <td class="style1">&nbsp;</td><td>
+        <asp:Label ID="Label1" runat="server" Text=""></asp:Label></td></tr>
+    <tr><td colspan="4">
+        <asp:GridView ID="GridView2" runat="server" BackColor="White" 
+            BorderColor="#999999" BorderStyle="None" BorderWidth="1px" CellPadding="3" 
+            GridLines="Vertical" Visible="False" Width="100%" 
+            AutoGenerateColumns="False" AutoGenerateSelectButton="True" 
+            onselectedindexchanged="GridView2_SelectedIndexChanged" class="WrapText" 
+            style="font-size:10.5pt;" onrowdatabound="GridView2_RowDataBound" 
+           >
+            <AlternatingRowStyle BackColor="#DCDCDC" />
+            <FooterStyle BackColor="#CCCCCC" ForeColor="Black" />
+            <HeaderStyle BackColor="#000084" Font-Bold="True" ForeColor="White" />
+            <PagerStyle BackColor="#999999" ForeColor="Black" HorizontalAlign="Center" />
+            <RowStyle BackColor="#EEEEEE" ForeColor="Black" />
+            <SelectedRowStyle BackColor="#008A8C" Font-Bold="True" ForeColor="White" />
+            <SortedAscendingCellStyle BackColor="#F1F1F1" />
+            <SortedAscendingHeaderStyle BackColor="#0000A9" />
+            <SortedDescendingCellStyle BackColor="#CAC9C9" />
+            <SortedDescendingHeaderStyle BackColor="#000065" />
+             <Columns>
+                <asp:BoundField DataField="CUSTREGNO" HeaderText="REGNO">
+                 <ItemStyle Width="70px" />
+                            </asp:BoundField>
+                            <asp:BoundField DataField="NAME" HeaderText="NAME" >
+                             <ItemStyle Width="180px" />
+                            </asp:BoundField>
+                            <asp:BoundField DataField="APPNO" HeaderText="ARAZI" >
+                            <ItemStyle Width="50px" />
+                            </asp:BoundField>
+                           <asp:BoundField DataField="plotno" HeaderText="P.NO" >
+                           <ItemStyle Width="60px" />
+                            </asp:BoundField>
+                            <asp:BoundField DataField="PLOTSIZE" HeaderText="P.SIZE" >
+                            <ItemStyle Width="50px" />
+                            </asp:BoundField>
+                            <asp:BoundField DataField="date3" HeaderText="DATE" DataFormatString="{0:dd/MM/yyyy}" >
+                            <ItemStyle Width="70px" />
+                            </asp:BoundField>
+                            <asp:BoundField DataField="MOBILE" HeaderText="MOBILE" >
+                             <ItemStyle Width="80px" />
+                            </asp:BoundField>
+                            <asp:BoundField DataField="CHECKBY" HeaderText="CHECKBY">
+                            <ItemStyle Width="130px" />
+                            </asp:BoundField>
+                            <asp:BoundField DataField="date" HeaderText="CALL DATE" DataFormatString="{0:dd/MM/yyyy}" >
+                            <ItemStyle Width="80px" />
+                               </asp:BoundField>
+                            <asp:BoundField DataField="reason" HeaderText="FEEDBACK" >
+                            <ItemStyle Width="290px" />
+                               </asp:BoundField>
+                               <asp:BoundField DataField="feeddate" HeaderText="Given Date" DataFormatString="{0:dd/MM/yyyy}" >
+                            <ItemStyle Width="70px" />
+                               </asp:BoundField>
+                          
+                            
+                             <asp:HyperLinkField Text="Call Now" DataNavigateUrlFields="CUSTREGNO,NAME,MOBILE" DataNavigateUrlFormatString="~/dailer/dialerhome.aspx?CUSTREGNO={0}&NAME={1}&MOBILE={2}" />
+                 </Columns>
+        </asp:GridView>
+		
+        <br />
+		
+    </td></tr>
+	<tr><td style="font-weight:bold;" colspan="4">CUSTOMER RECIPT DETAILS&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</td></tr>
+	<tr><td style="font-weight:bold;" colspan="4">
+                    <asp:GridView ID="GridView3" runat="server" BackColor="LightGoldenrodYellow" 
+                        BorderColor="Tan" BorderWidth="1px" CellPadding="2" ForeColor="Black" 
+                        GridLines="None" Width="100%" AutoGenerateColumns="False">
+                        <AlternatingRowStyle BackColor="PaleGoldenrod" />
+                        <FooterStyle BackColor="Tan" />
+                        <HeaderStyle BackColor="Tan" Font-Bold="True" />
+                        <PagerStyle BackColor="PaleGoldenrod" ForeColor="DarkSlateBlue" 
+                            HorizontalAlign="Center" />
+                        <SelectedRowStyle BackColor="DarkSlateBlue" ForeColor="GhostWhite" />
+                        <SortedAscendingCellStyle BackColor="#FAFAE7" />
+                        <SortedAscendingHeaderStyle BackColor="#DAC09E" />
+                        <SortedDescendingCellStyle BackColor="#E1DB9C" />
+                        <SortedDescendingHeaderStyle BackColor="#C2A47B" />
+                         <Columns>
+                <asp:BoundField DataField="REGNO" HeaderText="CUSTREGNO" />
+                            <asp:BoundField DataField="ADDRESS" HeaderText="NAME" />
+                            <asp:BoundField DataField="PLAN" HeaderText="PLAN" />
+                           <asp:BoundField DataField="VALUE" HeaderText="VALUE" />
+                            <asp:BoundField DataField="RECIPT" HeaderText="RECIPT NO." />
+                            <asp:BoundField DataField="DATE" HeaderText="DATE" DataFormatString="{0:dd/MM/yyyy}" />
+                            <asp:BoundField DataField="INSTNO" HeaderText="INSTNO" />
+                            <asp:BoundField DataField="AMOUNTR" HeaderText="AMOIUNT" />
+                             <asp:BoundField DataField="APPNO" HeaderText="ARAZI NO." />
+                 </Columns>
+                    </asp:GridView>
+                    
+                    </td></tr>
+</table>
+    
+    </div>
+    </form>
+</body>
+</html>

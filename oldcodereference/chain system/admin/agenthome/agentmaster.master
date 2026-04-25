@@ -1,0 +1,100 @@
+﻿﻿<%@ Master Language="C#" AutoEventWireup="true" CodeFile="agentmaster.master.cs" Inherits="admin_homemaster" %>
+
+<!doctype html>
+<html lang="en">
+  <head>
+  	<title>Agent</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+    <asp:ContentPlaceHolder ID="ContentPlaceHolder1" runat="server">
+    </asp:ContentPlaceHolder>
+    <link href="https://fonts.googleapis.com/css?family=Poppins:300,400,500,600,700,800,900" rel="stylesheet">
+		
+		<link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/font-awesome/4.7.0/css/font-awesome.min.css">
+		<link rel="stylesheet" href="css/style.css">
+  </head>
+  <body>
+		
+		<div class="wrapper d-flex align-items-stretch">
+			<nav id="sidebar">
+				<div class="p-4 pt-5">
+		  		<a href="#" class="img logo rounded-circle mb-5" style="background-image: url(images/logo.png);"></a>
+	        <ul class="list-unstyled components mb-5">
+	          
+	          <li>
+	              <a href="AgentHome.aspx">Home</a>
+	          </li>
+			   <li>
+                    <a href="agent1.aspx">Add Assosiate</a>
+                </li>
+              <li>
+	            <a href="#homeSubmenu" data-toggle="collapse" aria-expanded="false" class="dropdown-toggle">Associate</a>
+	            <ul class="collapse list-unstyled" id="homeSubmenu">
+                <li>
+                    <a href="agentself.aspx">Self List</a>
+                </li>
+                <li>
+                    <a href="teamagent.aspx">Team List</a>
+                </li>
+                
+	            </ul>
+	          </li>
+	          <li>
+              <a href="#pageSubmenu" data-toggle="collapse" aria-expanded="false" class="dropdown-toggle">Business Report</a>
+              <ul class="collapse list-unstyled" id="pageSubmenu">
+                <li>
+                    <a href="maintinance.aspx">Self Business</a>
+                </li>
+                <li>
+                    <a href="maintinance.aspx">Team Business</a>
+                </li>
+                <li>
+                    <a href="#">Total Business</a>
+                </li>
+              </ul>
+	          </li>
+	          <li>
+              <a href="mappdf.aspx">Site Map</a>
+	          </li>
+	          <li>
+              <a href="changepass.aspx">Change Password</a>
+	          </li>
+	        </ul>
+
+	        <div class="footer" >
+	        	 <a href="../../admin.aspx"> LOGOUT</a>
+	        </div>
+
+	      </div>
+    	</nav>
+
+        <!-- Page Content  -->
+      <div id="content" class="p-4 p-md-5">
+
+       
+          <div class="container-fluid">
+
+            <button type="button" id="sidebarCollapse" class="btn btn-primary">
+              <i class="fa fa-bars"></i>
+              <span class="sr-only">Toggle Menu</span>
+            </button>
+           
+
+           
+          </div>
+        </nav>
+<form id="form1" runat="server">
+        <asp:ContentPlaceHolder ID="ContentPlaceHolder2" runat="server">
+        </asp:ContentPlaceHolder>
+		</form>
+      </div>
+		</div>
+
+    <script src="js/jquery.min.js"></script>
+    <script src="js/popper.js"></script>
+       
+    <script src="js/bootstrap.min.js"></script>
+    <script src="js/main.js"></script>
+   
+  </body>
+</html>

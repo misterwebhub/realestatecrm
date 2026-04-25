@@ -30,7 +30,7 @@ class CustomerBondPaymentController extends Controller
 
     protected function resourceColumns(): array
     {
-        return ['Entry No', 'Customer', 'Registry', 'Entry Date', 'Type', 'Amount'];
+        return ['Entry No', 'Customer', 'Registry', 'Land Size', 'Witness', 'Entry Date', 'Type', 'Amount'];
     }
 
     protected function resourceFields(?Model $item = null): array
@@ -56,6 +56,8 @@ class CustomerBondPaymentController extends Controller
             ],
             ['name' => 'entry_date', 'label' => 'Entry Date', 'type' => 'date', 'value' => optional($item?->entry_date)->format('Y-m-d')],
             ['name' => 'entry_type', 'label' => 'Entry Type', 'type' => 'select', 'options' => ['advance' => 'Advance', 'installment' => 'Installment', 'final' => 'Final', 'penalty' => 'Penalty', 'other' => 'Other'], 'value' => $item?->entry_type ?? 'installment'],
+            ['name' => 'land_size', 'label' => 'Land Size', 'type' => 'number', 'step' => '0.01', 'value' => $item?->land_size],
+            ['name' => 'witness_name', 'label' => 'Witness Name', 'type' => 'text', 'value' => $item?->witness_name],
             ['name' => 'amount', 'label' => 'Amount', 'type' => 'number', 'step' => '0.01', 'value' => $item?->amount],
             ['name' => 'payment_method', 'label' => 'Payment Method', 'type' => 'text', 'value' => $item?->payment_method],
             ['name' => 'remarks', 'label' => 'Remarks', 'type' => 'textarea', 'value' => $item?->remarks],
@@ -70,6 +72,8 @@ class CustomerBondPaymentController extends Controller
             'registry_id' => ['required', 'exists:registries,id'],
             'entry_date' => ['required', 'date'],
             'entry_type' => ['required', 'in:advance,installment,final,penalty,other'],
+            'land_size' => ['nullable', 'numeric', 'min:0'],
+            'witness_name' => ['nullable', 'string', 'max:150'],
             'amount' => ['required', 'numeric', 'min:0'],
             'payment_method' => ['nullable', 'string', 'max:40'],
             'remarks' => ['nullable', 'string'],
@@ -89,6 +93,8 @@ class CustomerBondPaymentController extends Controller
                 $item->entry_no,
                 $item->customer?->name ?? '-',
                 ($item->registry?->registry_code ?? '-') . ' / ' . ($item->registry?->arazi?->plot_number ?? '-'),
+                (string) ($item->land_size ?? '-'),
+                $item->witness_name ?? '-',
                 optional($item->entry_date)->format('d-m-Y') ?? '-',
                 ucfirst($item->entry_type),
                 number_format((float) $item->amount, 2),

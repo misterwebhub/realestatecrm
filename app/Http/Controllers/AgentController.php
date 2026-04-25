@@ -13,7 +13,7 @@ class AgentController extends Controller
 
     protected function resourceTitle(): string
     {
-        return 'Agent';
+        return 'Broker';
     }
 
     protected function resourceModel(): string
@@ -34,13 +34,13 @@ class AgentController extends Controller
     protected function resourceFields(?Model $item = null): array
     {
         return [
-            ['name' => 'form_code', 'label' => 'Agent Form Code', 'type' => 'text', 'value' => $item?->form_code],
+            ['name' => 'form_code', 'label' => 'Broker Form Code', 'type' => 'text', 'value' => $item?->form_code],
             ['name' => 'name', 'label' => 'Name', 'type' => 'text', 'value' => $item?->name],
             ['name' => 'rank_title', 'label' => 'Rank/Level', 'type' => 'text', 'value' => $item?->rank_title],
             ['name' => 'mobile', 'label' => 'Mobile', 'type' => 'text', 'value' => $item?->mobile],
             [
                 'name' => 'sponsor_agent_id',
-                'label' => 'Sponsor Agent',
+                'label' => 'Sponsor Broker',
                 'type' => 'select',
                 'options' => Agent::query()
                     ->when($item, fn ($q) => $q->where('id', '!=', $item->id))

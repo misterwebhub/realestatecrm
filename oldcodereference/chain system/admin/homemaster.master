@@ -1,0 +1,98 @@
+﻿<%@ Master Language="C#" AutoEventWireup="true" CodeFile="homemaster.master.cs" Inherits="admin_homemaster" %>
+
+<!DOCTYPE html>
+<!-- Created by CodingLab |www.youtube.com/c/CodingLabYT-->
+<html lang="en" dir="ltr">
+  <head>
+    <meta charset="UTF-8">
+	
+    <title> ADMIN </title>
+   
+      <link href="style.css" rel="stylesheet" type="text/css" />
+    <!-- Boxicons CDN Link -->
+    <link href='https://unpkg.com/boxicons@2.0.7/css/boxicons.min.css' rel='stylesheet'>
+     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <asp:ContentPlaceHolder ID="ContentPlaceHolder2" runat="server">
+      </asp:ContentPlaceHolder>
+   </head>
+<body>
+
+  <div class="sidebar open">
+    <div class="logo-details">
+     
+        <div class="logo_name">Admin</div>
+        
+    </div>
+    <ul class="nav-list">
+      
+      <li>
+        <a href="adminhome.aspx">
+          
+          <span class="links_name">Dashboard</span>
+        </a>
+         <span class="tooltip">Dashboard</span>
+      </li>
+      <li>
+       <a href="Booking.aspx">
+	  
+        
+         <span class="links_name">Booking</span>
+       </a>
+       <span class="tooltip">Booking</span>
+     </li>    
+    
+     <li>
+       <a href="Addagentlevel.aspx">
+         
+         <span class="links_name">AGENT TYPE</span>
+       </a>
+       <span class="tooltip">AGENT TYPE</span>
+     </li>
+	 <li>
+       <a href="araziadd.aspx">
+         
+         <span class="links_name">ADD ARAZI</span>
+       </a>
+       <span class="tooltip">ADD ARAZI</span>
+     </li>
+     <li>
+       <a href="ADDAGENT.aspx">
+         
+         <span class="links_name">ADD AGENT</span>
+       </a>
+       <span class="tooltip">ADD AGENT</span>
+     </li>
+      
+   
+         
+	
+	 
+	 
+	 
+	  
+	  
+	  <li>
+       <a href="brokari.aspx" target="_blank">
+       
+         <span class="links_name">Agent Brokari</span>
+       </a>
+       <span class="tooltip">Agent Brokari</span>
+     </li>
+	 
+    <li>
+           
+           <a href="../admin.aspx" STYLE="FONT-SIZE:11PT;FONT-WEIGHT:BOLD;"> LOGOUT</a>
+        
+       
+     </li>
+     
+    </ul>
+  </div>
+  <section class="home-section" id="section_book">
+ <asp:ContentPlaceHolder ID="ContentPlaceHolder1" runat="server"></asp:ContentPlaceHolder>
+  </section>
+  
+    <script src="script.js" type="text/javascript"></script>
+    
+</body>
+</html>

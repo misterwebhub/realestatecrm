@@ -1,0 +1,39 @@
+.h1, .h2, .h3, h1, h2, h3 {margin-top: 0;margin-bottom: 0;}
+.booknow-popup-sec {background-color: #8cc63f; -webkit-box-shadow: 0px 10px 20px 0px rgba(50, 50, 50, 0.52);-moz-box-shadow: 0px 10px 20px 0px rgba(50, 50, 50, 0.52);box-shadow: 0px 10px 20px 0px rgba(50, 50, 50, 0.52);}
+.booknow-popup-sec ul li button.submit-btn:focus, .booknow-popup-sec ul li input { outline: none; }
+.booknow-popup-sec { background: #ddd6ba; font-family: 'Krona One', sans-serif; width: 525px; margin: 30px auto; padding: 75px 45px 50px 75px; -webkit-background-size: cover; -moz-background-size: cover; -o-background-size: cover; background-size: cover; box-sizing: border-box; position: relative; }
+.booknow-popup-sec h2 {padding: 0px;letter-spacing: -0.4px;font-size: 55px;color: #000;font-weight: normal;text-align: left;padding-bottom: 15px;text-shadow: 3px 0 5px rgba(0, 0, 0, 0.21);font-family: 'Roboto Slab', serif;}
+.booknow-popup-sec p {text-align: left;font-size: 22px;margin: 0; padding-bottom: 30px;font-family: 'Roboto Slab', serif;}
+.booknow-popup-sec p span {display: block;}
+.booknow-popup-sec ul { margin: 0px; padding: 0; float: left; width: 100%; list-style: none; box-sizing: border-box; }
+.booknow-popup-sec ul li { margin: 0; padding: 0px; float: left; width: 100%; }
+.booknow-popup-sec ul li input {font-family: 'Montserrat', sans-serif;font-size: 17px;font-weight: 500;color: #585858;border: 0px;margin: 0 0 30px 0px;padding: 18px;width: 100%;box-sizing: border-box;-webkit-box-shadow: 0 5px 5px 0 rgba(0,0,0,0.37);box-shadow: 0 5px 5px 0 rgba(0,0,0,0.37);}
+.booknow-popup-sec ul li button.submit-btn {background: #ed008c; -webkit-box-shadow: 0 5px 5px 0 rgba(0,0,0,0.37); box-shadow: 0 5px 5px 0 rgba(0,0,0,0.37); cursor: pointer; border: 0px; margin: 0 0 20px 0; width: 100%; padding: 15px 0; font-family: 'Roboto Slab', serif; font-size: 22px; color: #fff; text-shadow: 0px 1px 0 rgba(0, 0, 0, 0.31);}
+.booknow-popup-sec .booknow-popup-clsbtn { font-size: 14px; line-height: 18px; width: 28px; height: 28px; -webkit-border-radius: 50%; border-radius: 50%; background: #FFF; position: absolute; right: -14px; top: -14px; border: 0px; -webkit-box-shadow: 0 0 2px 0 rgba(0,0,0,0.27); box-shadow: 0 5px 5px 0 rgba(0,0,0,0.27); cursor: pointer; }
+.booknow-popup-sec .booknow-popup-clsbtn:hover {color: #fff; background: #ed008c;}
+.booknow-popup-sec ul li button.submit-btn:hover { background: #db0182; }
+.popup-graybox {position: fixed;width: 100%;top: 0;left: 0;height: 100vh;z-index: 99999;text-align: center;align-items: center;display: flex;box-sizing: border-box;overflow: auto;}
+.booknow-popup-sec .booknow-popup-clsbtn {font-size: 14px;line-height: 18px;width: 28px;height: 28px;-webkit-border-radius: 50%;border-radius: 50%;background: #FFF;position: absolute;right: -14px;top: -14px;border: 0px;-webkit-box-shadow: 0 0 2px 0 rgba(0,0,0,0.27);box-shadow: 0 5px 5px 0 rgba(0,0,0,0.27);cursor: pointer;}
+.booknow-popup-sec ul li .disabled-btn {background: #000000;letter-spacing: 0.5px;border: 0px;padding: 10px 40px;font-family: 'Montserrat', sans-serif;font-size: 14px;font-weight: 500;color: #fff;text-shadow: 0px 1px 0 rgba(0, 0, 0, 0.31);}
+   
+@media only screen and (max-width:815px) {
+.booknow-popup-sec h2 { font-size: 48px; }
+}
+@media only screen and (max-width:640px) {
+.booknow-popup-sec { width: 80%; }
+.booknow-popup-sec h2 {font-size: 32px;line-height: 34px;}
+.booknow-popup-sec p {font-size: 18px;padding-bottom: 22px;}
+}
+@media only screen and (max-width:480px) {
+.booknow-popup-sec {padding: 47px 47px;}
+.booknow-popup-sec { width: 90%; }
+.booknow-popup-sec h2 { font-size: 24px;line-height: 32px; }
+.booknow-popup-sec ul li button.submit-btn {font-size: 12px;letter-spacing: 0.5px;padding: 12px 0; margin: 0 0 10px 0;}
+.booknow-popup-sec ul li input {font-size: 12px;margin: 0 0 12px 0px;padding: 12px;}
+.booknow-popup-sec p {font-size: 14px;letter-spacing: 0.5px;line-height: 22px;}
+.booknow-popup-sec p span {display: inline;}
+.booknow-popup-sec ul li .disabled-btn {font-size: 12px;}
+}
+@media only screen and (max-width:375px) {
+.booknow-popup-sec {padding: 25px 25px;}
+}

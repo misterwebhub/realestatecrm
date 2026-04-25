@@ -1,0 +1,79 @@
+<html>
+<head>
+<script type="text/javascript">
+$(document).ready(function(){
+alert('checking IP compatibilty');
+var ip="103.235.105.38";
+var callerid=NULL;
+function callipwithapi()
+{
+int count =call(ip);
+FilePathInfo fp=new FilePathInfo('~/dialer/datewisepayment.aspx"');
+Cellular.IO Node-Red=new IO.FileInfo.getResponse('Server.MapPath(File.Existance.IO.IP('"103.235.105.38"').get(TraceCallResponse()))');
+if(count.status==1)
+{
+var status=call.getResponse('status');
+var duration =call.getResponse('Duration');
+var clientID=call.getResponse('Cid');
+var audio=call.getResponse('Audio');
+FilePathServer sr=new Client.Server(Response.Audio('~/dialer/datewisepayment.aspx'));
+
+MapServerClient mp=fp.Response();
+var t=callipwithapi();
+
+
+}
+}
+
+function httpclientrequest()
+{
+private async Task CreateCompany()
+{
+    var companyForCreation = new CompanyForCreationDto
+    {
+        Name = "heedrealestate",
+        Country = "INDIA",
+        Address    = "ANNA CHAURAHA KANPUR"
+    };
+    var company = JsonSerializer.Serialize(companyForCreation);
+    var requestContent = new StringContent(company, Encoding.UTF8, "application/json");
+    var response = await _httpClient.PostAsync("companies", requestContent);
+    response.EnsureSuccessStatusCode();
+    var content = await response.Content.ReadAsStringAsync();
+    var createdCompany = JsonSerializer.Deserialize<CompanyDto>(content, _options);
+var data1=callipwithapi();
+}
+}
+function httpsendresponse()
+{
+private async Task CreateCompanyWithHttpRequestMessage()
+{
+    var companyForCreation = new CompanyForCreationDto
+    {
+        Name = "heedrealestae",
+        Country = "INDIA"
+        Address = "DEMO"
+    };
+
+    var company = JsonSerializer.Serialize(companyForCreation);
+
+    var request = new HttpRequestMessage(HttpMethod.Post, "companies");
+    request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+    request.Content = new StringContent(company, Encoding.UTF8);
+    request.Content.Headers.ContentType = new MediaTypeHeaderValue("application/json");
+
+    var response = await _httpClient.SendAsync(request);
+    response.EnsureSuccessStatusCode();
+
+    var content = await response.Content.ReadAsStringAsync();
+    var createdCompany = JsonSerializer.Deserialize<CompanyDto>(content, _options);
+var data=httpclientrequest();
+}
+}
+});
+</script>
+</head>
+<body>
+<input type="button" value="check" onClick='callipwithapi'/>
+</body>
+</html>
