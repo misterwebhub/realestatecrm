@@ -101,4 +101,15 @@ class AraziDocumentController extends Controller
             Storage::disk('public')->delete($original->file_path);
         }
     }
+
+    public function download($id)
+    {
+        $doc = AraziDocument::findOrFail($id);
+
+        if (! Storage::disk('public')->exists($doc->file_path)) {
+            abort(404);
+        }
+
+        return Storage::disk('public')->download($doc->file_path, basename($doc->file_path));
+    }
 }

@@ -71,6 +71,7 @@ class CustomerController extends Controller
                 $item->id_document_no ?? '-',
                 (string) $item->registries_count,
             ],
+            'add_url' => route('customer-bonds.create') . '?customer_id=' . $item->id,
         ];
     }
 }

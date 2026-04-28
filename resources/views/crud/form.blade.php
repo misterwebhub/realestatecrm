@@ -1,6 +1,7 @@
 @extends('layouts.app')
 
 @section('content')
+    @php $isCustomerBondForm = str_contains($title ?? '', 'Customer Bond'); @endphp
     @php($hasFiles = collect($fields)->contains(fn ($field) => ($field['type'] ?? 'text') === 'file'))
 
     <div class="card card-outline card-primary">
@@ -67,8 +68,28 @@
                 <div class="mt-4 d-flex gap-2">
                     <button type="submit" class="btn btn-primary">Save</button>
                     <a href="{{ url()->previous() }}" class="btn btn-outline-secondary">Cancel</a>
+                    @if($isCustomerBondForm)
+                        <button type="button" class="btn btn-outline-secondary" id="backBtn">Back</button>
+                    @endif
                 </div>
             </form>
         </div>
     </div>
+    @if($isCustomerBondForm)
+    <script>
+        (function(){
+            const back = document.getElementById('backBtn');
+            if(!back) return;
+            back.addEventListener('click', function(){
+                try{
+                    if(window.opener && !window.opener.closed){
+                        window.close();
+                        return;
+                    }
+                }catch(e){}
+                history.back();
+            });
+        })();
+    </script>
+    @endif
 @endsection

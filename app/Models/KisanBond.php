@@ -17,6 +17,22 @@ class KisanBond extends Model
         'bond_amount',
         'witness_name',
         'notes',
+        'mobile',
+        'land_size',
+        'sale_land',
+        'sale_rate',
+        'total_amount',
+        'bayana_mode',
+        'bond_type',
+        'amount',
+        'balance',
+        'last_date',
+        'broker_id',
+        'broker_payment',
+        'broker_paid',
+        'broker_balance',
+        'broker_comment',
+        'kisan_comment',
     ];
 
     protected $casts = [
@@ -31,5 +47,20 @@ class KisanBond extends Model
     public function arazi()
     {
         return $this->belongsTo(Arazi::class);
+    }
+
+    public function broker()
+    {
+        return $this->belongsTo(Agent::class, 'broker_id');
+    }
+
+    public function witnesses()
+    {
+        return $this->hasMany(KisanBondWitness::class);
+    }
+
+    public function getWitnessNamesAttribute()
+    {
+        return $this->witnesses->pluck('name')->all();
     }
 }

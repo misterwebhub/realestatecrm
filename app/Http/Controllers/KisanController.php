@@ -115,6 +115,7 @@ class KisanController extends Controller
                 $item->location ?? '-',
                 $item->mobile,
             ],
+            'add_url' => route('kisan-bonds.create') . '?kisan_id=' . $item->id,
         ];
     }
 }

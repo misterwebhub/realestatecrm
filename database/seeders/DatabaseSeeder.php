@@ -15,6 +15,8 @@ class DatabaseSeeder extends Seeder
         $this->call([
             LandManagementDemoSeeder::class,
             AdminUserSeeder::class,
+            AdminRoleSeeder::class,
+            BasicSampleSeeder::class,
         ]);
     }
 }

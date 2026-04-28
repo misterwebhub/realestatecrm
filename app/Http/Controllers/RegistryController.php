@@ -145,6 +145,73 @@ class RegistryController extends Controller
         return Registry::with(['customer', 'arazi', 'agent'])->latest();
     }
 
+    public function create()
+    {
+        $modelClass = $this->resourceModel();
+        $item = new $modelClass();
+
+        $customers = Customer::orderBy('name')->pluck('name', 'id')->all();
+        $arazis = Arazi::orderBy('plot_number')->pluck('plot_number', 'id')->all();
+        $agents = Agent::orderBy('name')->pluck('name', 'id')->all();
+
+        return view('registries.add', [
+            'title' => 'Add ' . $this->resourceTitle(),
+            'action' => route($this->resourceRouteName() . '.store'),
+            'method' => 'POST',
+            'item' => $item,
+            'customers' => $customers,
+            'arazis' => $arazis,
+            'agents' => $agents,
+        ]);
+    }
+
+    public function edit($id)
+    {
+        $modelClass = $this->resourceModel();
+        $item = $modelClass::findOrFail($id);
+
+        $customers = Customer::orderBy('name')->pluck('name', 'id')->all();
+        $arazis = Arazi::orderBy('plot_number')->pluck('plot_number', 'id')->all();
+        $agents = Agent::orderBy('name')->pluck('name', 'id')->all();
+
+        return view('registries.add', [
+            'title' => 'Edit ' . $this->resourceTitle(),
+            'action' => route($this->resourceRouteName() . '.update', $item),
+            'method' => 'PUT',
+            'item' => $item,
+            'customers' => $customers,
+            'arazis' => $arazis,
+            'agents' => $agents,
+        ]);
+    }
+
+    public function print($id)
+    {
+        $registry = Registry::with(['customer', 'arazi', 'agent'])->findOrFail($id);
+        return view('prints.registry_certificate', ['registry' => $registry, 'title' => 'Registry Certificate']);
+    }
+
+    public function pdf($id)
+    {
+        $registry = Registry::with(['customer', 'arazi', 'agent'])->findOrFail($id);
+        $html = view('prints.registry_certificate', ['registry' => $registry, 'title' => 'Registry Certificate'])->render();
+        if (class_exists(\Barryvdh\DomPDF\Facade\Pdf::class)) {
+            $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadHTML($html);
+            return $pdf->download('registry-' . $registry->id . '.pdf');
+        }
+        return response($html)->header('Content-Type', 'text/html');
+    }
+
+    public function esign(Request $request, $id)
+    {
+        $registry = Registry::findOrFail($id);
+        $registry->esign_signed = true;
+        $registry->esign_data = json_encode(['signed_at' => now()->toDateTimeString(), 'by' => auth()->id()]);
+        $registry->save();
+
+        return response()->json(['ok' => true, 'message' => 'Registry e-signed (placeholder)']);
+    }
+
     protected function resourceRow(Model $item): array
     {
         /** @var Registry $item */

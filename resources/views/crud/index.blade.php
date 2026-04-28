@@ -4,9 +4,12 @@
     <div class="card card-outline card-primary">
         <div class="card-header d-flex align-items-center justify-content-between">
             <h5 class="card-title mb-0">{{ $title }}</h5>
-            <a href="{{ $createUrl }}" class="btn btn-primary btn-sm">
-                <i class="bi bi-plus-lg"></i> Add New
-            </a>
+            @if(auth()->check() && in_array(auth()->user()->role, ['admin','manager']))
+                @php $isCustomerBondIndex = str_contains($title, 'Customer Bond'); @endphp
+                <a href="{{ $createUrl }}" @if($isCustomerBondIndex) target="_blank" rel="noopener" @endif class="btn btn-primary btn-sm">
+                    <i class="bi bi-plus-lg"></i> Add New
+                </a>
+            @endif
         </div>
 
         <div class="card-body table-responsive p-0">
@@ -26,12 +29,23 @@
                             <td>{{ $cell }}</td>
                         @endforeach
                         <td class="text-end">
-                            <a href="{{ $row['edit_url'] }}" class="btn btn-outline-secondary btn-sm">Edit</a>
-                            <form action="{{ $row['delete_url'] }}" method="POST" class="d-inline-block" onsubmit="return confirm('Delete this record?');">
-                                @csrf
-                                @method('DELETE')
-                                <button type="submit" class="btn btn-outline-danger btn-sm">Delete</button>
-                            </form>
+                            @if(!empty($row['print_url']))
+                                <a href="{{ $row['print_url'] }}?print=1" target="_blank" class="btn btn-outline-success btn-sm">Print</a>
+                            @endif
+                            @if(!empty($row['pdf_url']))
+                                <a href="{{ $row['pdf_url'] }}" target="_blank" class="btn btn-outline-secondary btn-sm ms-1">PDF</a>
+                            @endif
+                            @if(!empty($row['add_url']))
+                                <a href="{{ $row['add_url'] }}" @if(!empty($row['open_in_new_tab'])) target="_blank" rel="noopener" @endif class="btn btn-outline-primary btn-sm ms-1">Add Bond</a>
+                            @endif
+                            @if(auth()->check() && in_array(auth()->user()->role, ['admin','manager']))
+                                <a href="{{ $row['edit_url'] }}" @if(!empty($row['open_in_new_tab'])) target="_blank" rel="noopener" @endif class="btn btn-outline-secondary btn-sm">Edit</a>
+                                <form action="{{ $row['delete_url'] }}" method="POST" class="d-inline-block" onsubmit="return confirm('Delete this record?');">
+                                    @csrf
+                                    @method('DELETE')
+                                    <button type="submit" class="btn btn-outline-danger btn-sm">Delete</button>
+                                </form>
+                            @endif
                         </td>
                     </tr>
                 @empty
