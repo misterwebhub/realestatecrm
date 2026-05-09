@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>{{ $title ?? 'Kisan Land Management System' }}</title>
-    <link rel="stylesheet" href="{{ asset('vendor/adminlte/css/adminlte.min.css') }}">
+    <link rel="stylesheet" href="{{ asset('vendor/adminlte/css/adminlte.css') }}">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
     @stack('styles')
 </head>
@@ -95,7 +95,7 @@
                             <ul class="nav nav-treeview">
                                 <li class="nav-item"><a href="{{ route('customer-bonds.index') }}" class="nav-link {{ request()->routeIs('customer-bonds.*') ? 'active' : '' }}"><i class="nav-icon bi bi-circle"></i><p>Customer Bonds</p></a></li>
                                 <li class="nav-item"><a href="{{ route('customer-bond-payments.index') }}" class="nav-link {{ request()->routeIs('customer-bond-payments.*') ? 'active' : '' }}"><i class="nav-icon bi bi-circle"></i><p>Receipts</p></a></li>
-                                <li class="nav-item"><a href="{{ route('payments.index') }}" class="nav-link {{ request()->routeIs('payments.*') ? 'active' : '' }}"><i class="nav-icon bi bi-circle"></i><p>Extra Payments</p></a></li>
+                                <li class="nav-item"><a href="{{ route('payments.index') }}" class="nav-link {{ request()->routeIs('payments.*') ? 'active' : '' }}"><i class="nav-icon bi bi-circle"></i><p>Kisan Payments</p></a></li>
                             </ul>
                         </li>
                     @endif
@@ -113,6 +113,13 @@
 
                         <li class="nav-item"><a href="{{ route('arazi-documents.index') }}" class="nav-link {{ request()->routeIs('arazi-documents.*') ? 'active' : '' }}"><i class="nav-icon bi bi-file-earmark-arrow-up"></i><p>Documents</p></a></li>
                     @endif
+
+                    <li class="nav-item">
+                        <a href="{{ route('converter.index') }}" class="nav-link {{ request()->routeIs('converter.*') ? 'active' : '' }}">
+                            <i class="nav-icon bi bi-calculator"></i>
+                            <p>Area Converter</p>
+                        </a>
+                    </li>
                 </ul>
             </nav>
         </div>
@@ -150,7 +157,7 @@
     </footer>
 </div>
 
-<script src="{{ asset('vendor/adminlte/js/adminlte.min.js') }}"></script>
+<script src="{{ asset('vendor/adminlte/js/adminlte.js') }}"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 @stack('scripts')
 </body>

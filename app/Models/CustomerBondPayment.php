@@ -12,6 +12,8 @@ class CustomerBondPayment extends Model
     protected $fillable = [
         'registry_id',
         'customer_id',
+        'arazi_id',
+        'plot_id',
         'entry_no',
         'entry_date',
         'entry_type',
@@ -29,6 +31,16 @@ class CustomerBondPayment extends Model
     public function registry()
     {
         return $this->belongsTo(Registry::class);
+    }
+
+    public function arazi()
+    {
+        return $this->belongsTo(Arazi::class);
+    }
+
+    public function plot()
+    {
+        return $this->belongsTo(Plot::class);
     }
 
     public function customer()

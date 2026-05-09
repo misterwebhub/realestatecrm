@@ -11,7 +11,7 @@
 <head>
     <meta charset="utf-8">
     <title>{{ $isEdit ? 'Edit' : 'Create' }} Customer Bond</title>
-    <link href="/css/bootstrap.min.css" rel="stylesheet" />
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <style>
         .wrrper{width:990px;margin:0 auto;border:5px solid black;padding:8px}
         table {border-collapse: collapse;width:100%;}
@@ -133,7 +133,12 @@
                 <th colspan="2">Plot No./Plot Size</th>
             </tr>
             <tr>
-                <td colspan="2">{{ $item->arazi?->plot_number ?? '-' }} / <input type="text" name="land_size" value="{{ old('land_size', $item->land_size ?? $item->arazi?->size ?? '') }}" /></td>
+                <td colspan="2">
+                    <select name="plot_id" id="plot-select">
+                        <option value="">--Select Plot--</option>
+                    </select>
+                    / <input type="text" name="land_size" id="land-size" value="{{ old('land_size', $item->land_size ?? '') }}" />
+                </td>
             </tr>
             <tr>
                 <th>Nominee's Name D.O.B and Relationship</th>
@@ -166,5 +171,63 @@
         </div>
     </form>
 </div>
+</div>
+
+<script>
+    (function(){
+        const araziPlotsUrl = @json(route('arazis.plots', ['arazi' => '__ARAZI_ID__']));
+        const araziSelect = document.querySelector('select[name="arazi_id"]');
+        const plotSelect = document.getElementById('plot-select');
+        const landSize = document.getElementById('land-size');
+
+        function clearPlots(){
+            plotSelect.innerHTML = '<option value="">--Select Plot--</option>';
+            landSize.value = '';
+        }
+
+        function loadPlots(araziId, selectPlotId){
+            clearPlots();
+            if(!araziId) return;
+            fetch(araziPlotsUrl.replace('__ARAZI_ID__', encodeURIComponent(araziId)))
+                .then(r => r.json())
+                .then(data => {
+                    data.forEach(function(p){
+                        const opt = document.createElement('option');
+                        opt.value = p.id;
+                        opt.textContent = p.label + (p.area ? (' / ' + p.area) : '');
+                        opt.dataset.area = p.area;
+                        if(String(p.id) === String(selectPlotId)) opt.selected = true;
+                        plotSelect.appendChild(opt);
+                    });
+                    // if a plot selected, set land size
+                    const sel = plotSelect.options[plotSelect.selectedIndex];
+                    if(sel && sel.dataset && sel.dataset.area){
+                        landSize.value = sel.dataset.area;
+                    }
+                })
+                .catch(()=>{});
+        }
+
+        // when arazi changes, load its plots
+        araziSelect && araziSelect.addEventListener('change', function(){
+            loadPlots(this.value, null);
+        });
+
+        // when plot changes, set land size
+        plotSelect && plotSelect.addEventListener('change', function(){
+            const opt = this.options[this.selectedIndex];
+            if(opt && opt.dataset && opt.dataset.area) landSize.value = opt.dataset.area;
+        });
+
+        // on load, if arazi selected, load plots and preselect plot if any
+        document.addEventListener('DOMContentLoaded', function(){
+            const araziId = document.querySelector('select[name="arazi_id"]').value;
+            const selectedPlot = '{{ old('plot_id', $item->plot_id ?? '') }}';
+            if(araziId){
+                loadPlots(araziId, selectedPlot);
+            }
+        });
+    })();
+</script>
 </body>
 </html>

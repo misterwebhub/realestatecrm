@@ -11,7 +11,9 @@ class Plot extends Model
 
     protected $fillable = [
         'arazi_id',
+        'block',
         'title',
+        'area',
         'coordinates',
         'latitude',
         'longitude',

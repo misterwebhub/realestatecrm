@@ -114,7 +114,7 @@ class CustomerBondController extends Controller
         $item = new $modelClass();
 
         $customers = \App\Models\Customer::orderBy('name')->pluck('name', 'id')->all();
-        $arazis = \App\Models\Arazi::orderBy('plot_number')->pluck('plot_number', 'id')->all();
+        $arazis = \App\Models\Arazi::orderBy('id')->get()->mapWithKeys(function ($a) { return [$a->id => ($a->legacy_arazi_code ?: ($a->plot_number ?? ('Arazi-' . $a->id)))]; })->all();
         $agents = \App\Models\Agent::orderBy('name')->pluck('name', 'id')->all();
 
         return view('customer_bonds.form_certificate', [
@@ -134,7 +134,7 @@ class CustomerBondController extends Controller
         $item = $modelClass::findOrFail($id);
 
         $customers = \App\Models\Customer::orderBy('name')->pluck('name', 'id')->all();
-        $arazis = \App\Models\Arazi::orderBy('plot_number')->pluck('plot_number', 'id')->all();
+        $arazis = \App\Models\Arazi::orderBy('id')->get()->mapWithKeys(function ($a) { return [$a->id => ($a->legacy_arazi_code ?: ($a->plot_number ?? ('Arazi-' . $a->id)))]; })->all();
         $agents = \App\Models\Agent::orderBy('name')->pluck('name', 'id')->all();
 
         return view('customer_bonds.form_certificate', [

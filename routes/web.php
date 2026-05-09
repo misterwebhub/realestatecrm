@@ -39,6 +39,11 @@ Route::middleware('auth')->group(function () {
     Route::post('registries/{registry}/esign', [RegistryController::class, 'esign'])->name('registries.esign');
     Route::get('registries/waiting-payments', [RegistryController::class, 'waitingPayments'])->name('registries.waiting-payments');
     Route::get('payments/print', [PaymentController::class, 'printReceipt'])->name('payments.print');
+    // Kisan-scoped payment routes (list/create for a specific kisan)
+    Route::get('kisans/{kisan}/payments', [PaymentController::class, 'index'])->name('kisans.payments.index');
+    Route::get('kisans/{kisan}/payments/create', [PaymentController::class, 'create'])->name('kisans.payments.create');
+    Route::post('kisans/{kisan}/payments', [PaymentController::class, 'store'])->name('kisans.payments.store');
+
     Route::resource('payments', PaymentController::class)->except(['show']);
     Route::resource('kisan-bonds', KisanBondController::class)->except(['show']);
     Route::resource('customer-bonds', CustomerBondController::class)->except(['show']);
@@ -55,4 +60,10 @@ Route::middleware('auth')->group(function () {
         'arazi-documents' => 'araziDocument',
     ])->except(['show']);
     Route::get('arazi-documents/{arazi_document}/download', [AraziDocumentController::class, 'download'])->name('arazi-documents.download');
+    // Area converter
+    Route::get('converter', [\App\Http\Controllers\AreaConverterController::class, 'index'])->name('converter.index');
+    Route::post('converter', [\App\Http\Controllers\AreaConverterController::class, 'convert'])->name('converter.convert');
+    Route::get('arazi/{arazi}/plots', [\App\Http\Controllers\AraziController::class, 'plots'])->name('arazis.plots');
+    Route::get('arazi/{arazi}/saleable', [\App\Http\Controllers\AraziController::class, 'saleable'])->name('arazis.saleable');
+    Route::get('kisans/{kisan}/arazis', [\App\Http\Controllers\KisanController::class, 'arazis'])->name('kisans.arazis');
 });

@@ -12,7 +12,7 @@
     <meta charset="utf-8">
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>{{ $isEdit ? 'Edit' : 'Add' }} Registry</title>
-    <link href="/css/bootstrap.min.css" rel="stylesheet" />
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <style>
         body{background:#fff;color:#000;font-family:Arial,Helvetica,sans-serif}
         .card{max-width:1100px;margin:12px auto;padding:14px;border:4px solid #000}

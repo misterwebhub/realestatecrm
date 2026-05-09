@@ -118,5 +118,17 @@ class KisanController extends Controller
             'add_url' => route('kisan-bonds.create') . '?kisan_id=' . $item->id,
         ];
     }
+
+    public function arazis(Kisan $kisan)
+    {
+        $list = $kisan->arazis()->get(['id', 'legacy_arazi_code', 'plot_number'])->map(function ($a) {
+            return [
+                'id' => $a->id,
+                'label' => $a->legacy_arazi_code ?: ($a->plot_number ?: ('Arazi-' . $a->id)),
+            ];
+        })->values();
+
+        return response()->json($list);
+    }
 }
 

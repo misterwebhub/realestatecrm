@@ -37,7 +37,7 @@ class SaleController extends Controller
     protected function resourceFields(?Model $item = null): array
     {
         return [
-            ['name' => 'plot_id', 'label' => 'Plot', 'type' => 'select', 'options' => Plot::with('arazi')->get()->mapWithKeys(function ($p) { return [$p->id => ($p->arazi?->plot_number ?? 'Arazi').' - '.($p->plot_number ?? $p->title)]; })->all(), 'value' => $item?->plot_id],
+            ['name' => 'plot_id', 'label' => 'Plot', 'type' => 'select', 'options' => Plot::with('arazi')->get()->mapWithKeys(function ($p) { return [$p->id => (($p->arazi?->plot_number ? $p->arazi->plot_number.' - ' : '') . ($p->title ?? $p->plot_number ?? ('Plot-' . $p->id)))]; })->all(), 'value' => $item?->plot_id],
             ['name' => 'customer_id', 'label' => 'Customer', 'type' => 'text', 'value' => $item?->customer_id],
             ['name' => 'broker_id', 'label' => 'Broker', 'type' => 'text', 'value' => $item?->broker_id],
             ['name' => 'total_price', 'label' => 'Total Price', 'type' => 'number', 'step' => '0.01', 'value' => $item?->total_price],

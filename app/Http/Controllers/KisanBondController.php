@@ -48,7 +48,18 @@ class KisanBondController extends Controller
                 'name' => 'arazi_id',
                 'label' => 'Arazi',
                 'type' => 'select',
-                'options' => Arazi::orderBy('plot_number')->pluck('plot_number', 'id')->all(),
+                'options' => (function() use ($item) {
+                    $q = Arazi::query();
+                    $kisanId = $item?->kisan_id ?? request('kisan_id') ?? request()->route('kisan')?->id;
+                    if ($kisanId) {
+                        $q->where('kisan_id', $kisanId);
+                    }
+
+                    return $q->orderBy('legacy_arazi_code')
+                        ->get()
+                        ->mapWithKeys(function ($a) { return [$a->id => ($a->legacy_arazi_code ?: ($a->plot_number ?? ('Arazi-' . $a->id)))]; })
+                        ->all();
+                })(),
                 'value' => $item?->arazi_id,
             ],
             ['name' => 'bond_date', 'label' => 'Bond Date', 'type' => 'date', 'value' => optional($item?->bond_date)->format('Y-m-d')],
@@ -150,7 +161,7 @@ class KisanBondController extends Controller
             'cells' => [
                 $item->bond_no,
                 $item->kisan?->name ?? '-',
-                $item->arazi?->plot_number ?? '-',
+                $item->arazi?->legacy_arazi_code ?: ($item->arazi?->plot_number ?? '-'),
                 optional($item->bond_date)->format('d-m-Y') ?? '-',
                 number_format((float) $item->bond_amount, 2),
             ],

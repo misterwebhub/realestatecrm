@@ -27,13 +27,13 @@ class CustomerController extends Controller
 
     protected function resourceColumns(): array
     {
-        return ['Legacy Code', 'Name', 'Mobile', 'Secondary Mobile', 'ID Doc', 'Registries'];
+        return ['Code', 'Name', 'Mobile', 'Secondary Mobile', 'ID Doc', 'Registries'];
     }
 
     protected function resourceFields(?Model $item = null): array
     {
         return [
-            ['name' => 'legacy_customer_code', 'label' => 'Legacy Customer Code', 'type' => 'text', 'value' => $item?->legacy_customer_code],
+            ['name' => 'legacy_customer_code', 'label' => 'Customer Code', 'type' => 'text', 'value' => $item?->legacy_customer_code],
             ['name' => 'name', 'label' => 'Name', 'type' => 'text', 'value' => $item?->name],
             ['name' => 'mobile', 'label' => 'Mobile', 'type' => 'text', 'value' => $item?->mobile],
             ['name' => 'secondary_mobile', 'label' => 'Secondary Mobile', 'type' => 'text', 'value' => $item?->secondary_mobile],

@@ -30,7 +30,7 @@ class CustomerBondPaymentController extends Controller
 
     protected function resourceColumns(): array
     {
-        return ['Entry No', 'Customer', 'Registry', 'Land Size', 'Witness', 'Entry Date', 'Type', 'Amount'];
+        return ['Entry No', 'Customer', 'Arazi', 'Plot', 'Land Size', 'Witness', 'Entry Date', 'Type', 'Amount'];
     }
 
     protected function resourceFields(?Model $item = null): array
@@ -45,14 +45,18 @@ class CustomerBondPaymentController extends Controller
                 'value' => $item?->customer_id,
             ],
             [
-                'name' => 'registry_id',
-                'label' => 'Registry',
+                'name' => 'arazi_id',
+                'label' => 'Arazi',
                 'type' => 'select',
-                'options' => Registry::with('arazi')->latest()->get()->mapWithKeys(function (Registry $registry) {
-                    $text = ($registry->registry_code ?? ('REG-' . $registry->id)) . ' / ' . ($registry->arazi?->plot_number ?? '-');
-                    return [$registry->id => $text];
-                })->all(),
-                'value' => $item?->registry_id,
+                'options' => \App\Models\Arazi::orderBy('id')->get()->mapWithKeys(function ($a) { return [$a->id => ($a->legacy_arazi_code ?: ($a->plot_number ?? ('Arazi-' . $a->id)))]; })->all(),
+                'value' => $item?->arazi_id,
+            ],
+            [
+                'name' => 'plot_id',
+                'label' => 'Plot',
+                'type' => 'select',
+                'options' => [],
+                'value' => $item?->plot_id,
             ],
             ['name' => 'entry_date', 'label' => 'Entry Date', 'type' => 'date', 'value' => optional($item?->entry_date)->format('Y-m-d')],
             ['name' => 'entry_type', 'label' => 'Entry Type', 'type' => 'select', 'options' => ['advance' => 'Advance', 'installment' => 'Installment', 'final' => 'Final', 'penalty' => 'Penalty', 'other' => 'Other'], 'value' => $item?->entry_type ?? 'installment'],
@@ -69,7 +73,15 @@ class CustomerBondPaymentController extends Controller
         return [
             'entry_no' => ['required', 'string', 'max:50', Rule::unique('customer_bond_payments', 'entry_no')->ignore($item?->id)],
             'customer_id' => ['required', 'exists:customers,id'],
-            'registry_id' => ['required', 'exists:registries,id'],
+            // registry removed; payments are now against arazi/plot
+            'arazi_id' => ['nullable', 'exists:arazis,id'],
+            'plot_id' => ['nullable', 'exists:plots,id', function($attr, $value, $fail) {
+                // if plot provided, ensure it belongs to provided arazi
+                $plot = \App\Models\Plot::find($value);
+                if($plot && request()->input('arazi_id') && (string)$plot->arazi_id !== (string)request()->input('arazi_id')){
+                    $fail('Selected plot does not belong to selected Arazi.');
+                }
+            }],
             'entry_date' => ['required', 'date'],
             'entry_type' => ['required', 'in:advance,installment,final,penalty,other'],
             'land_size' => ['nullable', 'numeric', 'min:0'],
@@ -80,9 +92,15 @@ class CustomerBondPaymentController extends Controller
         ];
     }
 
+    protected function resourcePrepareData(array $validated, \Illuminate\Http\Request $request, ?Model $item = null): array
+    {
+        // pass through plot_id and arazi_id
+        return $validated;
+    }
+
     protected function resourceQuery()
     {
-        return CustomerBondPayment::with(['customer', 'registry.arazi'])->latest();
+        return CustomerBondPayment::with(['customer', 'arazi', 'plot'])->latest();
     }
 
     protected function resourceRow(Model $item): array
@@ -92,7 +110,8 @@ class CustomerBondPaymentController extends Controller
             'cells' => [
                 $item->entry_no,
                 $item->customer?->name ?? '-',
-                ($item->registry?->registry_code ?? '-') . ' / ' . ($item->registry?->arazi?->plot_number ?? '-'),
+                $item->arazi?->legacy_arazi_code ?? ($item->arazi?->plot_number ?? '-'),
+                $item->plot?->title ?? ($item->plot?->plot_number ?? '-'),
                 (string) ($item->land_size ?? '-'),
                 $item->witness_name ?? '-',
                 optional($item->entry_date)->format('d-m-Y') ?? '-',

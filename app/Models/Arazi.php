@@ -13,13 +13,14 @@ class Arazi extends Model
         'legacy_arazi_code',
         'kisan_id',
         'location',
-        'plot_number',
-        'block',
-        'plot_type',
+        'unit',
         'size',
+        'road_area',
         'coordinates',
         'status',
     ];
+
+    protected $appends = ['saleable_area'];
 
     public function kisan()
     {
@@ -44,5 +45,15 @@ class Arazi extends Model
     public function documents()
     {
         return $this->hasMany(AraziDocument::class);
+    }
+
+    public function getSaleableAreaAttribute()
+    {
+        $size = (float) ($this->size ?? 0);
+        $road = (float) ($this->road_area ?? 0);
+
+        $saleable = $size - $road;
+
+        return $saleable > 0 ? round($saleable, 2) : 0;
     }
 }

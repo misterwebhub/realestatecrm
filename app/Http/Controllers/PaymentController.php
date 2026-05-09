@@ -48,7 +48,7 @@ class PaymentController extends Controller
 
     protected function resourceTitle(): string
     {
-        return 'Payment';
+        return 'Kisan Payment';
     }
 
     protected function resourceModel(): string
@@ -83,7 +83,7 @@ class PaymentController extends Controller
                 'label' => 'Kisan',
                 'type' => 'select',
                 'options' => Kisan::orderBy('name')->pluck('name', 'id')->all(),
-                'value' => $item?->kisan_id,
+                'value' => $item?->kisan_id ?? request('kisan_id') ?? request()->route('kisan')?->id,
             ],
             [
                 'name' => 'customer_id',
@@ -151,5 +151,68 @@ class PaymentController extends Controller
         if ($item->payment_type === 'advance') {
             $this->registryLifecycleService->markRegistryPending($item->registry);
         }
+    }
+
+    // Kisan-scoped index
+    public function index(Request $request, ?Kisan $kisan = null)
+    {
+        $records = $this->resourceQuery()
+            ->when($kisan, fn($q) => $q->where('kisan_id', $kisan->id))
+            ->get();
+
+        $routeName = $this->resourceRouteName();
+
+        $rows = $records->map(function (Model $record) use ($routeName) {
+            return array_merge($this->resourceRow($record), [
+                'edit_url' => route($routeName . '.edit', $record),
+                'delete_url' => route($routeName . '.destroy', $record),
+            ]);
+        })->all();
+
+        return view('crud.index', [
+            'title' => $this->resourceTitle(),
+            'columns' => $this->resourceColumns(),
+            'rows' => $rows,
+            'createUrl' => $kisan ? route('kisans.payments.create', $kisan) : route($routeName . '.create'),
+        ]);
+    }
+
+    // Kisan-scoped create
+    public function create(Request $request, ?Kisan $kisan = null)
+    {
+        $modelClass = $this->resourceModel();
+
+        return view('crud.form', [
+            'title' => 'Create ' . $this->resourceTitle(),
+            'action' => $kisan ? route('kisans.payments.store', $kisan) : route($this->resourceRouteName() . '.store'),
+            'method' => 'POST',
+            'fields' => $this->resourceFields(),
+            'item' => new $modelClass(),
+        ]);
+    }
+
+    // Kisan-scoped store
+    public function store(Request $request, ?Kisan $kisan = null)
+    {
+        $validated = $request->validate($this->resourceRules());
+        $modelClass = $this->resourceModel();
+        $payload = $this->resourcePrepareData($validated, $request);
+
+        if ($kisan) {
+            $payload['kisan_id'] = $kisan->id;
+        }
+
+        $item = $modelClass::create($payload);
+        $this->resourceAfterSave($item, $request, $validated);
+
+        if ($kisan) {
+            return redirect()
+                ->route('kisans.payments.index', $kisan)
+                ->with('success', $this->resourceTitle() . ' created successfully.');
+        }
+
+        return redirect()
+            ->route($this->resourceRouteName() . '.index')
+            ->with('success', $this->resourceTitle() . ' created successfully.');
     }
 }
