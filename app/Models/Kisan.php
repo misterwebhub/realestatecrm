@@ -28,4 +28,9 @@ class Kisan extends Model
     {
         return $this->hasMany(Payment::class);
     }
+
+    public function bonds()
+    {
+        return $this->hasMany(KisanBond::class);
+    }
 }

@@ -10,6 +10,7 @@ class Agent extends Model
     use HasFactory;
 
     protected $fillable = [
+        'broker_type',
         'form_code',
         'name',
         'rank_title',

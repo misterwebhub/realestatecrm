@@ -16,6 +16,7 @@ class Arazi extends Model
         'unit',
         'size',
         'road_area',
+        'sale_amount_per_gaz',
         'coordinates',
         'status',
     ];
@@ -45,6 +46,25 @@ class Arazi extends Model
     public function documents()
     {
         return $this->hasMany(AraziDocument::class);
+    }
+
+    public function expenses()
+    {
+        return $this->hasMany(\App\Models\Expense::class);
+    }
+
+    public function getOriginalValueAttribute()
+    {
+        $rate = (float) ($this->sale_amount_per_gaz ?? 0);
+        $area = (float) $this->saleable_area;
+        return round($rate * $area, 2);
+    }
+
+    public function getPriceAfterExpensesAttribute()
+    {
+        $original = $this->original_value;
+        $expenses = $this->expenses()->sum('amount');
+        return round($original + (float) $expenses, 2);
     }
 
     public function getSaleableAreaAttribute()

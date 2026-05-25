@@ -27,4 +27,9 @@ class Customer extends Model
     {
         return $this->hasMany(Payment::class);
     }
+
+    public function bonds()
+    {
+        return $this->hasMany(CustomerBond::class);
+    }
 }

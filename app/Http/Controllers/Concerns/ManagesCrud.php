@@ -2,8 +2,10 @@
 
 namespace App\Http\Controllers\Concerns;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
+use Illuminate\Support\Str;
 
 trait ManagesCrud
 {
@@ -40,6 +42,56 @@ trait ManagesCrud
     {
     }
 
+    /**
+     * Override in controllers that support CSV download from the index page (e.g. payment lists).
+     */
+    protected function allowsCsvExport(): bool
+    {
+        return false;
+    }
+
+    /**
+     * Override (e.g. PaymentController) to apply filters matching the index table.
+     */
+    protected function recordsForCsvExport(Request $request): Builder
+    {
+        return $this->resourceQuery();
+    }
+
+    public function exportCsv(Request $request)
+    {
+        if (! $this->allowsCsvExport()) {
+            abort(404);
+        }
+
+        $records = $this->recordsForCsvExport($request)->get();
+        $columns = $this->resourceColumns();
+        $filename = Str::slug($this->resourceTitle()).'-'.now()->format('Y-m-d-His').'.csv';
+
+        return response()->streamDownload(function () use ($records, $columns) {
+            $out = fopen('php://output', 'w');
+            fprintf($out, chr(0xEF).chr(0xBB).chr(0xBF));
+            fputcsv($out, $columns);
+            foreach ($records as $record) {
+                $row = $this->resourceRow($record);
+                $cells = array_map(function ($cell) {
+                    if ($cell === null) {
+                        return '';
+                    }
+                    if (is_int($cell) || is_float($cell)) {
+                        return $cell;
+                    }
+
+                    return preg_replace('/\s+/', ' ', trim(strip_tags((string) $cell)));
+                }, $row['cells'] ?? []);
+                fputcsv($out, $cells);
+            }
+            fclose($out);
+        }, $filename, [
+            'Content-Type' => 'text/csv; charset=UTF-8',
+        ]);
+    }
+
     public function index()
     {
         $records = $this->resourceQuery()->get();
@@ -57,6 +109,7 @@ trait ManagesCrud
             'columns' => $this->resourceColumns(),
             'rows' => $rows,
             'createUrl' => route($routeName . '.create'),
+            'exportCsvUrl' => $this->allowsCsvExport() ? route($routeName.'.export.csv') : null,
         ]);
     }
 

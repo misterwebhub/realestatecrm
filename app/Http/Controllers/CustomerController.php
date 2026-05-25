@@ -72,6 +72,34 @@ class CustomerController extends Controller
                 (string) $item->registries_count,
             ],
             'add_url' => route('customer-bonds.create') . '?customer_id=' . $item->id,
+            'action_buttons' => [
+                [
+                    'label' => 'Customer Ledger',
+                    'url' => route('customer-bond-payments.ledger', ['customer_id' => $item->id]),
+                    'class' => 'btn-outline-info',
+                ],
+                [
+                    'label' => 'Customer Payment',
+                    'url' => route('customer-bond-payments.create', ['customer_id' => $item->id]),
+                    'class' => 'btn-outline-success',
+                ],
+            ],
         ];
+    }
+
+    public function bonds(Customer $customer)
+    {
+        $list = $customer->bonds()
+            ->latest()
+            ->get(['id', 'bond_no', 'bond_date', 'bond_amount', 'total_amount'])
+            ->map(function ($bond) {
+                return [
+                    'id' => $bond->id,
+                    'label' => $bond->bond_no . ' - ' . number_format((float) ($bond->total_amount ?? $bond->bond_amount ?? 0), 2),
+                ];
+            })
+            ->values();
+
+        return response()->json($list);
     }
 }

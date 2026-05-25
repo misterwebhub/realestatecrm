@@ -49,6 +49,13 @@ class KisanBond extends Model
         return $this->belongsTo(Arazi::class);
     }
 
+    public function arazis()
+    {
+        return $this->belongsToMany(Arazi::class, 'kisan_bond_arazi')
+            ->withPivot(['land_size', 'sale_land', 'sale_rate', 'sale_amount'])
+            ->withTimestamps();
+    }
+
     public function broker()
     {
         return $this->belongsTo(Agent::class, 'broker_id');
@@ -59,8 +66,18 @@ class KisanBond extends Model
         return $this->hasMany(KisanBondWitness::class);
     }
 
+    public function payments()
+    {
+        return $this->hasMany(Payment::class);
+    }
+
     public function getWitnessNamesAttribute()
     {
         return $this->witnesses->pluck('name')->all();
+    }
+
+    protected static function booted(): void
+    {
+        // Do not alter Arazi.status here; leave Arazi status management to controller logic if needed.
     }
 }

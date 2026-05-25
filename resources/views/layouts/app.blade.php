@@ -7,6 +7,8 @@
     <title>{{ $title ?? 'Kisan Land Management System' }}</title>
     <link rel="stylesheet" href="{{ asset('vendor/adminlte/css/adminlte.css') }}">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/select2-bootstrap-5-theme@1.3.0/dist/select2-bootstrap-5-theme.min.css">
     @stack('styles')
 </head>
 <body class="layout-fixed sidebar-expand-lg bg-body-tertiary">
@@ -60,6 +62,15 @@
                         </li>
 
                         <li class="nav-item">
+                            <a href="{{ route('arazi-documents.index') }}" class="nav-link {{ request()->routeIs('arazi-documents.*') ? 'active' : '' }}">
+                                <i class="nav-icon bi bi-file-earmark-arrow-up"></i>
+                                <p>Arazi Registry Upload</p>
+                            </a>
+                        </li>
+
+                        
+
+                        <li class="nav-item">
                             <a href="{{ route('plots.index') }}" class="nav-link {{ request()->routeIs('plots.*') ? 'active' : '' }}">
                                 <i class="nav-icon bi bi-pin-map"></i>
                                 <p>Plots</p>
@@ -68,8 +79,8 @@
                     @endif
 
                     @if(auth()->check() && (auth()->user()->role === 'admin' || auth()->user()->role === 'manager'))
-                        <li class="nav-item {{ request()->routeIs('kisans.*') || request()->routeIs('kisan-bonds.*') ? 'menu-open' : '' }}">
-                        <a href="#" class="nav-link {{ request()->routeIs('kisans.*') || request()->routeIs('kisan-bonds.*') ? 'active' : '' }}">
+                        <li class="nav-item {{ request()->routeIs('kisans.*') || request()->routeIs('kisan-bonds.*') || request()->routeIs('kisan-payment.*') || request()->routeIs('kisan-payment.ledger') || (request()->routeIs('agents.type.index') && request()->route('type') === 'kisan') ? 'menu-open' : '' }}">
+                        <a href="#" class="nav-link {{ request()->routeIs('kisans.*') || request()->routeIs('kisan-bonds.*') || request()->routeIs('kisan-payment.*') || request()->routeIs('kisan-payment.ledger') || (request()->routeIs('agents.type.index') && request()->route('type') === 'kisan') ? 'active' : '' }}">
                             <i class="nav-icon bi bi-people-fill"></i>
                             <p>
                                 Kisans & Bonds
@@ -79,23 +90,27 @@
                         <ul class="nav nav-treeview">
                             <li class="nav-item"><a href="{{ route('kisans.index') }}" class="nav-link {{ request()->routeIs('kisans.*') ? 'active' : '' }}"><i class="nav-icon bi bi-circle"></i><p>Kisans</p></a></li>
                             <li class="nav-item"><a href="{{ route('kisan-bonds.index') }}" class="nav-link {{ request()->routeIs('kisan-bonds.*') ? 'active' : '' }}"><i class="nav-icon bi bi-circle"></i><p>Kisan Bonds</p></a></li>
+                            <li class="nav-item"><a href="{{ route('kisan-payment.index') }}" class="nav-link {{ request()->routeIs('kisan-payment.*') ? 'active' : '' }}"><i class="nav-icon bi bi-circle"></i><p>Kisan Payment</p></a></li>
+                            <li class="nav-item"><a href="{{ route('kisan-payment.ledger') }}" class="nav-link {{ request()->routeIs('kisan-payment.ledger') ? 'active' : '' }}"><i class="nav-icon bi bi-circle"></i><p>Kisan Ledger</p></a></li>
+                            <li class="nav-item"><a href="{{ route('agents.type.index', 'kisan') }}" class="nav-link {{ request()->routeIs('agents.type.index') && request()->route('type') === 'kisan' ? 'active' : '' }}"><i class="nav-icon bi bi-circle"></i><p>Kisan Broker</p></a></li>
                         </ul>
                         </li>
                     @endif
 
                     @if(auth()->check() && (auth()->user()->role === 'admin' || auth()->user()->role === 'manager' || auth()->user()->role === 'accountant'))
-                        <li class="nav-item {{ request()->routeIs('customer-bonds.*') || request()->routeIs('customer-bond-payments.*') || request()->routeIs('payments.*') ? 'menu-open' : '' }}">
-                            <a href="#" class="nav-link {{ request()->routeIs('customer-bonds.*') || request()->routeIs('customer-bond-payments.*') || request()->routeIs('payments.*') ? 'active' : '' }}">
+                        <li class="nav-item {{ request()->routeIs('customer-bonds.*') || request()->routeIs('customer-bond-payments.*') || request()->routeIs('customer-bond-payments.ledger') || (request()->routeIs('agents.type.index') && request()->route('type') === 'customer') ? 'menu-open' : '' }}">
+                            <a href="#" class="nav-link {{ request()->routeIs('customer-bonds.*') || request()->routeIs('customer-bond-payments.*') || request()->routeIs('customer-bond-payments.ledger') || (request()->routeIs('agents.type.index') && request()->route('type') === 'customer') ? 'active' : '' }}">
                             <i class="nav-icon bi bi-receipt"></i>
                             <p>
-                                Bonds & Payments
+                                Customer Bond & Payments
                                 <i class="nav-arrow bi bi-chevron-right"></i>
                             </p>
                             </a>
                             <ul class="nav nav-treeview">
                                 <li class="nav-item"><a href="{{ route('customer-bonds.index') }}" class="nav-link {{ request()->routeIs('customer-bonds.*') ? 'active' : '' }}"><i class="nav-icon bi bi-circle"></i><p>Customer Bonds</p></a></li>
-                                <li class="nav-item"><a href="{{ route('customer-bond-payments.index') }}" class="nav-link {{ request()->routeIs('customer-bond-payments.*') ? 'active' : '' }}"><i class="nav-icon bi bi-circle"></i><p>Receipts</p></a></li>
-                                <li class="nav-item"><a href="{{ route('payments.index') }}" class="nav-link {{ request()->routeIs('payments.*') ? 'active' : '' }}"><i class="nav-icon bi bi-circle"></i><p>Kisan Payments</p></a></li>
+                                <li class="nav-item"><a href="{{ route('customer-bond-payments.index') }}" class="nav-link {{ request()->routeIs('customer-bond-payments.*') ? 'active' : '' }}"><i class="nav-icon bi bi-circle"></i><p>Customer Payment</p></a></li>
+                                <li class="nav-item"><a href="{{ route('customer-bond-payments.ledger') }}" class="nav-link {{ request()->routeIs('customer-bond-payments.ledger') ? 'active' : '' }}"><i class="nav-icon bi bi-circle"></i><p>Customer Ledger</p></a></li>
+                                <li class="nav-item"><a href="{{ route('agents.type.index', 'customer') }}" class="nav-link {{ request()->routeIs('agents.type.index') && request()->route('type') === 'customer' ? 'active' : '' }}"><i class="nav-icon bi bi-circle"></i><p>Customer Broker</p></a></li>
                             </ul>
                         </li>
                     @endif
@@ -103,15 +118,18 @@
                     @if(auth()->check() && (auth()->user()->role === 'admin' || auth()->user()->role === 'manager'))
                         <li class="nav-item"><a href="{{ route('customers.index') }}" class="nav-link {{ request()->routeIs('customers.*') ? 'active' : '' }}"><i class="nav-icon bi bi-people"></i><p>Customers</p></a></li>
 
-                        <li class="nav-item"><a href="{{ route('agents.index') }}" class="nav-link {{ request()->routeIs('agents.*') ? 'active' : '' }}"><i class="nav-icon bi bi-person-badge"></i><p>Brokers</p></a></li>
+                        <li class="nav-item"><a href="{{ route('agents.type.index', 'office') }}" class="nav-link {{ request()->routeIs('agents.type.index') && request()->route('type') === 'office' ? 'active' : '' }}"><i class="nav-icon bi bi-person-badge"></i><p>Office Brokers</p></a></li>
+
+                        <li class="nav-item"><a href="{{ route('registries.index') }}" class="nav-link {{ request()->routeIs('registries.*') ? 'active' : '' }}"><i class="nav-icon bi bi-journal-text"></i><p>Plot Registry</p></a></li>
 
                         <li class="nav-item"><a href="{{ route('investors.index') }}" class="nav-link {{ request()->routeIs('investors.*') ? 'active' : '' }}"><i class="nav-icon bi bi-graph-up"></i><p>Investors</p></a></li>
+
+                            <li class="nav-item"><a href="{{ route('expenses.index') }}" class="nav-link {{ request()->routeIs('expenses.*') ? 'active' : '' }}"><i class="nav-icon bi bi-cash-stack"></i><p>Expenses</p></a></li>
 
                         <li class="nav-item"><a href="{{ route('partners.index') }}" class="nav-link {{ request()->routeIs('partners.*') ? 'active' : '' }}"><i class="nav-icon bi bi-diagram-3"></i><p>Partners</p></a></li>
 
                         <li class="nav-item"><a href="{{ route('registries.waiting-payments') }}" class="nav-link {{ request()->routeIs('registries.waiting-payments') ? 'active' : '' }}"><i class="nav-icon bi bi-hourglass-split"></i><p>Waiting Payments</p></a></li>
 
-                        <li class="nav-item"><a href="{{ route('arazi-documents.index') }}" class="nav-link {{ request()->routeIs('arazi-documents.*') ? 'active' : '' }}"><i class="nav-icon bi bi-file-earmark-arrow-up"></i><p>Documents</p></a></li>
                     @endif
 
                     <li class="nav-item">
@@ -120,6 +138,22 @@
                             <p>Area Converter</p>
                         </a>
                     </li>
+                    
+                    @if(auth()->check() && (auth()->user()->role === 'admin' || auth()->user()->role === 'manager'))
+                        <li class="nav-item">
+                            <a href="{{ route('uploads.index') }}" class="nav-link {{ request()->routeIs('uploads.*') ? 'active' : '' }}">
+                                <i class="nav-icon bi bi-folder2-open"></i>
+                                <p>Uploads</p>
+                            </a>
+                        </li>
+
+                        <li class="nav-item">
+                            <a href="{{ route('upload-categories.index') }}" class="nav-link {{ request()->routeIs('upload-categories.*') ? 'active' : '' }}">
+                                <i class="nav-icon bi bi-tags"></i>
+                                <p>Upload Categories</p>
+                            </a>
+                        </li>
+                    @endif
                 </ul>
             </nav>
         </div>
@@ -130,7 +164,9 @@
             <div class="container-fluid">
                 <div class="row align-items-center">
                     <div class="col-sm-6">
-                        <h3 class="mb-0">{{ $title ?? 'Dashboard' }}</h3>
+                        @if(!empty($title))
+                            <h3 class="mb-0">{{ $title }}</h3>
+                        @endif
                     </div>
                 </div>
             </div>
@@ -150,6 +186,11 @@
         </div>
     </main>
 
+    {{-- Render view modals placed in a named section --}}
+    @hasSection('modals')
+        @yield('modals')
+    @endif
+
     <footer class="app-footer">
         <div class="float-end d-none d-sm-inline">Kisan Land Management System</div>
         <strong>Copyright &copy; {{ date('Y') }} <a href="{{ route('dashboard') }}" class="text-decoration-none">Kisan LMS</a>.</strong>
@@ -157,6 +198,9 @@
     </footer>
 </div>
 
+<script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
 <script src="{{ asset('vendor/adminlte/js/adminlte.js') }}"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 @stack('scripts')

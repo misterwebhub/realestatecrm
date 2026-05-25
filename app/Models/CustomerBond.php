@@ -25,18 +25,24 @@ class CustomerBond extends Model
         'bayana_mode',
         'bond_type',
         'amount',
+        'installment_amount',
         'balance',
         'last_date',
+        'no_of_months',
+        'expiry_date',
         'broker_id',
         'broker_payment',
         'broker_paid',
         'broker_balance',
         'broker_comment',
         'customer_comment',
+        'nominee_details',
     ];
 
     protected $casts = [
         'bond_date' => 'date',
+        'last_date' => 'date',
+        'expiry_date' => 'date',
     ];
 
     public function customer()
@@ -49,13 +55,30 @@ class CustomerBond extends Model
         return $this->belongsTo(Arazi::class);
     }
 
+    public function plots()
+    {
+        return $this->belongsToMany(Plot::class, 'customer_bond_plot')
+            ->withPivot(['sale_amount'])
+            ->withTimestamps();
+    }
+
     public function witnesses()
     {
         return $this->hasMany(CustomerBondWitness::class);
     }
 
+    public function payments()
+    {
+        return $this->hasMany(CustomerBondPayment::class);
+    }
+
     public function broker()
     {
         return $this->belongsTo(Agent::class, 'broker_id');
+    }
+
+    protected static function booted(): void
+    {
+        // Intentionally left blank: do not change Arazi.status here.
     }
 }

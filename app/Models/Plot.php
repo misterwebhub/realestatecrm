@@ -18,6 +18,7 @@ class Plot extends Model
         'latitude',
         'longitude',
         'description',
+        'status',
     ];
 
     public function arazi()

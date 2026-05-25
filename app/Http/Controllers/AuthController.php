@@ -9,7 +9,10 @@ class AuthController extends Controller
 {
     public function showLogin()
     {
-        return view('auth.login');
+        return view('auth.login', [
+            'defaultEmail' => env('DEFAULT_LOGIN_EMAIL', 'admin@example.com'),
+            'defaultPassword' => env('DEFAULT_LOGIN_PASSWORD', 'Admin@12345'),
+        ]);
     }
 
     public function login(Request $request)

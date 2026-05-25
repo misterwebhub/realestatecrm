@@ -1,5 +1,9 @@
 <?php
 
+// Uploads controllers
+use App\Http\Controllers\UploadController;
+use App\Http\Controllers\UploadCategoryController;
+
 use App\Http\Controllers\AgentController;
 use App\Http\Controllers\AraziController;
 use App\Http\Controllers\AraziDocumentController;
@@ -29,23 +33,37 @@ Route::middleware('auth')->group(function () {
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
 
     Route::resource('kisans', KisanController::class)->except(['show']);
+    // AJAX endpoints to support modal creation of Kisan from other forms
+    Route::get('kisans/create-fragment', [KisanController::class, 'createFragment'])->name('kisans.create-fragment');
+    Route::post('kisans/ajax-store', [KisanController::class, 'storeAjax'])->name('kisans.ajax-store');
+    // AJAX endpoints to support modal creation of Arazi from other forms
+    Route::get('arazis/create-fragment', [AraziController::class, 'createFragment'])->name('arazis.create-fragment')->middleware('role:admin,manager');
+    Route::post('arazis/ajax-store', [AraziController::class, 'storeAjax'])->name('arazis.ajax-store')->middleware('role:admin,manager');
+
     Route::resource('arazis', AraziController::class)->except(['show'])->middleware('role:admin,manager');
     Route::resource('plots', PlotController::class)->except(['show']);
     Route::resource('customers', CustomerController::class)->except(['show']);
+    Route::get('agents/type/{type}', [AgentController::class, 'typeIndex'])->name('agents.type.index');
+    Route::post('agents/type/{type}', [AgentController::class, 'typeStore'])->name('agents.type.store');
     Route::resource('agents', AgentController::class)->except(['show']);
     Route::resource('registries', RegistryController::class)->except(['show']);
     Route::get('registries/{registry}/print', [RegistryController::class, 'print'])->name('registries.print');
     Route::get('registries/{registry}/pdf', [RegistryController::class, 'pdf'])->name('registries.pdf');
     Route::post('registries/{registry}/esign', [RegistryController::class, 'esign'])->name('registries.esign');
     Route::get('registries/waiting-payments', [RegistryController::class, 'waitingPayments'])->name('registries.waiting-payments');
-    Route::get('payments/print', [PaymentController::class, 'printReceipt'])->name('payments.print');
+    Route::get('kisan-payment/print', [PaymentController::class, 'printReceipt'])->name('kisan-payment.print');
+    Route::get('kisan-payment/receipt-pdf', [PaymentController::class, 'receiptPdf'])->name('kisan-payment.receipt-pdf');
     // Kisan-scoped payment routes (list/create for a specific kisan)
-    Route::get('kisans/{kisan}/payments', [PaymentController::class, 'index'])->name('kisans.payments.index');
-    Route::get('kisans/{kisan}/payments/create', [PaymentController::class, 'create'])->name('kisans.payments.create');
-    Route::post('kisans/{kisan}/payments', [PaymentController::class, 'store'])->name('kisans.payments.store');
+    Route::get('kisans/{kisan}/kisan-payment', [PaymentController::class, 'index'])->name('kisans.kisan-payment.index');
+    Route::get('kisans/{kisan}/kisan-payment/create', [PaymentController::class, 'create'])->name('kisans.kisan-payment.create');
+    Route::post('kisans/{kisan}/kisan-payment', [PaymentController::class, 'store'])->name('kisans.kisan-payment.store');
 
-    Route::resource('payments', PaymentController::class)->except(['show']);
+    Route::get('kisan-payment-ledger', [PaymentController::class, 'ledger'])->name('kisan-payment.ledger');
+    Route::get('kisan-payment-ledger/export/csv', [PaymentController::class, 'ledgerExportCsv'])->name('kisan-payment.ledger.export.csv');
+    Route::get('kisan-payment/export/csv', [PaymentController::class, 'exportCsv'])->name('kisan-payment.export.csv');
+    Route::resource('kisan-payment', PaymentController::class)->names('kisan-payment')->except(['show']);
     Route::resource('kisan-bonds', KisanBondController::class)->except(['show']);
+    Route::get('customer-bonds/{customer_bond}/payment-context', [CustomerBondController::class, 'paymentContext'])->name('customer-bonds.payment-context');
     Route::resource('customer-bonds', CustomerBondController::class)->except(['show']);
     Route::get('kisan-bonds/{kisan_bond}/print', [KisanBondController::class, 'print'])->name('kisan-bonds.print');
     Route::get('kisan-bonds/{kisan_bond}/pdf', [KisanBondController::class, 'pdf'])->name('kisan-bonds.pdf');
@@ -53,6 +71,11 @@ Route::middleware('auth')->group(function () {
     Route::get('customer-bonds/{customer_bond}/pdf', [CustomerBondController::class, 'pdf'])->name('customer-bonds.pdf');
     Route::resource('bookings', BookingController::class)->except(['show']);
     Route::resource('sales', SaleController::class)->except(['show']);
+    Route::get('customer-payment-ledger', [CustomerBondPaymentController::class, 'ledger'])->name('customer-bond-payments.ledger');
+    Route::get('customer-payment-ledger/export/csv', [CustomerBondPaymentController::class, 'ledgerExportCsv'])->name('customer-bond-payments.ledger.export.csv');
+    Route::get('customer-bond-payments/export/csv', [CustomerBondPaymentController::class, 'exportCsv'])->name('customer-bond-payments.export.csv');
+    Route::get('customer-bond-payments/receipt', [CustomerBondPaymentController::class, 'printReceipt'])->name('customer-bond-payments.receipt');
+    Route::get('customer-bond-payments/receipt-pdf', [CustomerBondPaymentController::class, 'receiptPdf'])->name('customer-bond-payments.receipt-pdf');
     Route::resource('customer-bond-payments', CustomerBondPaymentController::class)->except(['show']);
     Route::resource('investors', InvestorController::class)->except(['show']);
     Route::resource('partners', PartnerController::class)->except(['show']);
@@ -60,10 +83,35 @@ Route::middleware('auth')->group(function () {
         'arazi-documents' => 'araziDocument',
     ])->except(['show']);
     Route::get('arazi-documents/{arazi_document}/download', [AraziDocumentController::class, 'download'])->name('arazi-documents.download');
+    
+    // Uploads module
+    Route::get('uploads', [UploadController::class, 'index'])->name('uploads.index');
+    Route::get('uploads/create', [UploadController::class, 'create'])->name('uploads.create');
+    Route::post('uploads', [UploadController::class, 'store'])->name('uploads.store');
+    Route::get('uploads/{upload}/download', [UploadController::class, 'download'])->name('uploads.download');
+    Route::get('ajax/arazi-search', [UploadController::class, 'ajaxAraziSearch'])->name('ajax.arazi.search');
+
+    Route::get('upload-categories', [UploadCategoryController::class, 'index'])->name('upload-categories.index');
+    Route::post('upload-categories', [UploadCategoryController::class, 'store'])->name('upload-categories.store');
+    Route::post('upload-categories/ajax-store', [UploadCategoryController::class, 'ajaxStore'])->name('upload-categories.ajax-store');
     // Area converter
     Route::get('converter', [\App\Http\Controllers\AreaConverterController::class, 'index'])->name('converter.index');
     Route::post('converter', [\App\Http\Controllers\AreaConverterController::class, 'convert'])->name('converter.convert');
     Route::get('arazi/{arazi}/plots', [\App\Http\Controllers\AraziController::class, 'plots'])->name('arazis.plots');
+    Route::get('arazi/{arazi}/grid', [\App\Http\Controllers\AraziController::class, 'grid'])->name('arazis.grid');
     Route::get('arazi/{arazi}/saleable', [\App\Http\Controllers\AraziController::class, 'saleable'])->name('arazis.saleable');
+    Route::get('arazi/{arazi}/bond-info', [\App\Http\Controllers\AraziController::class, 'bondInfo'])->name('arazis.bond-info');
+    
+    // Expenses
+    Route::get('expenses', [\App\Http\Controllers\ExpenseController::class, 'index'])->name('expenses.index');
+    Route::get('expenses/create', [\App\Http\Controllers\ExpenseController::class, 'create'])->name('expenses.create');
+    Route::post('expenses', [\App\Http\Controllers\ExpenseController::class, 'store'])->name('expenses.store');
+    // Expense types (AJAX)
+    Route::post('expense-types/ajax-store', [\App\Http\Controllers\ExpenseTypeController::class, 'ajaxStore'])->name('expense-types.ajax-store');
+    // Expense types: separate page create + store
+    Route::get('expense-types/create', [\App\Http\Controllers\ExpenseTypeController::class, 'create'])->name('expense-types.create');
+    Route::post('expense-types', [\App\Http\Controllers\ExpenseTypeController::class, 'store'])->name('expense-types.store');
     Route::get('kisans/{kisan}/arazis', [\App\Http\Controllers\KisanController::class, 'arazis'])->name('kisans.arazis');
+    Route::get('kisans/{kisan}/bonds', [\App\Http\Controllers\KisanController::class, 'bonds'])->name('kisans.bonds');
+    Route::get('customers/{customer}/bonds', [\App\Http\Controllers\CustomerController::class, 'bonds'])->name('customers.bonds');
 });

@@ -10,6 +10,7 @@ class CustomerBondPayment extends Model
     use HasFactory;
 
     protected $fillable = [
+        'customer_bond_id',
         'registry_id',
         'customer_id',
         'arazi_id',
@@ -31,6 +32,11 @@ class CustomerBondPayment extends Model
     public function registry()
     {
         return $this->belongsTo(Registry::class);
+    }
+
+    public function customerBond()
+    {
+        return $this->belongsTo(CustomerBond::class);
     }
 
     public function arazi()

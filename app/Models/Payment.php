@@ -10,6 +10,7 @@ class Payment extends Model
     use HasFactory;
 
     protected $fillable = [
+        'kisan_bond_id',
         'reference_no',
         'receipt_no',
         'source_table',
@@ -32,6 +33,11 @@ class Payment extends Model
     public function registry()
     {
         return $this->belongsTo(Registry::class);
+    }
+
+    public function kisanBond()
+    {
+        return $this->belongsTo(KisanBond::class);
     }
 
     public function kisan()

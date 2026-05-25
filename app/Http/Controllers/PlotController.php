@@ -28,7 +28,7 @@ class PlotController extends Controller
 
     protected function resourceColumns(): array
     {
-        return ['Arazi', 'Block', 'Title', 'Area', 'Coordinates', 'Latitude', 'Longitude'];
+        return ['Arazi', 'Block', 'Title', 'Area', 'Coordinates', 'Latitude', 'Longitude', 'Status'];
     }
 
     protected function resourceFields(?Model $item = null): array
@@ -56,6 +56,14 @@ class PlotController extends Controller
             ['name' => 'latitude', 'label' => 'Latitude', 'type' => 'number', 'step' => '0.000001', 'value' => $item?->latitude],
             ['name' => 'longitude', 'label' => 'Longitude', 'type' => 'number', 'step' => '0.000001', 'value' => $item?->longitude],
             ['name' => 'description', 'label' => 'Description', 'type' => 'textarea', 'value' => $item?->description],
+            ['name' => 'status', 'label' => 'Status', 'type' => 'select', 'options' => [
+                'available' => 'Available',
+                'booked_advance' => 'Booked (advance)',
+                'hold' => 'Hold',
+                'registry' => 'Registry done',
+                'blacklist' => 'Blacklist',
+                'not_for_sale' => 'Not for sale',
+            ], 'value' => $item?->status ?? 'available'],
         ];
     }
 
@@ -97,6 +105,7 @@ class PlotController extends Controller
             'latitude' => ['nullable', 'numeric'],
             'longitude' => ['nullable', 'numeric'],
             'description' => ['nullable', 'string'],
+            'status' => ['required', 'in:available,booked_advance,hold,registry,blacklist,not_for_sale,locked,sold'],
         ];
     }
 
@@ -117,6 +126,7 @@ class PlotController extends Controller
                 $item->coordinates ?? '-',
                 $item->latitude ?? '-',
                 $item->longitude ?? '-',
+                ucfirst(str_replace('_', ' ', (string) ($item->status ?? 'available'))),
             ],
         ];
     }

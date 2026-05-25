@@ -1,21 +1,46 @@
+@php
+    $consideration = (float) ($bond->total_amount ?? $bond->bond_amount ?? 0);
+    $booking = (float) ($bond->amount ?? 0);
+    $expectedSumPayable = max(0, $consideration - $booking);
+    $installmentMonths = $bond->installment_amount ?? $bond->no_of_months;
+    $fmtDate = static function ($value) {
+        if ($value === null || $value === '') {
+            return '-';
+        }
+        try {
+            return \Carbon\Carbon::parse($value)->format('d-m-Y');
+        } catch (\Throwable $e) {
+            return '-';
+        }
+    };
+@endphp
 <!doctype html>
 <html>
 <head>
     <meta charset="utf-8">
     <title>Registration Certificate - {{ $bond->bond_no ?? '' }}</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <style>
-        .wrrper{width:990px;margin:0 auto;border:5px solid black;padding:8px}
-        table {border-collapse: collapse;width:100%;}
-        table, td, th {border: 1px solid black;text-align:center;}
-        th{padding:5px;background:#ececec}
-        td{padding:10px}
-        .style4{height:237px}
-        .style3{height:131px}
-        .style1{height:78px}
-        .style5{width:415px}
-        .textboxmain{width:100%}
-        .small{font-size:12px;color:#555}
+        @page { margin: 12mm; size: A4 portrait; }
+        * { box-sizing: border-box; }
+        body { font-family: DejaVu Sans, sans-serif; font-size: 11pt; color: #000; margin: 0; padding: 12px; }
+        .wrrper { max-width: 990px; margin: 0 auto; border: 3px solid #000; padding: 8px; }
+        table { border-collapse: collapse; width: 100%; table-layout: fixed; }
+        table, td, th { border: 1px solid #000; text-align: center; vertical-align: middle; word-wrap: break-word; }
+        th { padding: 6px; background: #ececec; font-weight: bold; }
+        td { padding: 8px 6px; }
+        .style4 { min-height: 120px; }
+        .style3 { min-height: 80px; }
+        .style1 { height: 56px; }
+        .style5 { width: 38%; text-align: left !important; }
+        .textboxmain { width: 100%; }
+        .small { font-size: 10px; color: #555; }
+        .num { text-align: right; white-space: nowrap; }
+        .bg-cyan { background-color: #00FFCC; }
+        .bg-navy { background-color: #000080; color: #fff; }
+        @media print {
+            body { padding: 0; }
+            .no-print { display: none !important; }
+        }
     </style>
 </head>
 <body>
@@ -23,35 +48,35 @@
     <table>
         <tr>
             <td style="font-weight:bold;">CIN-U45201UP2019PTC123734</td>
-            <td bgcolor="#00FFCC"><strong>CUSTOMER REG. NO</strong>&nbsp;
+            <td class="bg-cyan"><strong>CUSTOMER REG. NO</strong>&nbsp;
                 <span style="color:red;font-weight:bold">{{ $bond->bond_no ?? '' }}</span>
             </td>
             <td style="text-align:right;font-weight:bold;">MOB. +91-9696446268, 9935142277</td>
         </tr>
         <tr>
             <td colspan="3" class="style4" style="text-align:left">
-                <p style="font-size:37pt;color:red;font-weight:bold;margin-top:1px;">HEED REAL</p>
-                <p style="margin-top:-35px;font-size:21pt;">ESTATE PRIVATE LIMITED</p>
-                <p style="padding:3px;background-color:#000080;color:white;font-size:15pt;margin-top:-10px;">19A ,New PAC Line, Gadiyana, Kanpur, Uttar Pradesh</p>
-                <p style="font-size:12pt;font-weight:bold;text-align:justify;">CERTIFIED that the associate described in Schedule here to Registered Joint Venture Of Consideration as shown in Schedule under Plan of Company subject to the regular payment of subscription(s) has mentioned in the said schedule and also subject to "general terms & conditions" printed over leaf...</p>
+                <p style="font-size:28pt;color:red;font-weight:bold;margin:0;line-height:1;">HEED REAL</p>
+                <p style="margin:0;font-size:16pt;line-height:1;">ESTATE PRIVATE LIMITED</p>
+                <p class="bg-navy" style="padding:4px 6px;font-size:12pt;margin-top:6px;">19A ,New PAC Line, Gadiyana, Kanpur, Uttar Pradesh</p>
+                <p style="font-size:11pt;font-weight:bold;text-align:justify;margin-top:8px;">CERTIFIED that the associate described in Schedule here to Registered Joint Venture Of Consideration as shown in Schedule under Plan of Company subject to the regular payment of subscription(s) has mentioned in the said schedule and also subject to "general terms &amp; conditions" printed over leaf...</p>
             </td>
         </tr>
     </table>
 
     <table>
         <tr>
-            <th>Regd.No & Date of Commenement</th>
+            <th>Regd.No &amp; Date of Commenement</th>
             <th>Plan Name / Term</th>
             <th>Mode of Payment</th>
             <th>Consideration Amount</th>
-            <th>Installment of subscription Payment</th>
+            <th>Installment of subscription Payment<br><span class="small">(No. of months)</span></th>
         </tr>
         <tr>
-            <td>{{ optional($bond->bond_date)->format('d/m/Y') ?? '' }}</td>
+            <td>{{ $bond->bond_date ? $bond->bond_date->format('d-m-Y') : '' }}</td>
             <td>{{ $bond->bond_type ?? '-' }}</td>
             <td>{{ ucfirst($bond->bayana_mode ?? '-') }}</td>
-            <td>{{ number_format((float) ($bond->total_amount ?? $bond->bond_amount ?? 0), 2) }}</td>
-            <td>{{ number_format((float) ($bond->amount ?? 0), 2) }}</td>
+            <td class="num">{{ number_format($consideration, 2) }}</td>
+            <td>{{ $installmentMonths !== null && $installmentMonths !== '' ? (int) $installmentMonths : '-' }}</td>
         </tr>
     </table>
 
@@ -61,21 +86,21 @@
             <th>Booking Amount</th>
             <th>Date Of Last Payment</th>
             <th>Expiry Date</th>
-            <th>Agency ID</th>
+            <th>Broker Name</th>
         </tr>
         <tr>
-            <td>{{ optional($bond->last_date)->format('d/m/Y') ?? '-' }}</td>
-            <td>{{ number_format((float) ($bond->amount ?? 0), 2) }}</td>
-            <td>-</td>
-            <td>-</td>
-            <td>{{ $bond->broker?->id ?? '-' }}</td>
+            <td>{{ $bond->last_date ? $bond->last_date->format('d-m-Y') : '-' }}</td>
+            <td class="num">{{ number_format($booking, 2) }}</td>
+            <td>{{ isset($lastPaymentDate) && $lastPaymentDate ? $fmtDate($lastPaymentDate) : '-' }}</td>
+            <td>{{ $bond->expiry_date ? $bond->expiry_date->format('d-m-Y') : '-' }}</td>
+            <td style="text-align:left">{{ $bond->broker?->name ?? '-' }}</td>
         </tr>
     </table>
 
     <table>
         <tr>
             <th rowspan="4">Name, D.O.B and Address of Associate</th>
-            <td rowspan="4" class="style5" style="text-align:left">{{ $bond->customer?->name ?? '-' }}<br>{{ $bond->customer?->address ?? '' }}</td>
+            <td rowspan="4" class="style5">{{ $bond->customer?->name ?? '-' }}<br>{{ $bond->customer?->address ?? '' }}</td>
             <th colspan="2">Arazi No.</th>
         </tr>
         <tr>
@@ -85,24 +110,39 @@
             <th colspan="2">Plot No./Plot Size</th>
         </tr>
         <tr>
-            <td colspan="2">{{ $bond->arazi?->plot_number ?? '-' }} / {{ $bond->land_size ?? $bond->arazi?->size ?? '-' }}</td>
+            <td colspan="2" style="text-align:left">
+                @if($bond->plots && $bond->plots->isNotEmpty())
+                    <ol style="margin:0;padding-left:18px;text-align:left">
+                        @foreach($bond->plots as $plot)
+                            <li style="text-align:left">
+                                {{ $plot->plot_number ?? $plot->title ?? ('Plot-' . $plot->id) }}
+                                / {{ $plot->area ?? $plot->size ?? '-' }}
+                            </li>
+                        @endforeach
+                    </ol>
+                @else
+                    {{ $bond->arazi?->plot_number ?? '-' }} / {{ $bond->land_size ?? $bond->arazi?->size ?? '-' }}
+                @endif
+            </td>
         </tr>
         <tr>
             <th>Nominee's Name D.O.B and Relationship</th>
-            <td colspan="2" class="style5">-</td>
-            <td>Aadhar/PAN/Voter/D.L NO</td>
-            <td>{{ $bond->customer?->id_document_no ?? '-' }}</td>
+            <td colspan="2" class="style5" style="text-align:left">{{ $bond->nominee_details ? nl2br(e($bond->nominee_details)) : '-' }}</td>
+            <td style="text-align:left"><strong>Aadhar/PAN/Voter/D.L NO</strong><br>{{ $bond->customer?->id_document_no ?? '-' }}</td>
         </tr>
     </table>
 
     <table>
         <tr>
             <th>EXPECTED SUM PAYABLE RUPEES</th>
-            <td>{{ $bond->total_amount ?? $bond->bond_amount ?? 0 }}</td>
+            <td class="num">{{ number_format($expectedSumPayable, 2) }}</td>
         </tr>
         <tr>
-            <td rowspan="3" style="font-weight:bold;">Date</td>
-            <td>For: ____________________________</td>
+            <td rowspan="2" style="font-weight:bold;">Date</td>
+            <td style="text-align:left">For: ____________________________</td>
+        </tr>
+        <tr>
+            <td style="text-align:left">&nbsp;</td>
         </tr>
     </table>
 
@@ -113,9 +153,9 @@
         </tr>
         <tr>
             <td colspan="4" class="style3" style="text-align:left">
-                <p style="font-size:37pt;color:red;font-weight:bold;margin-top:5px;">HEED REAL</p>
-                <p style="margin-top:-35px;font-size:21pt;">ESTATE PRIVATE LIMITED</p>
-                <p style="padding:3px;background-color:#000080;color:white;font-size:15pt;margin-top:-10px;">19A ,New PAC Line, Gadiyana, Kanpur, Uttar Pradesh</p>
+                <p style="font-size:28pt;color:red;font-weight:bold;margin:0;line-height:1;">HEED REAL</p>
+                <p style="margin:0;font-size:16pt;">ESTATE PRIVATE LIMITED</p>
+                <p class="bg-navy" style="padding:4px 6px;font-size:12pt;margin-top:6px;">19A ,New PAC Line, Gadiyana, Kanpur, Uttar Pradesh</p>
             </td>
         </tr>
         <tr>
@@ -130,7 +170,7 @@
         </tr>
         <tr>
             <th>Amount in words Rs.</th>
-            <td colspan="3">{{ number_format((float) ($bond->total_amount ?? $bond->bond_amount ?? 0), 2) }}</td>
+            <td colspan="3" class="num">{{ number_format($consideration, 2) }}</td>
         </tr>
     </table>
 
@@ -145,9 +185,9 @@
     <div style="margin-top:12px">
         <div style="font-weight:700">Witnesses:</div>
         @if($bond->witnesses && $bond->witnesses->isNotEmpty())
-            <ul>
+            <ul style="margin:6px 0;padding-left:20px;text-align:left">
                 @foreach($bond->witnesses as $w)
-                    <li>{{ $w->name }} @if($w->id_no) — ID: {{ $w->id_no }}@endif @if($w->mobile) — {{ $w->mobile }}@endif</li>
+                    <li style="text-align:left">{{ $w->name }} @if($w->id_no) — ID: {{ $w->id_no }}@endif @if($w->mobile) — {{ $w->mobile }}@endif</li>
                 @endforeach
             </ul>
         @else
@@ -156,5 +196,13 @@
     </div>
 
 </div>
+
+@if(request()->boolean('print'))
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    window.print();
+});
+</script>
+@endif
 </body>
 </html>

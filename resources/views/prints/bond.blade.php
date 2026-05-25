@@ -39,7 +39,16 @@
             <div class="card">
                 <div><span class="label">Bond No:</span> <span class="value">{{ $bond->bond_no }}</span></div>
                 <div><span class="label">Bond Date:</span> <span class="value">{{ optional($bond->bond_date)->format('d-m-Y') ?? '-' }}</span></div>
-                <div><span class="label">Arazi:</span> <span class="value">{{ $bond->arazi?->plot_number ?? '-' }}</span></div>
+                <div>
+                    <span class="label">Arazis:</span>
+                    <span class="value">
+                        @if($bond->arazis && $bond->arazis->isNotEmpty())
+                            {{ $bond->arazis->map(fn ($arazi) => $arazi->legacy_arazi_code ?: ($arazi->plot_number ?? ('Arazi-' . $arazi->id)))->join(', ') }}
+                        @else
+                            {{ $bond->arazi?->legacy_arazi_code ?? $bond->arazi?->plot_number ?? '-' }}
+                        @endif
+                    </span>
+                </div>
                 <div><span class="label">Kisan:</span> <span class="value">{{ $bond->kisan?->name ?? '-' }}</span></div>
                 <div><span class="label">Mobile:</span> <span class="value">{{ $bond->mobile ?? ($bond->kisan?->mobile ?? '-') }}</span></div>
                 <div><span class="label">Land Size:</span> <span class="value">{{ $bond->land_size ?? $bond->arazi?->size ?? '-' }}</span></div>
@@ -55,6 +64,48 @@
                 <div><span class="label">Balance:</span> <span class="value">{{ number_format((float) ($bond->balance ?? 0), 2) }}</span></div>
                 <div><span class="label">Last Date:</span> <span class="value">{{ optional($bond->last_date)->format('d-m-Y') ?? '-' }}</span></div>
             </div>
+        </div>
+
+        <div class="section-title">Selected Arazis</div>
+        <div class="card">
+            @if($bond->arazis && $bond->arazis->isNotEmpty())
+                <table style="width:100%;border-collapse:collapse">
+                    <thead>
+                        <tr>
+                            <th style="border:1px solid #ddd;padding:6px;text-align:left">Arazi</th>
+                            <th style="border:1px solid #ddd;padding:6px;text-align:right">Land Size</th>
+                            <th style="border:1px solid #ddd;padding:6px;text-align:right">Sale Land</th>
+                            <th style="border:1px solid #ddd;padding:6px;text-align:right">Sale Rate</th>
+                            <th style="border:1px solid #ddd;padding:6px;text-align:right">Amount</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach($bond->arazis as $arazi)
+                            <tr>
+                                <td style="border:1px solid #ddd;padding:6px">
+                                    <strong>{{ $arazi->legacy_arazi_code ?: ($arazi->plot_number ?? ('Arazi-' . $arazi->id)) }}</strong>
+                                    @if($arazi->location)<br><span class="small">{{ $arazi->location }}</span>@endif
+                                </td>
+                                <td style="border:1px solid #ddd;padding:6px;text-align:right">{{ number_format((float) ($arazi->pivot->land_size ?? $arazi->size ?? 0), 2) }}</td>
+                                <td style="border:1px solid #ddd;padding:6px;text-align:right">{{ number_format((float) ($arazi->pivot->sale_land ?? 0), 2) }}</td>
+                                <td style="border:1px solid #ddd;padding:6px;text-align:right">{{ number_format((float) ($arazi->pivot->sale_rate ?? 0), 2) }}</td>
+                                <td style="border:1px solid #ddd;padding:6px;text-align:right">{{ number_format((float) ($arazi->pivot->sale_amount ?? 0), 2) }}</td>
+                            </tr>
+                        @endforeach
+                    </tbody>
+                    <tfoot>
+                        <tr>
+                            <th style="border:1px solid #ddd;padding:6px;text-align:left">Total</th>
+                            <th style="border:1px solid #ddd;padding:6px;text-align:right">{{ number_format((float) ($bond->land_size ?? 0), 2) }}</th>
+                            <th style="border:1px solid #ddd;padding:6px;text-align:right">{{ number_format((float) ($bond->sale_land ?? 0), 2) }}</th>
+                            <th style="border:1px solid #ddd;padding:6px"></th>
+                            <th style="border:1px solid #ddd;padding:6px;text-align:right">{{ number_format((float) ($bond->total_amount ?? $bond->bond_amount ?? 0), 2) }}</th>
+                        </tr>
+                    </tfoot>
+                </table>
+            @else
+                <div class="small">{{ $bond->arazi?->legacy_arazi_code ?? $bond->arazi?->plot_number ?? '-' }}</div>
+            @endif
         </div>
 
         <div class="section-title">Broker / Payments</div>

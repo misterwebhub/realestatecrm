@@ -11,7 +11,9 @@ class Registry extends Model
 
     protected $fillable = [
         'registry_code',
+        'receipt_no',
         'customer_reg_no',
+        'plot_id',
         'customer_id',
         'arazi_id',
         'agent_id',
@@ -24,6 +26,7 @@ class Registry extends Model
         'id_card_no',
         'witness_name',
         'nominee_name',
+        'document_path',
         'broker_commission',
         'advance_amount',
         'installment_amount',
@@ -44,6 +47,11 @@ class Registry extends Model
     public function customer()
     {
         return $this->belongsTo(Customer::class);
+    }
+
+    public function plot()
+    {
+        return $this->belongsTo(Plot::class);
     }
 
     public function arazi()

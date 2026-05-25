@@ -20,11 +20,11 @@
             @csrf
             <div class="mb-3">
                 <label class="form-label">Email</label>
-                <input type="email" name="email" value="{{ old('email') }}" class="form-control" required autofocus>
+                <input type="email" name="email" value="{{ old('email', $defaultEmail ?? 'admin@example.com') }}" class="form-control" required autofocus autocomplete="username">
             </div>
             <div class="mb-3">
                 <label class="form-label">Password</label>
-                <input type="password" name="password" class="form-control" required>
+                <input type="password" name="password" value="{{ old('password', $defaultPassword ?? '') }}" class="form-control" required autocomplete="current-password">
             </div>
             <div class="mb-3 form-check">
                 <input type="checkbox" name="remember" class="form-check-input" id="remember">

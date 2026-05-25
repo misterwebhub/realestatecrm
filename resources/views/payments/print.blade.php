@@ -2,9 +2,9 @@
 
 @php
     $registry = $payment?->registry;
-    $arazi = $registry?->arazi;
-    $customer = $payment?->customer ?? $registry?->customer;
-    $kisan = $payment?->kisan ?? $arazi?->kisan;
+    $bond = $payment?->kisanBond;
+    $arazi = $registry?->arazi ?? $bond?->arazi;
+    $kisan = $payment?->kisan ?? $bond?->kisan ?? $arazi?->kisan;
     $agent = $registry?->agent;
 
     $amount = (float) ($payment?->amount ?? 0);
@@ -104,7 +104,7 @@
 @section('content')
     <div class="no-print card card-outline card-primary mb-3">
         <div class="card-body">
-            <form method="GET" action="{{ route('payments.print') }}" class="row g-2 align-items-end">
+            <form method="GET" action="{{ route('kisan-payment.print') }}" class="row g-2 align-items-end">
                 <div class="col-md-4">
                     <label for="receipt_no" class="form-label">RECEIPT. No.</label>
                     <input type="text" id="receipt_no" name="receipt_no" value="{{ $receiptNo }}" class="form-control" placeholder="Enter receipt no / reference no">
@@ -137,14 +137,20 @@
                     <div class="col-6 field-label">RECEIPT. No.</div>
                     <div class="col-6"><div class="field-box">{{ $payment?->receipt_no ?? '-' }}</div></div>
 
-                    <div class="col-6 field-label">ASC Name</div>
-                    <div class="col-6"><div class="field-box">{{ $customer?->name ?? '-' }}</div></div>
+                    <div class="col-6 field-label">Kisan Name</div>
+                    <div class="col-6"><div class="field-box">{{ $kisan?->name ?? '-' }}</div></div>
 
-                    <div class="col-6 field-label">Reg no No.</div>
-                    <div class="col-6"><div class="field-box" style="background:#c5f35f;">{{ $registry?->customer_reg_no ?? '-' }}</div></div>
+                    <div class="col-6 field-label">Kisan Reg No.</div>
+                    <div class="col-6"><div class="field-box" style="background:#c5f35f;">{{ $kisan?->reg_no ?? '-' }}</div></div>
 
-                    <div class="col-6 field-label">ASC Code</div>
-                    <div class="col-6"><div class="field-box">{{ $customer?->legacy_customer_code ?? '-' }}</div></div>
+                    <div class="col-6 field-label">Bond No.</div>
+                    <div class="col-6"><div class="field-box">{{ $bond?->bond_no ?? '-' }}</div></div>
+
+                    <div class="col-6 field-label">Arazi No.</div>
+                    <div class="col-6"><div class="field-box">{{ $arazi?->legacy_arazi_code ?: ($arazi?->plot_number ?? '-') }}</div></div>
+
+                    <div class="col-6 field-label">Plot No.</div>
+                    <div class="col-6"><div class="field-box">{{ $arazi?->plots->first()?->plot_number ?? $arazi?->plots->first()?->title ?? '-' }}</div></div>
 
                     <div class="col-6 field-label">Date</div>
                     <div class="col-6"><div class="field-box">{{ optional($payment?->payment_date)->format('d-m-Y') ?? '-' }}</div></div>
@@ -167,8 +173,8 @@
         <div class="receipt-row p-3">
             <div class="row g-2 align-items-center">
                 <div class="col-lg-2 field-label">SCHEDULE</div>
-                <div class="col-lg-2 field-label">ASC Address</div>
-                <div class="col-lg-8"><div class="field-box">{{ $customer?->address ?? '-' }}</div></div>
+                <div class="col-lg-2 field-label">Kisan Address</div>
+                <div class="col-lg-8"><div class="field-box">{{ $kisan?->address ?? '-' }}</div></div>
             </div>
         </div>
 

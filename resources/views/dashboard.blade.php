@@ -63,7 +63,7 @@
             <div class="small-box text-bg-dark">
                 <div class="inner">
                     <h3>{{ $totalBondReceipts }}</h3>
-                    <p>Bond Receipts</p>
+                    <p>Customer Payments</p>
                 </div>
                 <div class="small-box-footer">Customer bond entries</div>
             </div>

@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Http\Controllers\Concerns\ManagesCrud;
 use App\Models\Arazi;
 use App\Models\AraziDocument;
+use App\Models\Kisan;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -40,10 +41,15 @@ class AraziDocumentController extends Controller
                 'name' => 'arazi_id',
                 'label' => 'Arazi',
                 'type' => 'select',
-                'options' => Arazi::orderBy('plot_number')->pluck('plot_number', 'id')->all(),
+                'options' => Arazi::orderBy('legacy_arazi_code')
+                    ->get()
+                    ->mapWithKeys(function (Arazi $arazi) {
+                        return [$arazi->id => $arazi->legacy_arazi_code ?: ($arazi->plot_number ?? ('Arazi-' . $arazi->id))];
+                    })
+                    ->all(),
                 'value' => $item?->arazi_id,
             ],
-            ['name' => 'document_name', 'label' => 'Document Name', 'type' => 'text', 'value' => $item?->document_name],
+            ['name' => 'document_name', 'label' => 'Document Name', 'type' => 'text', 'value' => $item?->document_name ?? request('document_name', 'Arazi Registry')],
             ['name' => 'document_file', 'label' => 'File', 'type' => 'file', 'accept' => '.pdf,image/*'],
         ];
     }
@@ -57,6 +63,37 @@ class AraziDocumentController extends Controller
         ];
     }
 
+    public function index(Request $request)
+    {
+        $araziNumber = trim((string) $request->query('arazi_number', ''));
+        $kisanId = $request->query('kisan_id');
+
+        $documents = AraziDocument::with(['arazi.kisan'])
+            ->when($araziNumber !== '', function ($query) use ($araziNumber) {
+                $query->whereHas('arazi', function ($araziQuery) use ($araziNumber) {
+                    $araziQuery
+                        ->where('legacy_arazi_code', 'like', '%' . $araziNumber . '%')
+                        ->orWhere('plot_number', 'like', '%' . $araziNumber . '%');
+                });
+            })
+            ->when($kisanId, function ($query) use ($kisanId) {
+                $query->whereHas('arazi', fn ($araziQuery) => $araziQuery->where('kisan_id', $kisanId));
+            })
+            ->latest()
+            ->get();
+
+        return view('arazi_documents.index', [
+            'title' => 'Arazi Registry Upload',
+            'documents' => $documents,
+            'kisans' => Kisan::orderBy('name')->pluck('name', 'id')->all(),
+            'filters' => [
+                'arazi_number' => $araziNumber,
+                'kisan_id' => $kisanId,
+            ],
+            'createUrl' => route('arazi-documents.create', ['document_name' => 'Arazi Registry']),
+        ]);
+    }
+
     protected function resourceQuery()
     {
         return AraziDocument::with('arazi')->latest();
@@ -67,7 +104,7 @@ class AraziDocumentController extends Controller
         /** @var AraziDocument $item */
         return [
             'cells' => [
-                $item->arazi?->plot_number ?? '-',
+                $item->arazi?->legacy_arazi_code ?: ($item->arazi?->plot_number ?? '-'),
                 $item->document_name,
                 basename($item->file_path),
                 $item->mime_type ?? '-',

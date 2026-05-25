@@ -28,9 +28,7 @@
                         <thead>
                         <tr class="table-success">
                             <th class="text-nowrap">REG. NO.</th>
-                            <th class="text-nowrap">ARAZI NO.</th>
                             <th class="text-nowrap">KISHAN NAME</th>
-                            <th class="text-nowrap">AMOUNT</th>
                             <th class="text-nowrap">LOCATION</th>
                             <th class="text-nowrap">MOBILE</th>
                             <th class="text-nowrap">ADDRESS</th>
@@ -39,25 +37,23 @@
                         </thead>
                         <tbody>
                         <tr>
-                            @php($regNo = old('reg_no', data_get($item, 'reg_no')))
-                            @php($araziNo = old('legacy_arazi_no', data_get($item, 'legacy_arazi_no')))
+                            @php($isCreate = $method === 'POST')
+                            @php($regNo = old('reg_no', $isCreate ? ($nextRegNo ?? data_get($item, 'reg_no')) : data_get($item, 'reg_no')))
                             @php($kisanName = old('name', data_get($item, 'name')))
-                            @php($amount = old('amount', data_get($item, 'amount')))
                             @php($location = old('location', data_get($item, 'location')))
                             @php($mobile = old('mobile', data_get($item, 'mobile')))
                             @php($address = old('address', data_get($item, 'address')))
 
-                            <td><input type="text" name="reg_no" value="{{ $regNo }}" class="form-control" placeholder="K0030"></td>
                             <td>
-                                <select name="legacy_arazi_no" class="form-select">
-                                    <option value="">0</option>
-                                    @foreach(($fields[1]['options'] ?? []) as $value => $label)
-                                        <option value="{{ $value }}" @selected((string) $araziNo === (string) $value)>{{ $label }}</option>
-                                    @endforeach
-                                </select>
+                                <input type="text"
+                                       name="reg_no"
+                                       value="{{ $regNo }}"
+                                       class="form-control bg-light"
+                                       readonly
+                                       autocomplete="off"
+                                       title="Auto-generated on save (new) or fixed (edit)">
                             </td>
                             <td><input type="text" name="name" value="{{ $kisanName }}" class="form-control"></td>
-                            <td><input type="number" step="0.01" name="amount" value="{{ $amount }}" class="form-control"></td>
                             <td><input type="text" name="location" value="{{ $location }}" class="form-control"></td>
                             <td><input type="text" name="mobile" value="{{ $mobile }}" class="form-control"></td>
                             <td><input type="text" name="address" value="{{ $address }}" class="form-control"></td>
