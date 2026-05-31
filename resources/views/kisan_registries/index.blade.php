@@ -35,23 +35,6 @@
                 </form>
             </div>
         @endif
-        <script>
-            (function(){
-                try{
-                    if(window.jQuery && jQuery.fn.select2){
-                        jQuery(function(){
-                            jQuery('#filter-arazi').select2({
-                                theme: 'bootstrap-5',
-                                width: '250px',
-                                placeholder: 'All Arazis',
-                                allowClear: true,
-                                dropdownParent: jQuery(document.body)
-                            });
-                        });
-                    }
-                }catch(e){}
-            })();
-        </script>
         <table class="table table-striped table-hover mb-0 align-middle">
             <thead>
                 <tr>
@@ -79,9 +62,11 @@
                     <td>{{ $rec->arazi_deed_no ?? '-' }}</td>
                     <td>
                         @php
-                            $mapped = $arazi_map[$rec->arazi_deed_no] ?? null;
+                            $araziLabel = $rec->arazi
+                                ? ($rec->arazi->legacy_arazi_code ?: ('Arazi-' . $rec->arazi->id))
+                                : ($arazi_map[$rec->arazi_deed_no] ?? '-');
                         @endphp
-                        {{ $mapped ?? '-' }}
+                        {{ $araziLabel }}
                     </td>
                     <td>{{ $rec->name_deed_no ?? '-' }}</td>
                     <td>{{ $rec->sale_by ?? '-' }}</td>
@@ -139,3 +124,17 @@
     </div>
 </div>
 @endsection
+
+@push('scripts')
+<script>
+    jQuery(function(){
+        jQuery('#filter-arazi').select2({
+            theme: 'bootstrap-5',
+            width: '250px',
+            placeholder: 'All Arazis',
+            allowClear: true,
+            dropdownParent: jQuery(document.body)
+        });
+    });
+</script>
+@endpush

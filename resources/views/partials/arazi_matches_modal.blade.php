@@ -75,11 +75,15 @@
               window.dispatchEvent(ev);
             }catch(e){ }
             // hide modal
-            try{ const bs = bootstrap.Modal.getInstance(modal); if(bs) bs.hide(); }catch(e){ modal.style.display = 'none'; }
+            try{ bootstrap.Modal.getOrCreateInstance(modal).hide(); }catch(e){ modal.style.display = 'none'; }
           });
         });
 
-        try{ const bs = new bootstrap.Modal(modal); bs.show(); }catch(e){ modal.style.display = 'block'; }
+        try{
+            // Always reuse the same instance — never create a new one on each call
+            const bs = bootstrap.Modal.getOrCreateInstance(modal);
+            bs.show();
+        }catch(e){ modal.style.display = 'block'; }
     };
 })();
 </script>

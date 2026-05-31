@@ -25,14 +25,15 @@
             <div class="row g-3">
                 <div class="col-md-3">
                     <label class="form-label">Select Arazi</label>
-                    <select id="arazi_select" class="form-select">
+                    @php
+                        $selectedAraziId = old('arazi_id', $item->arazi_id ?? null);
+                        $groups = collect($arazis ?? [])->groupBy(function($a){ return $a->legacy_arazi_code ?: ('Arazi-' . $a->id); });
+                    @endphp
+                    <select id="arazi_select" name="arazi_id" class="form-select">
                         <option value="">-- choose arazi --</option>
-                        @php
-                            $groups = collect($arazis ?? [])->groupBy(function($a){ return $a->legacy_arazi_code ?: ('Arazi-' . $a->id); });
-                        @endphp
                         @foreach($groups as $code => $group)
                             @php $first = $group->first(); @endphp
-                            <option value="{{ $first->id }}" data-code="{{ $code }}" {{ old('arazi_id') == $first->id ? 'selected' : '' }}>{{ $code }}</option>
+                            <option value="{{ $first->id }}" data-code="{{ $code }}" {{ (string)$selectedAraziId === (string)$first->id ? 'selected' : '' }}>{{ $code }}</option>
                         @endforeach
                     </select>
                 </div>
@@ -178,89 +179,128 @@
             }catch(e){}
         }
 
-        araziSelect?.addEventListener('change', function(){
-            const val = this.value;
-            if(!val){ resetKisanSelects(); return; }
+        // initialize select2 first so jQuery .on('change') catches both native and Select2 events
+        if(window.jQuery && jQuery.fn.select2){
+            try{ deedName.select2({ theme: 'bootstrap-5', width: '100%', placeholder: 'Select Deed Name', allowClear: true }); }catch(e){}
+            try{
+                jQuery('#arazi_select').select2({
+                    theme: 'bootstrap-5',
+                    width: '100%',
+                    placeholder: '-- choose arazi --',
+                    allowClear: true
+                });
+            }catch(e){}
+        }
 
-            // If selection was made from modal, use id directly
+        // Use jQuery .on('change') — fires exactly once whether user picks from Select2 or native select
+        $(araziSelect).on('change', function(){
+            const val = $(this).val();
+            if(!val){ araziSelect.dataset.resolvedAraziId=''; araziSelect.dataset.resolvedForValue=''; resetKisanSelects(); return; }
+
+            // If selection was made from modal, use that arazi id directly
             if(window.__selectedFromModal){
-                // reset flag
                 window.__selectedFromModal = false;
-                // fetch kisans and info by id
                 $.getJSON("{{ route('ajax.kisans.by-arazi') }}", { arazi_id: val })
                     .done(function(data){ populateKisans(data || []); })
                     .fail(function(){ resetKisanSelects(); });
-
                 (async function(){
                     try{
                         const res = await fetch(araziInfoUrl.replace('__ARAZI_ID__', encodeURIComponent(val)));
                         if(!res.ok) return;
                         const info = await res.json();
                         if(info){
-                            try{ if(!window.__skipAutoDeedFill) document.getElementById('deed_no_input').value = info.legacy_arazi_code || ''; }catch(e){}
+                            if(!window.__skipAutoDeedFill) try{ document.getElementById('deed_no_input').value = info.legacy_arazi_code || ''; }catch(e){}
                             try{ document.querySelector('input[name="total_gaz"]').value = info.remaining_gaz ?? info.saleable_total_gaz ?? ''; }catch(e){}
                             try{ document.querySelector('input[name="road_land_gaj"]').value = info.road_area ?? 0; }catch(e){}
-                            try{ window.__skipAutoDeedFill = false; }catch(e){}
+                            window.__skipAutoDeedFill = false;
                         }
-                    }catch(e){ }
+                    }catch(e){}
                 })();
-
                 return;
             }
 
-            // otherwise, check if this option represents a group of arazis (by code)
-            const opt = this.options[this.selectedIndex];
+            // If user re-selects the same grouped option already resolved from modal — skip modal
+            if(araziSelect.dataset.resolvedAraziId && araziSelect.dataset.resolvedForValue === val){
+                const rid = araziSelect.dataset.resolvedAraziId;
+                $.getJSON("{{ route('ajax.kisans.by-arazi') }}", { arazi_id: rid })
+                    .done(function(data){ populateKisans(data || []); })
+                    .fail(function(){ resetKisanSelects(); });
+                (async function(){
+                    try{
+                        const res = await fetch(araziInfoUrl.replace('__ARAZI_ID__', encodeURIComponent(rid)));
+                        if(!res.ok) return;
+                        const info = await res.json();
+                        if(info){
+                            try{ document.querySelector('input[name="total_gaz"]').value = info.remaining_gaz ?? info.saleable_total_gaz ?? ''; }catch(e){}
+                            try{ document.querySelector('input[name="road_land_gaj"]').value = info.road_area ?? 0; }catch(e){}
+                        }
+                    }catch(e){}
+                })();
+                return;
+            }
+
+            // New/different selection — clear stale resolved data
+            araziSelect.dataset.resolvedAraziId = '';
+            araziSelect.dataset.resolvedForValue = '';
+
+            // Lookup by arazi code
+            const opt = araziSelect.options[araziSelect.selectedIndex];
             const code = opt?.dataset?.code || '';
             if(code){
-                // lookup by code — server returns matches if >1
                 (async function(){
                     try{
                         const res = await fetch("{{ route('arazis.by-code') }}?code=" + encodeURIComponent(code));
                         if(!res.ok) return;
                         const json = await res.json();
                         if(json.found && Array.isArray(json.matches) && json.matches.length > 0){
-                            // multiple matches — show modal and let user select
                             try{ showAraziMatches(json.matches); }catch(e){}
                             return;
                         }
-                        // single or not grouped — if server returned arazi_id, use it; else fallback to selected id
                         const araziId = (json.found && json.arazi_id) ? json.arazi_id : val;
-
-                        // fetch kisans and info for the resolved arazi id
                         $.getJSON("{{ route('ajax.kisans.by-arazi') }}", { arazi_id: araziId })
                             .done(function(data){ populateKisans(data || []); })
                             .fail(function(){ resetKisanSelects(); });
-
-                        try{
-                            const infoRes = await fetch(araziInfoUrl.replace('__ARAZI_ID__', encodeURIComponent(araziId)));
-                            if(infoRes && infoRes.ok){
-                                const info = await infoRes.json();
-                                if(info){
-                                    try{ document.getElementById('deed_no_input').value = info.legacy_arazi_code || ''; }catch(e){}
-                                    try{ document.querySelector('input[name="total_gaz"]').value = info.remaining_gaz ?? info.saleable_total_gaz ?? ''; }catch(e){}
-                                    try{ document.querySelector('input[name="road_land_gaj"]').value = info.road_area ?? 0; }catch(e){}
-                                }
+                        const infoRes = await fetch(araziInfoUrl.replace('__ARAZI_ID__', encodeURIComponent(araziId)));
+                        if(infoRes && infoRes.ok){
+                            const info = await infoRes.json();
+                            if(info){
+                                try{ document.getElementById('deed_no_input').value = info.legacy_arazi_code || ''; }catch(e){}
+                                try{ document.querySelector('input[name="total_gaz"]').value = info.remaining_gaz ?? info.saleable_total_gaz ?? ''; }catch(e){}
+                                try{ document.querySelector('input[name="road_land_gaj"]').value = info.road_area ?? 0; }catch(e){}
                             }
-                        }catch(e){}
-                    }catch(e){ }
+                        }
+                    }catch(e){}
                 })();
             }
         });
 
         // When user selects a Name on Deed, copy it to Sale By (seller)
-        try{
-            $('#deed_name_select').on('change', function(){
-                try{ $('#sale_by_input').val($(this).val()); }catch(e){}
-            });
-        }catch(e){}
+        $('#deed_name_select').on('change', function(){
+            try{ $('#sale_by_input').val($(this).val()); }catch(e){}
+        });
 
-        // initialize select2 if available
-        if(window.jQuery && jQuery.fn.select2){
-            try{ deedName.select2({ theme: 'bootstrap-5', width: '100%', placeholder: 'Select Deed Name', allowClear: true }); }catch(e){}
-        }
-
-        // If an arazi is already selected on page load, trigger change to populate kisans
+        // On page load (edit): fetch kisans directly by saved arazi_id — never open modal on load
+        @if(!empty($item->arazi_id))
+        (function(){
+            const savedId = @json((string)($item->arazi_id));
+            const savedVal = araziSelect ? araziSelect.value : '';
+            // Pre-mark as resolved so any subsequent re-selection also skips the modal
+            if(araziSelect){
+                araziSelect.dataset.resolvedAraziId = savedId;
+                araziSelect.dataset.resolvedForValue = savedVal;
+            }
+            $.getJSON("{{ route('ajax.kisans.by-arazi') }}", { arazi_id: savedId })
+                .done(function(data){
+                    populateKisans(data || []);
+                    // Re-select saved name_deed_no after kisans are populated
+                    const savedName = @json($item->name_deed_no ?? '');
+                    if(savedName){ try{ $('#deed_name_select').val(savedName).trigger('change'); }catch(e){} }
+                })
+                .fail(function(){ resetKisanSelects(); });
+        })();
+        @elseif(true)
         try{ if(araziSelect && araziSelect.value){ $(araziSelect).trigger('change'); } }catch(e){}
+        @endif
 
         // If a deed name already present, copy it to sale_by on load
         try{ if($('#deed_name_select').val()){ $('#sale_by_input').val($('#deed_name_select').val()); } }catch(e){}
@@ -280,6 +320,11 @@
                     for(const opt of (araziSelect.options || [])){
                         if(opt.dataset && opt.dataset.code === code){
                             araziSelect.value = opt.value;
+                            // Store resolved arazi ID so re-selecting this option skips the modal
+                            araziSelect.dataset.resolvedAraziId = String(a.id);
+                            araziSelect.dataset.resolvedForValue = opt.value;
+                            // Sync Select2 display without re-triggering change logic
+                            try{ jQuery('#arazi_select').trigger('change.select2'); }catch(e){}
                             matched = true;
                             break;
                         }

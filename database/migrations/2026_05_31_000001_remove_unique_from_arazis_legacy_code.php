@@ -8,14 +8,12 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::table('arazis', function (Blueprint $table) {
-            // Drop the unique index if it exists (ignore if already dropped)
-            try {
+        $indexes = collect(\DB::select("SHOW INDEX FROM arazis WHERE Key_name = 'arazis_legacy_arazi_code_unique'"));
+        if ($indexes->isNotEmpty()) {
+            Schema::table('arazis', function (Blueprint $table) {
                 $table->dropUnique(['legacy_arazi_code']);
-            } catch (\Throwable $e) {
-                // already removed or never existed
-            }
-        });
+            });
+        }
     }
 
     public function down(): void

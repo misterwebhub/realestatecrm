@@ -22,7 +22,7 @@ class KisanRegistryController extends Controller
             $query->where('arazi_deed_no', 'like', '%' . $araziCode . '%');
         }
 
-        $records = $query->latest()->get();
+        $records = $query->with('arazi')->latest()->get();
 
         // provide a unique list of arazi labels for the filter
         $araziList = \App\Models\Arazi::orderBy('id')->get();
@@ -70,7 +70,7 @@ class KisanRegistryController extends Controller
 
     public function store(Request $request)
     {
-        $validated = $this->validateRequest($request);
+        $validated = $this->validateRequest($request, null);
         $validated = $this->handleFileUpload($request, $validated);
 
         KisanRegistry::create($validated);
@@ -94,7 +94,7 @@ class KisanRegistryController extends Controller
 
     public function update(Request $request, KisanRegistry $kisanRegistry)
     {
-        $validated = $this->validateRequest($request);
+        $validated = $this->validateRequest($request, $kisanRegistry);
         $validated = $this->handleFileUpload($request, $validated, $kisanRegistry);
 
         $kisanRegistry->update($validated);
@@ -129,9 +129,12 @@ class KisanRegistryController extends Controller
         return response()->download($path, $kisanRegistry->registry_file_name ?? basename($path));
     }
 
-    private function validateRequest(Request $request): array
+    private function validateRequest(Request $request, ?KisanRegistry $existing = null): array
     {
+        $fileRule = ($existing !== null) ? ['nullable', 'file', 'max:10240'] : ['required', 'file', 'max:10240'];
+
         return $request->validate([
+            'arazi_id'       => ['nullable', 'integer', 'exists:arazis,id'],
             'arazi_deed_no'  => ['required', 'string', 'max:100'],
             'name_deed_no'   => ['required', 'string', 'max:100'],
             'sale_by'        => ['nullable', 'string', 'max:200'],
@@ -145,7 +148,7 @@ class KisanRegistryController extends Controller
             'commission'     => ['required', 'numeric', 'min:0'],
             'brokari'        => ['required', 'numeric', 'min:0'],
             'broker_name'    => ['required', 'string', 'max:200'],
-            'registry_file'  => ['required', 'file', 'max:10240'], // 10 MB
+            'registry_file'  => $fileRule,
         ]);
     }
 

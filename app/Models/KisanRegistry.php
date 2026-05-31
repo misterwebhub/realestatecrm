@@ -10,6 +10,7 @@ class KisanRegistry extends Model
     use HasFactory;
 
     protected $fillable = [
+        'arazi_id',
         'arazi_deed_no',
         'name_deed_no',
         'sale_by',
@@ -37,6 +38,11 @@ class KisanRegistry extends Model
         'commission'    => 'decimal:2',
         'brokari'       => 'decimal:2',
     ];
+
+    public function arazi()
+    {
+        return $this->belongsTo(\App\Models\Arazi::class);
+    }
 
     public function getTotalExpensesAttribute(): float
     {
