@@ -467,7 +467,7 @@
             const customerPaymentBondSelect = document.querySelector('select[name="customer_bond_id"]');
 
             if(window.jQuery && jQuery.fn.select2){
-                jQuery('select[name="kisan_id"], select[name="kisan_bond_id"], select[name="customer_id"], select[name="customer_bond_id"]').select2({
+                jQuery('select[name="kisan_id"], select[name="kisan_bond_id"], select[name="customer_id"], select[name="customer_bond_id"], select[name="customer_bond_cheque_id"]').select2({
                     theme: 'bootstrap-5',
                     width: '100%'
                 });
@@ -548,6 +548,7 @@
             const araziSaleableUrl = @json(route('arazis.saleable', ['arazi' => '__ARAZI_ID__']));
             const araziPlotsUrl = @json(route('arazis.plots', ['arazi' => '__ARAZI_ID__']));
             const paymentCtxUrl = @json(route('customer-bonds.payment-context', ['customer_bond' => '__BOND_ID__']));
+            const customerBondChequesUrl = @json(route('customer-bond-cheques.for-bond', ['customer_bond' => '__BOND_ID__']));
             const hiddenArazi = document.querySelector('input#arazi_id[type="hidden"]');
             const hiddenPlot = document.querySelector('input#plot_id[type="hidden"]');
             const araziDisplayInput = document.getElementById('arazi_display');
@@ -582,10 +583,77 @@
             if(customerPaymentBondSelect && hiddenArazi){
                 customerPaymentBondSelect.addEventListener('change', function(){
                     applyCustomerBondPaymentContext(this.value);
+                    // load cheques for selected bond
+                    loadChequesForBond(this.value);
                 });
                 if(customerPaymentBondSelect.value){
                     applyCustomerBondPaymentContext(customerPaymentBondSelect.value);
+                    loadChequesForBond(customerPaymentBondSelect.value);
                 }
+            }
+
+            async function loadChequesForBond(bondId){
+                const select = document.querySelector('select[name="customer_bond_cheque_id"]');
+                if(!select) return;
+                select.innerHTML = '<option value="">Select Cheque (optional)</option>';
+                if(!bondId) return;
+                try{
+                    // request only pending (unpaid) cheques by default
+                    const url = customerBondChequesUrl.replace('__BOND_ID__', encodeURIComponent(bondId)) + '?status=pending';
+                    const res = await fetch(url);
+                    if(!res.ok) return;
+                    const data = await res.json();
+                    if(!Array.isArray(data)) return;
+                    data.forEach(function(c){
+                        const opt = document.createElement('option');
+                        opt.value = c.id;
+                        opt.textContent = c.label;
+                        // include amount for client-side autofill when provided
+                        opt.dataset.amount = (c.amount !== undefined && c.amount !== null) ? c.amount : '';
+                        select.appendChild(opt);
+                    });
+                    if(window.jQuery && jQuery.fn.select2) jQuery(select).trigger('change.select2');
+
+                    // when a cheque is selected, autofill amount and make it readonly
+                    const amountInput = document.querySelector('input[name="amount"]');
+                    const paymentInput = document.querySelector('input[name="payment_method"]');
+
+                    // default to cash if nothing selected
+                    if(paymentInput && !paymentInput.value) paymentInput.value = 'cash';
+
+                    select.addEventListener('change', function(){
+                        const sel = this.options[this.selectedIndex];
+                        if(sel && sel.value){
+                            let amt = sel.dataset.amount || '';
+                            if(!amt){
+                                const m = (sel.textContent || '').match(/₹\s*([\d,\.]+)/);
+                                if(m) amt = m[1].replace(/,/g, '');
+                            }
+                            if(amountInput && amt !== ''){
+                                amountInput.value = amt;
+                                amountInput.setAttribute('readonly', 'readonly');
+                                amountInput.classList.add('bg-light');
+                            }
+                            // force payment method to cheque and disable editing
+                            if(paymentInput){
+                                paymentInput.value = 'cheque';
+                                paymentInput.setAttribute('readonly', 'readonly');
+                                paymentInput.classList.add('bg-light');
+                            }
+                        } else {
+                            // no cheque selected -> make amount editable and default payment to cash
+                            if(amountInput){
+                                amountInput.removeAttribute('readonly');
+                                amountInput.classList.remove('bg-light');
+                            }
+                            if(paymentInput){
+                                paymentInput.removeAttribute('readonly');
+                                paymentInput.classList.remove('bg-light');
+                                paymentInput.value = 'cash';
+                            }
+                        }
+                    });
+                }catch(e){}
             }
 
             if(customerPaymentCustomerSelect && hiddenArazi){

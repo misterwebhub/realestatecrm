@@ -135,7 +135,12 @@
                             <td>{{ $entry['date'] }}</td>
                             <td>{{ $entry['type'] }}</td>
                             <td class="text-end">{{ number_format((float) $entry['amount'], 2) }}</td>
-                            <td>{{ $entry['method'] }}</td>
+                            <td>
+                                {{ $entry['method'] }}
+                                @if(!empty($entry['cheque_number']))
+                                    — {{ $entry['cheque_number'] }}
+                                @endif
+                            </td>
                             <td>{{ $entry['remarks'] }}</td>
                         </tr>
                     @empty

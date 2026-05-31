@@ -195,6 +195,72 @@ class AraziController extends Controller
         return response()->json($plots);
     }
 
+    /**
+     * Lookup an Arazi by legacy code or plot_number and return plots and arazi info.
+     * GET /arazi/by-code?code=XXX
+     */
+    public function byCode(Request $request)
+    {
+        $code = trim((string) $request->query('code', ''));
+        if ($code === '') {
+            return response()->json(['found' => false]);
+        }
+
+        $arazi = Arazi::where('legacy_arazi_code', $code)->orWhere('plot_number', $code)->first();
+        if (! $arazi) {
+            return response()->json(['found' => false]);
+        }
+
+        // reuse plots() logic to prepare plot payload
+        $plots = $arazi->plots()->get(['id', 'plot_number', 'title', 'block', 'area', 'description', 'status'])->map(function ($p) {
+            $status = null;
+            $dbStatus = strtolower((string) ($p->status ?? ''));
+            $explicitStatuses = ['available','booked_advance','booked','hold','registry','blacklist','not_for_sale','issue'];
+            if ($dbStatus !== '' && in_array($dbStatus, $explicitStatuses, true)) {
+                $status = $dbStatus;
+            }
+
+            if ($status === null || $status === 'available') {
+                $hasRegistry = \App\Models\Registry::where('plot_id', $p->id)
+                    ->where(function($q){ $q->where('status', 'completed')->orWhere('payment_status', 'completed')->orWhereNull('status'); })
+                    ->exists();
+
+                if ($hasRegistry) {
+                    $status = 'registry';
+                } else {
+                    $booking = \App\Models\Booking::where('plot_id', $p->id)
+                        ->where(function($q){ $q->where('status', '!=', 'expired')->orWhereNull('status'); })
+                        ->latest()->first();
+                    if ($booking) {
+                        $status = 'booked';
+                    }
+                }
+            }
+
+            $desc = strtolower((string) ($p->description ?? ''));
+            if (str_contains($desc, 'issue') || empty($p->area) || (float) ($p->area ?? 0) <= 0) {
+                $status = 'issue';
+            }
+
+            if ($status === null) $status = 'available';
+
+            return [
+                'id' => $p->id,
+                'plot_number' => $p->plot_number ?? ($p->title ?? $p->id),
+                'label' => $p->title ?? ($p->plot_number ?: ('Plot-' . $p->id)),
+                'area' => $p->area,
+                'status' => $status,
+            ];
+        })->values();
+
+        return response()->json([
+            'found' => true,
+            'arazi_id' => $arazi->id,
+            'arazi_label' => $arazi->legacy_arazi_code ?: ($arazi->plot_number ?? ('Arazi-' . $arazi->id)),
+            'plots' => $plots,
+        ]);
+    }
+
     public function grid(Arazi $arazi)
     {
         $plots = $arazi->plots()->get();

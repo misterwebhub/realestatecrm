@@ -64,6 +64,9 @@
 	<input type="hidden" name="__VIEWSTATEGENERATOR" id="__VIEWSTATEGENERATOR" value="867AEF2B" />
 </div>
     <div style="height:500px;width:80%;margin-left:10%;">
+        <div style="margin-bottom:8px;text-align:right;">
+            <button type="button" id="show_plots_btn" style="padding:6px 10px;border:1px solid #ccc;background:#f8f9fa;cursor:pointer;">Show plots</button>
+        </div>
     
     
         <table style="height:100%;width:100%;">
@@ -397,6 +400,9 @@ try {
 }
 ?>
 <script>
+// Expose plots as a global so popup scripts can access them outside the DOMContentLoaded scope
+window.plots = <?php echo json_encode($plots, JSON_UNESCAPED_SLASHES|JSON_UNESCAPED_UNICODE); ?> || [];
+
 document.addEventListener('DOMContentLoaded', function(){
     const serverDebug = <?php echo json_encode($serverDebug, JSON_UNESCAPED_SLASHES|JSON_UNESCAPED_UNICODE); ?> || {};
     console.log('serverDebug', serverDebug);
@@ -413,7 +419,7 @@ document.addEventListener('DOMContentLoaded', function(){
         'issue':'#6C757D'
     };
 
-    const plots = <?php echo json_encode($plots, JSON_UNESCAPED_SLASHES|JSON_UNESCAPED_UNICODE); ?> || [];
+    const plots = window.plots || [];
     console.log('arazi plots payload:', plots);
 
     // Simple number-based lookup: map plot_number (digits only) -> status
@@ -474,6 +480,157 @@ document.addEventListener('DOMContentLoaded', function(){
         }
     });
 });
+</script>
+<style>
+/* Embed essential grid styles so popup matches /arazi/{id}/grid look */
+:root{
+    --status-available: #FFC107;
+    --status-booked: #28A745;
+    --status-booked-advance: #20C997;
+    --status-not-for-sale: #9E9E9E;
+    --status-blacklist: #212529;
+    --status-hold: #A0522D;
+    --status-registry: #E53935;
+    --status-issue: #6C757D;
+}
+#plots-popup { position: fixed; inset: 6% 6% auto 6%; background: #fff; border:1px solid #ccc; box-shadow: 0 6px 24px rgba(0,0,0,0.2); z-index:9999; display:none; max-height:88%; overflow:auto; border-radius:8px; }
+#plots-popup .pp-header { padding:10px 12px; border-bottom:1px solid #eee; display:flex; justify-content:space-between; align-items:center; }
+#plots-popup .pp-body { padding:12px; }
+#pp-legend { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:12px; }
+.pp-legend-item { display:inline-flex; align-items:center; gap:8px; padding:6px 10px; border-radius:8px; cursor:pointer; background:transparent; }
+.pp-legend-item.active { background:rgba(0,0,0,0.04); transform:translateY(-2px); }
+.legend-dot { width:12px; height:12px; border-radius:50%; display:inline-block; margin-right:6px; }
+.legend-dot.available { background:var(--status-available); }
+.legend-dot.booked { background:var(--status-booked); }
+.legend-dot.booked-advance { background:var(--status-booked-advance); }
+.legend-dot.registry { background:var(--status-registry); }
+.legend-dot.not-for-sale { background:var(--status-not-for-sale); }
+.legend-dot.blacklist { background:var(--status-blacklist); }
+.legend-dot.hold { background:var(--status-hold); }
+.legend-dot.issue { background:var(--status-issue); }
+.pp-grid { display:flex; gap:10px; flex-wrap:wrap; }
+.plot-card { background:linear-gradient(180deg,#ffffff, #fcfcfc); border-radius:8px; overflow:hidden; box-shadow:0 6px 18px rgba(0,0,0,0.06); transition:transform .12s ease; cursor:pointer; width:160px; }
+.plot-card:hover { transform:translateY(-6px); }
+.plot-strip { height:9px; }
+.plot-strip.available { background:var(--status-available); }
+.plot-strip.booked { background:var(--status-booked); }
+.plot-strip.booked-advance { background:var(--status-booked-advance); }
+.plot-strip.registry { background:var(--status-registry); }
+.plot-strip.not-for-sale { background:var(--status-not-for-sale); }
+.plot-strip.blacklist { background:var(--status-blacklist); }
+.plot-strip.hold { background:var(--status-hold); }
+.plot-strip.issue { background:var(--status-issue); }
+.plot-card-body { padding:8px; text-align:center; }
+.plot-number { font-weight:700; font-size:18px; }
+.plot-area { color:#5c6975; font-size:13px; }
+.plot-status { display:inline-block; padding:4px 8px; border-radius:10px; font-size:13px; margin-top:6px; }
+#pp-close { border:none;background:transparent;cursor:pointer;font-size:18px; }
+</style>
+
+<div id="plots-popup">
+    <div class="pp-header">
+        <strong>Plots</strong>
+        <div><button id="pp-close">✕</button></div>
+    </div>
+    <div class="pp-body">
+        <div id="pp-legend"></div>
+        <div id="pp-content" class="pp-grid"></div>
+        <div id="pp-detail" style="display:none;margin-top:12px;border-top:1px solid #eee;padding-top:12px;"></div>
+    </div>
+</div>
+
+<script>
+(function(){
+    const pp = document.getElementById('plots-popup');
+    const ppLegend = document.getElementById('pp-legend');
+    const ppContent = document.getElementById('pp-content');
+    const btn = document.getElementById('show_plots_btn');
+
+    const statusLabels = [
+        {key:'all', label:'All'},
+        {key:'available', label:'Available'},
+        {key:'booked', label:'Booked'},
+        {key:'booked-advance', label:'Booked (advance)'},
+        {key:'hold', label:'Hold'},
+        {key:'registry', label:'Registry'},
+        {key:'not-for-sale', label:'Not for sale'},
+        {key:'blacklist', label:'Blacklist'},
+        {key:'issue', label:'Issue'}
+    ];
+
+    function normalizeStatus(s){ return String(s||'available').toLowerCase().replace(/[_ ]+/g,'-'); }
+
+    function buildLegend(){
+        ppLegend.innerHTML = '';
+        const counts = {};
+        (plots||[]).forEach(p => { const k = normalizeStatus(p.status); counts[k] = (counts[k]||0)+1; });
+        const total = (plots||[]).length;
+        statusLabels.forEach(function(s, idx){
+            const el = document.createElement('div');
+            el.className = 'pp-legend-item' + (idx===0? ' active':'');
+            el.dataset.key = s.key;
+            const dot = document.createElement('span'); dot.className = 'legend-dot ' + (s.key === 'all' ? 'available' : s.key.replace(/_/g,'-'));
+            el.appendChild(dot);
+            const txt = document.createElement('span');
+            const cnt = (s.key === 'all') ? total : (counts[s.key] || 0);
+            txt.innerHTML = s.label + ' <small style="color:#666;margin-left:6px">(' + cnt + ')</small>';
+            el.appendChild(txt);
+            el.addEventListener('click', function(){
+                Array.from(ppLegend.children).forEach(c=>c.classList.remove('active'));
+                el.classList.add('active');
+                renderPlots(s.key);
+            });
+            ppLegend.appendChild(el);
+        });
+    }
+
+    function renderPlots(filterKey){
+        ppContent.innerHTML = '';
+        const ppDetail = document.getElementById('pp-detail'); ppDetail.style.display = 'none'; ppDetail.innerHTML = '';
+        const items = (filterKey === 'all') ? (plots||[]) : (plots||[]).filter(p => normalizeStatus(p.status) === filterKey);
+        if(!items.length){ ppContent.innerHTML = '<div style="padding:8px;color:#666">No plots in this category.</div>'; return; }
+        items.forEach(function(p){
+            const card = document.createElement('div'); card.className = 'plot-card';
+            const strip = document.createElement('div'); strip.className = 'plot-strip ' + normalizeStatus(p.status);
+            const body = document.createElement('div'); body.className = 'plot-card-body';
+            body.innerHTML = '<div class="plot-number">' + (p.plot_number || p.id) + '</div>' +
+                '<div class="plot-area">' + (p.area || '-') + ' gaz</div>' +
+                '<div class="plot-status">' + (p.status || '') + '</div>';
+            card.appendChild(strip); card.appendChild(body);
+            card.style.cursor = 'pointer';
+            card.addEventListener('click', function(){ renderPlotDetail(p); });
+            ppContent.appendChild(card);
+        });
+    }
+
+    function renderPlotDetail(p){
+        const ppDetail = document.getElementById('pp-detail');
+        ppDetail.style.display = '';
+        ppDetail.innerHTML = '';
+        const back = document.createElement('button'); back.textContent = '← Back to list'; back.className = 'btn btn-sm btn-outline-secondary'; back.style.marginBottom = '8px';
+        back.addEventListener('click', function(){ ppDetail.style.display = 'none'; });
+        const title = document.createElement('h5'); title.textContent = 'Plot ' + (p.plot_number || p.id);
+        const info = document.createElement('div'); info.style.marginTop = '8px';
+        info.innerHTML = '<div><strong>Area:</strong> ' + (p.area || '-') + ' gaz</div>' +
+                         '<div><strong>Status:</strong> ' + (p.status || '-') + '</div>' +
+                         '<div><strong>ID:</strong> ' + (p.id) + '</div>';
+        const actions = document.createElement('div'); actions.style.marginTop = '10px';
+        const editLink = document.createElement('a'); editLink.className = 'btn btn-sm btn-primary'; editLink.target = '_blank'; editLink.href = '/plots/' + p.id + '/edit'; editLink.textContent = 'Edit Plot';
+        const regLink = document.createElement('a'); regLink.className = 'btn btn-sm btn-outline-primary'; regLink.style.marginLeft = '8px'; regLink.target = '_blank'; regLink.href = '/registries/create?plot_id=' + p.id; regLink.textContent = 'Create Registry';
+        actions.appendChild(editLink); actions.appendChild(regLink);
+        ppDetail.appendChild(back); ppDetail.appendChild(title); ppDetail.appendChild(info); ppDetail.appendChild(actions);
+        // scroll detail into view
+        ppDetail.scrollIntoView({behavior:'smooth', block:'center'});
+    }
+
+    btn.addEventListener('click', function(e){
+        buildLegend();
+        renderPlots('all');
+        pp.style.display = 'block';
+    });
+    document.getElementById('pp-close').addEventListener('click', function(){ pp.style.display = 'none'; });
+    document.addEventListener('keydown', function(e){ if(e.key === 'Escape') pp.style.display = 'none'; });
+})();
 </script>
 </body>
 </html>

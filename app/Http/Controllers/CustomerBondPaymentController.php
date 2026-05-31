@@ -11,6 +11,7 @@ use App\Support\PaymentReceiptPresenter;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
+use Illuminate\Support\Facades\DB;
 
 class CustomerBondPaymentController extends Controller
 {
@@ -102,6 +103,12 @@ class CustomerBondPaymentController extends Controller
                 ];
             }),
             'entries' => $entries->map(function (CustomerBondPayment $payment) {
+                $chequeNumber = null;
+                if (strtolower((string) $payment->payment_method) === 'cheque' && $payment->customer_bond_cheque_id) {
+                    $c = \App\Models\CustomerBondCheque::find($payment->customer_bond_cheque_id);
+                    $chequeNumber = $c?->cheque_number ?? null;
+                }
+
                 return [
                     'entry_no' => $payment->entry_no,
                     'bond_no' => $payment->customerBond?->bond_no ?? '-',
@@ -110,6 +117,7 @@ class CustomerBondPaymentController extends Controller
                     'type' => ucfirst($payment->entry_type),
                     'amount' => (float) $payment->amount,
                     'method' => $payment->payment_method ?? '-',
+                    'cheque_number' => $chequeNumber,
                     'remarks' => $payment->remarks ?? '-',
                 ];
             }),
@@ -118,6 +126,14 @@ class CustomerBondPaymentController extends Controller
                 'customer_id' => $selectedCustomerId,
             ], fn ($v) => $v !== null && $v !== '')),
         ]);
+    }
+
+    /**
+     * Redirect the standard create route to the compact payment UI.
+     */
+    public function create()
+    {
+        return redirect()->route('customer-bond-payments.compact');
     }
 
     public function ledgerExportCsv(\Illuminate\Http\Request $request)
@@ -133,9 +149,15 @@ class CustomerBondPaymentController extends Controller
             ->latest('id')
             ->get();
 
-        $columns = ['Entry No', 'Customer Bond', 'Customer', 'Date', 'Type', 'Amount', 'Method', 'Remarks'];
+        $columns = ['Entry No', 'Customer Bond', 'Customer', 'Date', 'Type', 'Amount', 'Method', 'Cheque No', 'Remarks'];
 
         $rows = $entries->map(function (CustomerBondPayment $payment) {
+            $chequeNumber = null;
+            if (strtolower((string) $payment->payment_method) === 'cheque' && $payment->customer_bond_cheque_id) {
+                $c = \App\Models\CustomerBondCheque::find($payment->customer_bond_cheque_id);
+                $chequeNumber = $c?->cheque_number ?? null;
+            }
+
             return [
                 $payment->entry_no,
                 $payment->customerBond?->bond_no ?? '-',
@@ -144,6 +166,7 @@ class CustomerBondPaymentController extends Controller
                 ucfirst($payment->entry_type),
                 number_format((float) $payment->amount, 2, '.', ''),
                 $payment->payment_method ?? '-',
+                $chequeNumber ?? '-',
                 $payment->remarks ?? '-',
             ];
         })->all();
@@ -153,7 +176,7 @@ class CustomerBondPaymentController extends Controller
 
     protected function resourceColumns(): array
     {
-        return ['Entry No', 'Bond', 'Customer', 'Arazi', 'Plot', 'Land Size', 'Witness', 'Entry Date', 'Type', 'Amount'];
+        return ['Entry No', 'Bond', 'Customer', 'Arazi', 'Plot', 'Land Size', 'Entry Date', 'Type', 'Amount'];
     }
 
     protected function resourceFields(?Model $item = null): array
@@ -192,6 +215,18 @@ class CustomerBondPaymentController extends Controller
                 'required' => true,
             ],
             [
+                'name' => 'customer_bond_cheque_id',
+                'label' => 'Cheque (optional)',
+                'type' => 'select',
+                // only show unpaid/pending cheques for selection
+                'options' => ($item && $item->customer_bond_id)
+                    ? \App\Models\CustomerBondCheque::where('customer_bond_id', $item->customer_bond_id)->where('status', 'pending')->orderByDesc('id')->get()->mapWithKeys(function ($c) {
+                        return [$c->id => ($c->cheque_number ? $c->cheque_number . ' — ' : '') . '₹' . number_format((float)$c->amount, 2) . ' — ' . ucfirst($c->status)];
+                    })->all()
+                    : [],
+                'value' => $item?->customer_bond_cheque_id,
+            ],
+            [
                 'name' => 'arazi_display',
                 'label' => 'Arazi',
                 'type' => 'readonly_text',
@@ -210,7 +245,7 @@ class CustomerBondPaymentController extends Controller
             ['name' => 'entry_date', 'label' => 'Entry Date', 'type' => 'date', 'value' => optional($item?->entry_date)->format('Y-m-d'), 'required' => true],
             ['name' => 'entry_type', 'label' => 'Entry Type', 'type' => 'select', 'options' => ['advance' => 'Advance', 'installment' => 'Installment', 'final' => 'Final', 'penalty' => 'Penalty', 'other' => 'Other'], 'value' => $item?->entry_type ?? 'installment', 'required' => true],
             ['name' => 'land_size', 'label' => 'Land Size', 'type' => 'number', 'step' => '0.01', 'value' => $item?->land_size],
-            ['name' => 'witness_name', 'label' => 'Witness Name', 'type' => 'text', 'value' => $item?->witness_name],
+            // witness_name removed per request
             ['name' => 'amount', 'label' => 'Amount', 'type' => 'number', 'step' => '0.01', 'value' => $item?->amount, 'required' => true],
             ['name' => 'payment_method', 'label' => 'Payment Method', 'type' => 'text', 'value' => $item?->payment_method],
             ['name' => 'remarks', 'label' => 'Remarks', 'type' => 'textarea', 'value' => $item?->remarks],
@@ -239,9 +274,22 @@ class CustomerBondPaymentController extends Controller
                 }
             }],
             'entry_date' => ['required', 'date'],
+            'customer_bond_cheque_id' => ['nullable', 'exists:customer_bond_cheques,id', function ($attr, $value, $fail) {
+                $bondId = request()->input('customer_bond_id');
+                if ($value && $bondId) {
+                    $cheque = \App\Models\CustomerBondCheque::where('id', $value)->where('customer_bond_id', $bondId)->first();
+                    if (! $cheque) {
+                        $fail('Selected cheque does not belong to selected Customer Bond.');
+                        return;
+                    }
+
+                    if ($cheque->status !== 'pending') {
+                        $fail('Selected cheque is not unpaid (pending).');
+                    }
+                }
+            }],
             'entry_type' => ['required', 'in:advance,installment,final,penalty,other'],
             'land_size' => ['nullable', 'numeric', 'min:0'],
-            'witness_name' => ['nullable', 'string', 'max:150'],
             'amount' => ['required', 'numeric', 'min:0'],
             'payment_method' => ['nullable', 'string', 'max:40'],
             'remarks' => ['nullable', 'string'],
@@ -260,6 +308,14 @@ class CustomerBondPaymentController extends Controller
 
             if (empty($validated['land_size']) && ($bond->land_size ?? $bond->sale_land)) {
                 $validated['land_size'] = $bond->land_size ?? $bond->sale_land;
+            }
+        }
+
+        // If a cheque is selected, ensure its customer matches and keep reference
+        if (! empty($validated['customer_bond_cheque_id'])) {
+            $cheque = \App\Models\CustomerBondCheque::find($validated['customer_bond_cheque_id']);
+            if ($cheque) {
+                $validated['customer_id'] = $validated['customer_id'] ?? $cheque->customer_id;
             }
         }
 
@@ -340,7 +396,6 @@ class CustomerBondPaymentController extends Controller
                 $item->arazi?->legacy_arazi_code ?? ($item->arazi?->plot_number ?? '-'),
                 $item->plot?->title ?? ($item->plot?->plot_number ?? '-'),
                 (string) ($item->land_size ?? '-'),
-                $item->witness_name ?? '-',
                 optional($item->entry_date)->format('d-m-Y') ?? '-',
                 ucfirst($item->entry_type),
                 number_format((float) $item->amount, 2),
@@ -366,6 +421,89 @@ class CustomerBondPaymentController extends Controller
             'autoPrint' => $request->boolean('print') && $receipt,
             'toolbar' => true,
         ]);
+    }
+
+    /**
+     * Compact UI: start with Arazi -> Plot -> autofill customer/land size, compact payment options.
+     */
+    public function compact()
+    {
+        $arazis = \App\Models\Arazi::orderBy('id')->get()->mapWithKeys(function ($a) {
+            return [$a->id => ($a->legacy_arazi_code ?: ($a->plot_number ?? ('Arazi-' . $a->id)))];
+        })->all();
+
+        $paymentMethods = [
+            'cheque' => 'Cheque',
+            'rtgs' => 'RTGS',
+            'imps' => 'IMPS',
+            'other' => 'Other',
+        ];
+
+        return view('customer_payments.compact', [
+            'title' => 'Compact Customer Payment',
+            'arazis' => $arazis,
+            'paymentMethods' => $paymentMethods,
+            'action' => route('customer-bond-payments.store'),
+            'method' => 'POST',
+        ]);
+    }
+
+    /**
+     * Override store to ensure atomic save and return JSON for AJAX requests.
+     */
+    public function store(Request $request)
+    {
+        $validated = $request->validate($this->resourceRules());
+        $modelClass = $this->resourceModel();
+        $payload = $this->resourcePrepareData($validated, $request);
+
+        try {
+            $payment = DB::transaction(function () use ($modelClass, $payload, $request, $validated) {
+                $item = $modelClass::create($payload);
+
+                // If the request explicitly included a cheque id but it wasn't in payload
+                // (e.g., disabled fields or other client issues), ensure the payment
+                // references it so resourceAfterSave can mark it cleared.
+                $reqCheque = $request->input('customer_bond_cheque_id') ?? null;
+                if ($reqCheque && empty($item->customer_bond_cheque_id)) {
+                    $item->customer_bond_cheque_id = $reqCheque;
+                    $item->save();
+                }
+
+                // call after save hook to mark cheque cleared etc
+                $this->resourceAfterSave($item, $request, $validated, null);
+                return $item;
+            });
+        } catch (\Throwable $e) {
+            if ($request->wantsJson() || $request->ajax()) {
+                return response()->json(['success' => false, 'error' => $e->getMessage()], 500);
+            }
+            throw $e;
+        }
+
+        if ($request->wantsJson() || $request->ajax()) {
+            $cheque = null;
+            if ($payment->customer_bond_cheque_id) {
+                $c = \App\Models\CustomerBondCheque::find($payment->customer_bond_cheque_id);
+                $cheque = $c ? ['id' => $c->id, 'status' => $c->status, 'cheque_date' => $c->cheque_date] : null;
+            }
+
+            return response()->json([
+                'success' => true,
+                'payment' => [
+                    'id' => $payment->id,
+                    'entry_no' => $payment->entry_no,
+                    'amount' => (float) $payment->amount,
+                    'entry_date' => optional($payment->entry_date)->format('Y-m-d'),
+                    'customer_bond_cheque_id' => $payment->customer_bond_cheque_id,
+                ],
+                'cheque' => $cheque,
+            ], 201);
+        }
+
+        return redirect()
+            ->route($this->resourceRouteName() . '.index')
+            ->with('success', $this->resourceTitle() . ' created successfully.');
     }
 
     public function receiptPdf(Request $request)
@@ -403,5 +541,24 @@ class CustomerBondPaymentController extends Controller
             ->latest('entry_date')
             ->latest('id')
             ->first();
+    }
+
+    protected function resourceAfterSave(Model $item, \Illuminate\Http\Request $request, array $validated, ?Model $original = null): void
+    {
+        // If a cheque was used for this payment, mark the cheque as cleared and set its date
+        $chequeId = $item->customer_bond_cheque_id ?? null;
+        if ($chequeId) {
+            try {
+                $cheque = \App\Models\CustomerBondCheque::find($chequeId);
+                if ($cheque) {
+                    $cheque->status = 'cleared';
+                    // set cheque_date to payment date if available, otherwise today
+                    $cheque->cheque_date = $item->entry_date ? $item->entry_date->format('Y-m-d') : now()->format('Y-m-d');
+                    $cheque->save();
+                }
+            } catch (\Throwable $e) {
+                // ignore errors to avoid breaking payment save
+            }
+        }
     }
 }

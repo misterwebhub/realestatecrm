@@ -13,6 +13,13 @@
             return '-';
         }
     };
+    $fmtArea = static function ($value) {
+        if ($value === null || $value === '') return '-';
+        if (!is_numeric($value)) return (string) $value;
+        $f = (float) $value;
+        if ($f == (int) $f) return (string) ((int) $f);
+        return rtrim(rtrim(number_format($f, 2, '.', ''), '0'), '.');
+    };
 @endphp
 <!doctype html>
 <html>
@@ -110,18 +117,18 @@
             <th colspan="2">Plot No./Plot Size</th>
         </tr>
         <tr>
-            <td colspan="2" style="text-align:left">
+                            <td colspan="2" style="text-align:left">
                 @if($bond->plots && $bond->plots->isNotEmpty())
-                    <ol style="margin:0;padding-left:18px;text-align:left">
+                    <ul style="margin:0;padding-left:20px;text-align:left; list-style-type: disc;">
                         @foreach($bond->plots as $plot)
-                            <li style="text-align:left">
+                            <li style="text-align:left; margin-bottom:4px;">
                                 {{ $plot->plot_number ?? $plot->title ?? ('Plot-' . $plot->id) }}
-                                / {{ $plot->area ?? $plot->size ?? '-' }}
+                                /{{ ($fmtArea($plot->area ?? $plot->size ?? '-') !== '-') ? $fmtArea($plot->area ?? $plot->size ?? '-') . ' gaz' : '-' }}
                             </li>
                         @endforeach
-                    </ol>
+                    </ul>
                 @else
-                    {{ $bond->arazi?->plot_number ?? '-' }} / {{ $bond->land_size ?? $bond->arazi?->size ?? '-' }}
+                    {{ $bond->arazi?->plot_number ?? '-' }} /{{ ($fmtArea($bond->land_size ?? $bond->arazi?->size ?? '-') !== '-') ? $fmtArea($bond->land_size ?? $bond->arazi?->size ?? '-') . ' gaz' : '-' }}
                 @endif
             </td>
         </tr>

@@ -33,7 +33,7 @@ class CustomerBondController extends Controller
 
     protected function resourceColumns(): array
     {
-        return ['Bond No', 'Customer', 'Arazi', 'Bond Date', 'Amount'];
+        return ['Bond No', 'Customer', 'Arazi', 'Plots', 'Bond Date', 'Amount', 'Paid', 'Balance', 'Installment Paid', 'Installment Remaining'];
     }
 
     protected function resourceFields(?Model $item = null): array
@@ -227,7 +227,10 @@ class CustomerBondController extends Controller
 
     protected function resourceQuery()
     {
-        return CustomerBond::with(['customer', 'arazi', 'plots', 'witnesses', 'broker'])->latest();
+        return CustomerBond::with(['customer', 'arazi', 'plots', 'witnesses', 'broker'])
+            ->withSum('payments as paid_amount', 'amount')
+            ->withSum(['payments as installment_paid' => function ($q) { $q->where('entry_type', 'installment'); }], 'amount')
+            ->latest();
     }
 
     public function create()
@@ -261,6 +264,52 @@ class CustomerBondController extends Controller
             'customerDetails' => $customerDetails,
             'arazis' => $arazis,
             'agents' => $agents,
+        ]);
+    }
+
+    public function index(\Illuminate\Http\Request $request)
+    {
+        $araziId = $request->query('arazi_id');
+        $plotQuery = trim((string) $request->query('plot'));
+
+        $query = $this->resourceQuery();
+        if ($araziId) {
+            $query->where('arazi_id', $araziId);
+        }
+        if ($plotQuery !== '') {
+            // allow numeric id match or title partial match
+            $query->whereHas('plots', function ($q) use ($plotQuery) {
+                if (is_numeric($plotQuery)) {
+                    $q->where('plots.id', (int) $plotQuery);
+                }
+                $q->where('plots.title', 'like', '%'.$plotQuery.'%');
+            });
+        }
+
+        $records = $query->get();
+        $routeName = $this->resourceRouteName();
+
+        $rows = $records->map(function (Model $record) use ($routeName) {
+            return array_merge($this->resourceRow($record), [
+                'edit_url' => route($routeName . '.edit', $record),
+                'delete_url' => route($routeName . '.destroy', $record),
+            ]);
+        })->all();
+
+        $arazis = \App\Models\Arazi::orderBy('id')->get()->mapWithKeys(function ($a) {
+            return [$a->id => ($a->legacy_arazi_code ?: ($a->plot_number ?? ('Arazi-' . $a->id)))];
+        })->all();
+
+        return view('crud.index', [
+            'title' => $this->resourceTitle(),
+            'columns' => $this->resourceColumns(),
+            'rows' => $rows,
+            'createUrl' => route($routeName . '.create'),
+            'exportCsvUrl' => $this->allowsCsvExport() ? route($routeName.'.export.csv') : null,
+            'isCustomerBondIndex' => true,
+            'filter_arazi' => $araziId,
+            'filter_plot' => $plotQuery,
+            'arazis' => $arazis,
         ]);
     }
 
@@ -303,11 +352,24 @@ class CustomerBondController extends Controller
                 $item->bond_no,
                 $item->customer?->name ?? '-',
                 $item->arazi?->plot_number ?? $item->arazi?->legacy_arazi_code ?? '-',
+                // plots summary: titles / area
+                ($item->plots->isNotEmpty() ? $item->plots->map(function($p){ return ($p->title ?? ('Plot-'.$p->id)).' / '.($p->area ?? '-').' gaz'; })->implode('; ') : '-'),
                 optional($item->bond_date)->format('d-m-Y') ?? '-',
                 number_format((float) $item->bond_amount, 2),
+                number_format((float) ($item->paid_amount ?? 0), 2),
+                number_format(max(0, ((float) ($item->bond_amount ?? 0) - (float) ($item->paid_amount ?? 0))), 2),
+                number_format((float) ($item->installment_paid ?? 0), 2),
+                number_format(max(0, ((float) ($item->bond_amount ?? 0) - (float) ($item->installment_paid ?? 0))), 2),
             ],
             'print_url' => route('customer-bonds.print', $item->id),
             'pdf_url' => route('customer-bonds.pdf', $item->id),
+            'action_buttons' => [
+                [
+                    'url' => route('customer-bond-cheques.create', ['customer_bond_id' => $item->id]),
+                    'label' => 'Cheques',
+                    'class' => 'btn-outline-info',
+                ],
+            ],
             // mark that links for this resource should open in a new tab
             'open_in_new_tab' => true,
         ];
@@ -351,6 +413,29 @@ class CustomerBondController extends Controller
             'plots' => $plots,
             'plot_summary' => $plotSummary,
             'plot_id' => $firstPlotId,
+            'land_size' => $bond->land_size ?? $bond->sale_land,
+        ]);
+    }
+
+    /**
+     * Find a bond (if any) that includes the given plot and return basic info for compact UI.
+     */
+    public function byPlot(\App\Models\Plot $plot)
+    {
+        $bond = CustomerBond::whereHas('plots', function ($q) use ($plot) {
+            $q->where('plots.id', $plot->id);
+        })->with('customer')->latest()->first();
+
+        if (! $bond) {
+            return response()->json(['found' => false]);
+        }
+
+        return response()->json([
+            'found' => true,
+            'bond_id' => $bond->id,
+            'bond_no' => $bond->bond_no,
+            'customer_id' => $bond->customer_id,
+            'customer_label' => $bond->customer?->name ?? null,
             'land_size' => $bond->land_size ?? $bond->sale_land,
         ]);
     }

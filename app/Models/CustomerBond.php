@@ -72,6 +72,11 @@ class CustomerBond extends Model
         return $this->hasMany(CustomerBondPayment::class);
     }
 
+    public function cheques()
+    {
+        return $this->hasMany(CustomerBondCheque::class);
+    }
+
     public function broker()
     {
         return $this->belongsTo(Agent::class, 'broker_id');

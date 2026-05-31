@@ -11,6 +11,7 @@ class CustomerBondPayment extends Model
 
     protected $fillable = [
         'customer_bond_id',
+        'customer_bond_cheque_id',
         'registry_id',
         'customer_id',
         'arazi_id',

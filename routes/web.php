@@ -9,6 +9,7 @@ use App\Http\Controllers\AraziController;
 use App\Http\Controllers\AraziDocumentController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\CustomerBondPaymentController;
+use App\Http\Controllers\CustomerBondChequeController;
 use App\Http\Controllers\CustomerController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\InvestorController;
@@ -73,10 +74,15 @@ Route::middleware('auth')->group(function () {
     Route::resource('sales', SaleController::class)->except(['show']);
     Route::get('customer-payment-ledger', [CustomerBondPaymentController::class, 'ledger'])->name('customer-bond-payments.ledger');
     Route::get('customer-payment-ledger/export/csv', [CustomerBondPaymentController::class, 'ledgerExportCsv'])->name('customer-bond-payments.ledger.export.csv');
+    Route::get('customer-bond-payments/compact', [CustomerBondPaymentController::class, 'compact'])->name('customer-bond-payments.compact');
     Route::get('customer-bond-payments/export/csv', [CustomerBondPaymentController::class, 'exportCsv'])->name('customer-bond-payments.export.csv');
     Route::get('customer-bond-payments/receipt', [CustomerBondPaymentController::class, 'printReceipt'])->name('customer-bond-payments.receipt');
     Route::get('customer-bond-payments/receipt-pdf', [CustomerBondPaymentController::class, 'receiptPdf'])->name('customer-bond-payments.receipt-pdf');
     Route::resource('customer-bond-payments', CustomerBondPaymentController::class)->except(['show']);
+    Route::resource('customer-bond-cheques', CustomerBondChequeController::class)->except(['show']);
+    Route::get('customer-bond-cheques/by-bond/{customer_bond}', [CustomerBondChequeController::class, 'forBond'])->name('customer-bond-cheques.for-bond');
+    Route::get('customer-bond-cheques/manage/{customer_bond}', [CustomerBondChequeController::class, 'manage'])->name('customer-bond-cheques.manage');
+    Route::post('customer-bond-cheques/bulk-save', [CustomerBondChequeController::class, 'storeBulk'])->name('customer-bond-cheques.bulk-save');
     Route::resource('investors', InvestorController::class)->except(['show']);
     Route::resource('partners', PartnerController::class)->except(['show']);
     Route::resource('arazi-documents', AraziDocumentController::class)->parameters([
@@ -98,9 +104,12 @@ Route::middleware('auth')->group(function () {
     Route::get('converter', [\App\Http\Controllers\AreaConverterController::class, 'index'])->name('converter.index');
     Route::post('converter', [\App\Http\Controllers\AreaConverterController::class, 'convert'])->name('converter.convert');
     Route::get('arazi/{arazi}/plots', [\App\Http\Controllers\AraziController::class, 'plots'])->name('arazis.plots');
+    Route::get('arazi/{arazi}/dashboard', [\App\Http\Controllers\AraziDashboardController::class, 'show'])->name('arazi.dashboard');
     Route::get('arazi/{arazi}/grid', [\App\Http\Controllers\AraziController::class, 'grid'])->name('arazis.grid');
     Route::get('arazi/{arazi}/saleable', [\App\Http\Controllers\AraziController::class, 'saleable'])->name('arazis.saleable');
     Route::get('arazi/{arazi}/bond-info', [\App\Http\Controllers\AraziController::class, 'bondInfo'])->name('arazis.bond-info');
+    Route::get('arazi/by-code', [\App\Http\Controllers\AraziController::class, 'byCode'])->name('arazis.by-code');
+    Route::get('customer-bonds/by-plot/{plot}', [CustomerBondController::class, 'byPlot'])->name('customer-bonds.by-plot');
     
     // Expenses
     Route::get('expenses', [\App\Http\Controllers\ExpenseController::class, 'index'])->name('expenses.index');
@@ -114,4 +123,5 @@ Route::middleware('auth')->group(function () {
     Route::get('kisans/{kisan}/arazis', [\App\Http\Controllers\KisanController::class, 'arazis'])->name('kisans.arazis');
     Route::get('kisans/{kisan}/bonds', [\App\Http\Controllers\KisanController::class, 'bonds'])->name('kisans.bonds');
     Route::get('customers/{customer}/bonds', [\App\Http\Controllers\CustomerController::class, 'bonds'])->name('customers.bonds');
+    Route::get('customers/{customer}/dashboard', [\App\Http\Controllers\CustomerDashboardController::class, 'show'])->name('customer.dashboard');
 });
