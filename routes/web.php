@@ -3,6 +3,7 @@
 // Uploads controllers
 use App\Http\Controllers\UploadController;
 use App\Http\Controllers\UploadCategoryController;
+use App\Http\Controllers\KisanRegistryController;
 
 use App\Http\Controllers\AgentController;
 use App\Http\Controllers\AraziController;
@@ -96,6 +97,7 @@ Route::middleware('auth')->group(function () {
     Route::post('uploads', [UploadController::class, 'store'])->name('uploads.store');
     Route::get('uploads/{upload}/download', [UploadController::class, 'download'])->name('uploads.download');
     Route::get('ajax/arazi-search', [UploadController::class, 'ajaxAraziSearch'])->name('ajax.arazi.search');
+    Route::get('ajax/kisans-by-arazi', [KisanController::class, 'byArazi'])->name('ajax.kisans.by-arazi');
 
     Route::get('upload-categories', [UploadCategoryController::class, 'index'])->name('upload-categories.index');
     Route::post('upload-categories', [UploadCategoryController::class, 'store'])->name('upload-categories.store');
@@ -104,10 +106,13 @@ Route::middleware('auth')->group(function () {
     Route::get('converter', [\App\Http\Controllers\AreaConverterController::class, 'index'])->name('converter.index');
     Route::post('converter', [\App\Http\Controllers\AreaConverterController::class, 'convert'])->name('converter.convert');
     Route::get('arazi/{arazi}/plots', [\App\Http\Controllers\AraziController::class, 'plots'])->name('arazis.plots');
+    Route::get('arazi/{arazi}/info', [\App\Http\Controllers\AraziController::class, 'info'])->name('arazis.info');
     Route::get('arazi/{arazi}/dashboard', [\App\Http\Controllers\AraziDashboardController::class, 'show'])->name('arazi.dashboard');
     Route::get('arazi/{arazi}/grid', [\App\Http\Controllers\AraziController::class, 'grid'])->name('arazis.grid');
     Route::get('arazi/{arazi}/saleable', [\App\Http\Controllers\AraziController::class, 'saleable'])->name('arazis.saleable');
     Route::get('arazi/{arazi}/bond-info', [\App\Http\Controllers\AraziController::class, 'bondInfo'])->name('arazis.bond-info');
+    Route::get('arazi/{arazi}/customers', [\App\Http\Controllers\AraziController::class, 'customers'])->name('arazis.customers');
+    Route::get('arazi/{arazi}/details', [\App\Http\Controllers\AraziController::class, 'details'])->name('arazis.details');
     Route::get('arazi/by-code', [\App\Http\Controllers\AraziController::class, 'byCode'])->name('arazis.by-code');
     Route::get('customer-bonds/by-plot/{plot}', [CustomerBondController::class, 'byPlot'])->name('customer-bonds.by-plot');
     
@@ -120,8 +125,63 @@ Route::middleware('auth')->group(function () {
     // Expense types: separate page create + store
     Route::get('expense-types/create', [\App\Http\Controllers\ExpenseTypeController::class, 'create'])->name('expense-types.create');
     Route::post('expense-types', [\App\Http\Controllers\ExpenseTypeController::class, 'store'])->name('expense-types.store');
+    // Kisan Registry
+    Route::resource('kisan-registries', KisanRegistryController::class)->except(['show']);
+    Route::get('kisan-registries/{kisanRegistry}/download', [KisanRegistryController::class, 'download'])->name('kisan-registries.download');
+
     Route::get('kisans/{kisan}/arazis', [\App\Http\Controllers\KisanController::class, 'arazis'])->name('kisans.arazis');
     Route::get('kisans/{kisan}/bonds', [\App\Http\Controllers\KisanController::class, 'bonds'])->name('kisans.bonds');
     Route::get('customers/{customer}/bonds', [\App\Http\Controllers\CustomerController::class, 'bonds'])->name('customers.bonds');
     Route::get('customers/{customer}/dashboard', [\App\Http\Controllers\CustomerDashboardController::class, 'show'])->name('customer.dashboard');
+    // Reports
+    Route::get('reports', [\App\Http\Controllers\ReportsController::class, 'index'])->name('reports.index');
+    Route::get('reports/plot-details', [\App\Http\Controllers\ReportsController::class, 'plotDetails'])->name('reports.plot.details');
+
+    // Arazis Map index: list folders under project root `arazis-map` and link to their index.php
+    Route::get('arazis-map', function () {
+        $base = base_path('arazis-map');
+        $list = [];
+        if (is_dir($base)) {
+            $items = scandir($base);
+            foreach ($items as $it) {
+                if ($it === '.' || $it === '..') continue;
+                $path = $base . DIRECTORY_SEPARATOR . $it;
+                if (! is_dir($path)) continue;
+
+                $modified = file_exists($path) ? @filemtime($path) : null;
+
+                // try to find a preview image inside the folder
+                $previewFile = null;
+                foreach (["preview.png", "preview.jpg", "thumb.png", "thumb.jpg", "screenshot.png"] as $cand) {
+                    if (file_exists($path . DIRECTORY_SEPARATOR . $cand)) {
+                        $previewFile = url('arazis-map/' . rawurlencode($it) . '/' . $cand);
+                        break;
+                    }
+                }
+
+                // count visible files
+                $files = array_values(array_filter(scandir($path), function ($n) {
+                    return $n !== '.' && $n !== '..';
+                }));
+
+                $list[] = [
+                    'name' => $it,
+                    'url' => url('arazis-map/' . rawurlencode($it) . '/index.php'),
+                    'preview' => $previewFile,
+                    'modified' => $modified ? date('d M Y H:i', $modified) : null,
+                    'files_count' => count($files),
+                ];
+            }
+        }
+
+        usort($list, function ($a, $b) {
+            // if both names numeric, sort numerically
+            if (is_numeric($a['name']) && is_numeric($b['name'])) {
+                return intval($a['name']) <=> intval($b['name']);
+            }
+            return strnatcmp($a['name'], $b['name']);
+        });
+
+        return view('arazis_map.index', ['folders' => $list]);
+    })->name('arazis.map.index');
 });

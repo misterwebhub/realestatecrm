@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Http\Controllers\Concerns\ManagesCrud;
 use App\Models\Kisan;
+use App\Models\Arazi;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -197,6 +198,36 @@ class KisanController extends Controller
                 ];
             })
             ->values();
+
+        return response()->json($list);
+    }
+
+    // Return kisans related to a given arazi id (used by AJAX in forms)
+    public function byArazi(Request $request)
+    {
+        $araziId = $request->query('arazi_id');
+
+        if (! $araziId) {
+            return response()->json([]);
+        }
+
+        $arazi = Arazi::find($araziId);
+        if (! $arazi) {
+            return response()->json([]);
+        }
+
+        $kisan = $arazi->kisan;
+        if (! $kisan) {
+            return response()->json([]);
+        }
+
+        $list = [
+            [
+                'id' => $kisan->id,
+                'reg_no' => $kisan->reg_no,
+                'name' => $kisan->name,
+            ],
+        ];
 
         return response()->json($list);
     }

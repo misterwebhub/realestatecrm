@@ -91,11 +91,13 @@
     </div>
 
             @include('partials.arazi_plots_modal')
+            @include('partials.arazi_matches_modal')
 
             <script>
         (function(){
             const arazisPlotsUrl = @json(route('arazis.plots', ['arazi' => '__ARAZI_ID__']));
             const arazisByCodeUrl = @json(route('arazis.by-code'));
+            // include matches modal helper
             const bondByPlotUrl = @json(route('customer-bonds.by-plot', ['plot' => '__PLOT_ID__']));
             const customerBondChequesUrl = @json(route('customer-bond-cheques.for-bond', ['customer_bond' => '__BOND_ID__']));
 
@@ -142,6 +144,12 @@
                         document.getElementById('arazi_label').textContent = 'Arazi not found';
                         return;
                     }
+                    // if multiple matches returned, show modal for selection
+                    if(json.matches && Array.isArray(json.matches) && json.matches.length > 0){
+                        try{ showAraziMatches(json.matches); }catch(e){ console.debug('show matches failed', e); }
+                        return;
+                    }
+
                     document.getElementById('arazi_label').textContent = json.arazi_label || '';
                     document.getElementById('arazi_id_hidden').value = json.arazi_id || '';
                     // populate plots
@@ -153,6 +161,16 @@
                         pSelect.appendChild(opt);
                     });
                 }catch(e){}
+            });
+
+            // when user selects an arazi from matches modal, populate fields
+            window.addEventListener('arazi:selected', function(evt){
+                const a = evt.detail || {};
+                if(!a || !a.id) return;
+                document.getElementById('arazi_label').textContent = a.label || '';
+                document.getElementById('arazi_id_hidden').value = a.id;
+                // load plots for selected arazi id
+                loadPlots(a.id);
             });
 
             pSelect.addEventListener('change', async function(){

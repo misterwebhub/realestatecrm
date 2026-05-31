@@ -50,7 +50,10 @@
             <div class="row g-3 align-items-end">
                 <div class="col-md-5">
                     <label class="form-label" for="arazi_search">Search Arazi</label>
-                    <input type="text" id="arazi_search" class="form-control" placeholder="Type Arazi number/location to search">
+                    <div style="position:relative;">
+                        <input type="text" id="arazi_search" class="form-control" placeholder="Type Arazi number/location to search" autocomplete="off">
+                        <div id="arazi_suggestions" class="list-group position-absolute" style="z-index:3000; width:100%; display:none; max-height:240px; overflow:auto;"></div>
+                    </div>
                 </div>
                 <div class="col-md-5">
                     <label class="form-label" for="available_arazi">Available Arazis</label>
@@ -113,34 +116,38 @@
                     <label class="form-label" for="last_date">Last Date</label>
                     <input type="date" name="last_date" id="last_date" class="form-control" value="{{ old('last_date', optional($item->last_date)->format('Y-m-d') ?? '') }}">
                 </div>
-                <div class="col-md-3">
-                    <label class="form-label" for="mobile">Mobile</label>
-                    <input type="text" name="mobile" id="mobile" class="form-control" value="{{ old('mobile', $item->mobile ?? '') }}">
-                </div>
-                <div class="col-md-3">
-                    <label class="form-label" for="bond_type">Type</label>
-                    <input type="text" name="bond_type" id="bond_type" class="form-control" value="{{ old('bond_type', $item->bond_type ?? '') }}">
-                </div>
-                <div class="col-md-3">
-                    <label class="form-label" for="broker_id">Broker</label>
-                    <select name="broker_id" id="broker_id" class="form-select">
-                        <option value="">Select Broker</option>
-                        @foreach($agents as $id => $name)
-                            <option value="{{ $id }}" @selected((string) old('broker_id', $item->broker_id ?? '') === (string) $id)>{{ $name }}</option>
-                        @endforeach
-                    </select>
-                </div>
-                <div class="col-md-3">
-                    <label class="form-label" for="broker_payment">Broker Payment</label>
-                    <input type="number" step="0.01" name="broker_payment" id="broker_payment" class="form-control" value="{{ old('broker_payment', $item->broker_payment ?? '') }}">
-                </div>
-                <div class="col-md-3">
-                    <label class="form-label" for="broker_paid">Broker Paid</label>
-                    <input type="number" step="0.01" name="broker_paid" id="broker_paid" class="form-control" value="{{ old('broker_paid', $item->broker_paid ?? '') }}">
-                </div>
-                <div class="col-md-3">
-                    <label class="form-label" for="broker_balance">Broker Balance</label>
-                    <input type="number" step="0.01" name="broker_balance" id="broker_balance" class="form-control" value="{{ old('broker_balance', $item->broker_balance ?? '') }}">
+                {{-- hide bond type and keep its value as hidden field --}}
+                <input type="hidden" name="bond_type" id="bond_type" value="{{ old('bond_type', $item->bond_type ?? '') }}">
+
+                {{-- Group Broker, Mobile, Broker Payment, Broker Paid, Broker Balance in one row --}}
+                <div class="col-12">
+                    <div class="row g-3">
+                        <div class="col-md-2">
+                            <label class="form-label" for="broker_id">Broker</label>
+                            <select name="broker_id" id="broker_id" class="form-select">
+                                <option value="">Select Broker</option>
+                                @foreach($agents as $id => $name)
+                                    <option value="{{ $id }}" @selected((string) old('broker_id', $item->broker_id ?? '') === (string) $id)>{{ $name }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label" for="mobile">Mobile</label>
+                            <input type="text" name="mobile" id="mobile" class="form-control" value="{{ old('mobile', $item->mobile ?? '') }}">
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label" for="broker_payment">Broker Payment</label>
+                            <input type="number" step="0.01" name="broker_payment" id="broker_payment" class="form-control" value="{{ old('broker_payment', $item->broker_payment ?? '') }}">
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label" for="broker_paid">Broker Paid</label>
+                            <input type="number" step="0.01" name="broker_paid" id="broker_paid" class="form-control" value="{{ old('broker_paid', $item->broker_paid ?? '') }}">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label" for="broker_balance">Broker Balance</label>
+                            <input type="number" step="0.01" name="broker_balance" id="broker_balance" class="form-control" value="{{ old('broker_balance', $item->broker_balance ?? '') }}">
+                        </div>
+                    </div>
                 </div>
                 <div class="col-md-6">
                     <label class="form-label" for="broker_comment">Broker Comment</label>
@@ -215,9 +222,24 @@
 
         function calculateRow(row){
             const saleLand = Number(row.querySelector('[data-field="sale_land"]').value) || 0;
-            const saleRate = Number(row.querySelector('[data-field="sale_rate"]').value) || 0;
-            const amount = saleLand * saleRate;
-            row.querySelector('[data-field="sale_amount"]').value = amount.toFixed(2);
+            const saleRateEl = row.querySelector('[data-field="sale_rate"]');
+            const saleAmountEl = row.querySelector('[data-field="sale_amount"]');
+            let saleAmount = Number(saleAmountEl.value) || 0;
+
+            if(saleLand > 0){
+                // If user edited sale amount, compute rate; otherwise compute amount from rate
+                if(!saleAmountEl.hasAttribute('readonly')){
+                    const perGaz = saleAmount / saleLand;
+                    saleRateEl.value = isFinite(perGaz) ? perGaz.toFixed(2) : '0.00';
+                } else {
+                    const rate = Number(saleRateEl.value) || 0;
+                    saleAmount = saleLand * rate;
+                    saleAmountEl.value = saleAmount.toFixed(2);
+                }
+            } else {
+                saleRateEl.value = (saleAmount && saleLand === 0) ? '0.00' : saleRateEl.value;
+            }
+
             calculateTotals();
         }
 
@@ -259,14 +281,14 @@
                     <input type="number" step="0.01" name="arazi_items[${index}][land_size]" class="form-control" value="${landSize.toFixed(2)}" data-field="land_size" readonly>
                     <div class="text-muted small">${arazi.unit || 'gaz'}</div>
                 </td>
-                <td><input type="number" step="0.01" name="arazi_items[${index}][sale_land]" class="form-control" value="${saleLand.toFixed(2)}" data-field="sale_land"></td>
-                <td><input type="number" step="0.01" name="arazi_items[${index}][sale_rate]" class="form-control" value="${saleRate.toFixed(2)}" data-field="sale_rate"></td>
-                <td><input type="number" step="0.01" name="arazi_items[${index}][sale_amount]" class="form-control" value="${saleAmount.toFixed(2)}" data-field="sale_amount" readonly></td>
+                <td><input type="number" step="0.01" name="arazi_items[${index}][sale_land]" class="form-control" value="${saleLand.toFixed(2)}" data-field="sale_land" readonly></td>
+                <td><input type="number" step="0.01" name="arazi_items[${index}][sale_rate]" class="form-control" value="${saleRate.toFixed(2)}" data-field="sale_rate" readonly></td>
+                <td><input type="number" step="0.01" name="arazi_items[${index}][sale_amount]" class="form-control" value="${saleAmount.toFixed(2)}" data-field="sale_amount"></td>
                 <td><button type="button" class="btn btn-sm btn-outline-danger" data-remove-row>Delete</button></td>
             `;
 
-            row.querySelector('[data-field="sale_land"]').addEventListener('input', () => calculateRow(row));
-            row.querySelector('[data-field="sale_rate"]').addEventListener('input', () => calculateRow(row));
+            // Sale Land and Sale Rate are readonly; user edits Sale Amount which recalculates Sale Rate
+            row.querySelector('[data-field="sale_amount"]').addEventListener('input', () => calculateRow(row));
             row.querySelector('[data-remove-row]').addEventListener('click', () => {
                 row.remove();
                 renderAvailableOptions();
@@ -285,17 +307,19 @@
 
             if(!kisanId){
                 availableSelect.innerHTML = '<option value="">Select Kisan first</option>';
-                return;
+                return Promise.resolve([]);
             }
 
-            fetch(kisanArazisUrl.replace('__KISAN_ID__', encodeURIComponent(kisanId)))
+            return fetch(kisanArazisUrl.replace('__KISAN_ID__', encodeURIComponent(kisanId)))
                 .then(res => res.ok ? res.json() : [])
                 .then(data => {
                     availableArazis = Array.isArray(data) ? data : [];
                     renderAvailableOptions();
+                    return availableArazis;
                 })
                 .catch(() => {
                     availableSelect.innerHTML = '<option value="">Unable to load Arazis</option>';
+                    return [];
                 });
         }
 
@@ -312,6 +336,127 @@
         addButton.addEventListener('click', function(){
             const arazi = availableArazis.find(item => String(item.id) === String(availableSelect.value));
             addAraziRow(arazi);
+        });
+
+        // Autocomplete for Arazi search
+        (function(){
+            const input = document.getElementById('arazi_search');
+            const sugg = document.getElementById('arazi_suggestions');
+            const ajaxUrl = @json(route('ajax.arazi.search'));
+            let debounceTimer = null;
+
+            function hideSuggestions(){ sugg.style.display = 'none'; sugg.innerHTML = ''; }
+            function showSuggestions(items){
+                sugg.innerHTML = '';
+                if(!items || !items.length){ hideSuggestions(); return; }
+                items.forEach(function(it){
+                    const a = document.createElement('button');
+                    a.type = 'button';
+                    a.className = 'list-group-item list-group-item-action';
+                    a.textContent = it.text || it.label || ('Arazi-' + (it.id || ''));
+                    a.dataset.araziId = it.id;
+                    a.addEventListener('click', function(){
+                        const selectedId = this.dataset.araziId;
+                        hideSuggestions();
+                        input.value = this.textContent;
+                        // fetch arazi info to determine kisan and then load arazis
+                        (async function(){
+                            try{
+                                const infoRes = await fetch(@json(route('arazis.info', ['arazi' => '__ARAZI_ID__'])).replace('__ARAZI_ID__', encodeURIComponent(selectedId)));
+                                if(!infoRes.ok) return;
+                                const info = await infoRes.json();
+                                if(info && info.kisan && info.kisan.id){
+                                    // set kisan and reload arazis, then preselect this arazi
+                                    kisanSelect.value = info.kisan.id;
+                                    await loadArazis();
+                                    // select the matched arazi in available list
+                                    try{ availableSelect.value = String(selectedId); }catch(e){}
+                                    renderAvailableOptions();
+                                    // additionally check for customers who purchased this arazi
+                                    try{
+                                        const custRes = await fetch(@json(route('arazis.customers', ['arazi' => '__ARAZI_ID__'])).replace('__ARAZI_ID__', encodeURIComponent(selectedId)));
+                                        if(custRes.ok){
+                                            const custJson = await custRes.json();
+                                            const customers = custJson.customers || [];
+                                            if(Array.isArray(customers) && customers.length > 0){
+                                                // If single customer with single purchase, auto-select bond/entry
+                                                if(customers.length === 1 && customers[0].purchases === 1 && Array.isArray(customers[0].bonds) && customers[0].bonds.length === 1){
+                                                    // auto-select kisan + arazi as above (already set)
+                                                    // nothing else to do for now
+                                                } else {
+                                                    // show modal to allow user select relevant customer / bond
+                                                    if(window.showAraziCustomers) window.showAraziCustomers(customers);
+                                                    return;
+                                                }
+                                            }
+                                        }
+                                    }catch(e){}
+                                } else {
+                                    // fallback: if arazi code may match multiple entries, call by-code
+                                    const code = input.value.trim();
+                                    try{
+                                        const res = await fetch(@json(route('arazis.by-code')) + '?code=' + encodeURIComponent(code));
+                                        if(res.ok){
+                                            const json = await res.json();
+                                            if(json.found && Array.isArray(json.matches) && json.matches.length > 1){
+                                                showAraziMatches(json.matches);
+                                                return;
+                                            }
+                                            if(json.found && json.arazi_id){
+                                                const aid = json.arazi_id;
+                                                const info2 = await (await fetch(@json(route('arazis.info', ['arazi' => '__ARAZI_ID__'])).replace('__ARAZI_ID__', encodeURIComponent(aid)))).json();
+                                                if(info2 && info2.kisan && info2.kisan.id){
+                                                    kisanSelect.value = info2.kisan.id;
+                                                    await loadArazis();
+                                                    try{ availableSelect.value = String(aid); }catch(e){}
+                                                    renderAvailableOptions();
+                                                }
+                                            }
+                                        }
+                                    }catch(e){}
+                                }
+                            }catch(e){}
+                        })();
+                    });
+                    sugg.appendChild(a);
+                });
+                sugg.style.display = 'block';
+            }
+
+            input.addEventListener('input', function(){
+                const q = this.value.trim();
+                clearTimeout(debounceTimer);
+                if(!q){ hideSuggestions(); return; }
+                debounceTimer = setTimeout(async function(){
+                    try{
+                        const res = await fetch(ajaxUrl + '?q=' + encodeURIComponent(q));
+                        if(!res.ok) return hideSuggestions();
+                        const json = await res.json();
+                        const items = json.results || [];
+                        showSuggestions(items);
+                    }catch(e){ hideSuggestions(); }
+                }, 250);
+            });
+
+            document.addEventListener('click', function(ev){ if(!ev.target.closest || !ev.target.closest('#arazi_search') && !ev.target.closest('#arazi_suggestions')) hideSuggestions(); });
+        })();
+
+        // handle arazi:selected from modal (choose specific arazi)
+        window.addEventListener('arazi:selected', async function(evt){
+            try{
+                const a = evt.detail || {};
+                if(!a || !a.id) return;
+                // fetch info and set kisan -> load arazis -> select this arazi
+                const infoRes = await fetch(@json(route('arazis.info', ['arazi' => '__ARAZI_ID__'])).replace('__ARAZI_ID__', encodeURIComponent(a.id)));
+                if(!infoRes.ok) return;
+                const info = await infoRes.json();
+                if(info && info.kisan && info.kisan.id){
+                    kisanSelect.value = info.kisan.id;
+                    await loadArazis();
+                    try{ availableSelect.value = String(a.id); }catch(e){}
+                    renderAvailableOptions();
+                }
+            }catch(e){}
         });
 
         const rowsToLoad = Object.keys(oldRows || {}).length
@@ -331,4 +476,5 @@
         calculateTotals();
     })();
 </script>
+@include('partials.arazi_customers_modal')
 @endsection

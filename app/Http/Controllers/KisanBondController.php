@@ -274,7 +274,7 @@ class KisanBondController extends Controller
             'method' => $method,
             'item' => $item,
             'kisans' => Kisan::orderBy('name')->pluck('name', 'id')->all(),
-            'agents' => \App\Models\Agent::orderBy('name')->pluck('name', 'id')->all(),
+            'agents' => \App\Models\Agent::where('broker_type', 'kisan')->orderBy('name')->pluck('name', 'id')->all(),
             'selectedArazis' => $item->exists
                 ? $item->arazis->map(function (Arazi $arazi) {
                     return [

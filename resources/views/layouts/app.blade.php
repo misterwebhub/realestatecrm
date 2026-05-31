@@ -62,6 +62,13 @@
                         </li>
 
                         <li class="nav-item">
+                            <a href="{{ route('arazis.map.index') }}" class="nav-link {{ request()->routeIs('arazis.map.*') || request()->routeIs('arazis-map') ? 'active' : '' }}">
+                                <i class="nav-icon bi bi-geo-alt"></i>
+                                <p>Arazi Maps</p>
+                            </a>
+                        </li>
+
+                        <li class="nav-item">
                             <a href="{{ route('arazi-documents.index') }}" class="nav-link {{ request()->routeIs('arazi-documents.*') ? 'active' : '' }}">
                                 <i class="nav-icon bi bi-file-earmark-arrow-up"></i>
                                 <p>Arazi Registry Upload</p>
@@ -79,8 +86,8 @@
                     @endif
 
                     @if(auth()->check() && (auth()->user()->role === 'admin' || auth()->user()->role === 'manager'))
-                        <li class="nav-item {{ request()->routeIs('kisans.*') || request()->routeIs('kisan-bonds.*') || request()->routeIs('kisan-payment.*') || request()->routeIs('kisan-payment.ledger') || (request()->routeIs('agents.type.index') && request()->route('type') === 'kisan') ? 'menu-open' : '' }}">
-                        <a href="#" class="nav-link {{ request()->routeIs('kisans.*') || request()->routeIs('kisan-bonds.*') || request()->routeIs('kisan-payment.*') || request()->routeIs('kisan-payment.ledger') || (request()->routeIs('agents.type.index') && request()->route('type') === 'kisan') ? 'active' : '' }}">
+                        <li class="nav-item {{ request()->routeIs('kisans.*') || request()->routeIs('kisan-bonds.*') || request()->routeIs('kisan-payment.*') || request()->routeIs('kisan-payment.ledger') || request()->routeIs('kisan-registries.*') || (request()->routeIs('agents.type.index') && request()->route('type') === 'kisan') ? 'menu-open' : '' }}">
+                        <a href="#" class="nav-link {{ request()->routeIs('kisans.*') || request()->routeIs('kisan-bonds.*') || request()->routeIs('kisan-payment.*') || request()->routeIs('kisan-payment.ledger') || request()->routeIs('kisan-registries.*') || (request()->routeIs('agents.type.index') && request()->route('type') === 'kisan') ? 'active' : '' }}">
                             <i class="nav-icon bi bi-people-fill"></i>
                             <p>
                                 Kisans & Bonds
@@ -88,7 +95,8 @@
                             </p>
                         </a>
                         <ul class="nav nav-treeview">
-                            <li class="nav-item"><a href="{{ route('kisans.index') }}" class="nav-link {{ request()->routeIs('kisans.*') ? 'active' : '' }}"><i class="nav-icon bi bi-circle"></i><p>Kisans</p></a></li>
+                            <li class="nav-item"><a href="{{ route('kisans.index') }}" class="nav-link {{ request()->routeIs('kisans.*') && !request()->routeIs('kisans.kisan-payment.*') ? 'active' : '' }}"><i class="nav-icon bi bi-circle"></i><p>Kisans</p></a></li>
+                            <li class="nav-item"><a href="{{ route('kisan-registries.index') }}" class="nav-link {{ request()->routeIs('kisan-registries.*') ? 'active' : '' }}"><i class="nav-icon bi bi-file-earmark-text"></i><p>Kisan Registry</p></a></li>
                             <li class="nav-item"><a href="{{ route('kisan-bonds.index') }}" class="nav-link {{ request()->routeIs('kisan-bonds.*') ? 'active' : '' }}"><i class="nav-icon bi bi-circle"></i><p>Kisan Bonds</p></a></li>
                             <li class="nav-item"><a href="{{ route('kisan-payment.index') }}" class="nav-link {{ request()->routeIs('kisan-payment.*') ? 'active' : '' }}"><i class="nav-icon bi bi-circle"></i><p>Kisan Payment</p></a></li>
                             <li class="nav-item"><a href="{{ route('kisan-payment.ledger') }}" class="nav-link {{ request()->routeIs('kisan-payment.ledger') ? 'active' : '' }}"><i class="nav-icon bi bi-circle"></i><p>Kisan Ledger</p></a></li>
@@ -127,6 +135,19 @@
                             <li class="nav-item"><a href="{{ route('expenses.index') }}" class="nav-link {{ request()->routeIs('expenses.*') ? 'active' : '' }}"><i class="nav-icon bi bi-cash-stack"></i><p>Expenses</p></a></li>
 
                         <li class="nav-item"><a href="{{ route('partners.index') }}" class="nav-link {{ request()->routeIs('partners.*') ? 'active' : '' }}"><i class="nav-icon bi bi-diagram-3"></i><p>Partners</p></a></li>
+
+                        <li class="nav-item {{ request()->routeIs('reports.*') ? 'menu-open' : '' }}">
+                            <a href="#" class="nav-link {{ request()->routeIs('reports.*') ? 'active' : '' }}">
+                                <i class="nav-icon bi bi-journal-text"></i>
+                                <p>
+                                    Reports
+                                    <i class="nav-arrow bi bi-chevron-right"></i>
+                                </p>
+                            </a>
+                            <ul class="nav nav-treeview">
+                                <li class="nav-item"><a href="{{ route('reports.plot.details') }}" class="nav-link {{ request()->routeIs('reports.plot.details') ? 'active' : '' }}"><i class="nav-icon bi bi-circle"></i><p>Plot Details</p></a></li>
+                            </ul>
+                        </li>
 
                         <li class="nav-item"><a href="{{ route('registries.waiting-payments') }}" class="nav-link {{ request()->routeIs('registries.waiting-payments') ? 'active' : '' }}"><i class="nav-icon bi bi-hourglass-split"></i><p>Waiting Payments</p></a></li>
 
@@ -203,6 +224,27 @@
 <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
 <script src="{{ asset('vendor/adminlte/js/adminlte.js') }}"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+    (function(){
+        try{
+            jQuery(function(){
+                if(! (window.jQuery && jQuery.fn && jQuery.fn.select2)) return;
+                jQuery('select[name="arazi_id"]').each(function(){
+                    var $el = jQuery(this);
+                    if($el.hasClass('select2-hidden-accessible')) return; // already initialized
+                    $el.select2({
+                        theme: 'bootstrap-5',
+                        width: '100%',
+                        placeholder: $el.data('placeholder') || 'Select Arazi',
+                        allowClear: true,
+                        minimumResultsForSearch: 0,
+                        dropdownParent: ($el.closest('form').length ? $el.closest('form') : jQuery(document.body))
+                    });
+                });
+            });
+        }catch(e){ /* ignore */ }
+    })();
+</script>
 @stack('scripts')
 </body>
 </html>

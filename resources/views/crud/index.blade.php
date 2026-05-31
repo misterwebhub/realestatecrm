@@ -3,7 +3,21 @@
 @section('content')
     <div class="card card-outline card-primary">
         <div class="card-header d-flex align-items-center justify-content-between flex-wrap gap-2">
-            <h5 class="card-title mb-0">{{ $title }}</h5>
+            @if(!empty($searchInHeader))
+                <div class="d-flex align-items-center gap-3 flex-grow-1">
+                  
+                    <form method="get" class="d-flex ms-3" action="{{ url()->current() }}">
+                        <input name="q" value="{{ $searchQuery ?? '' }}" placeholder="Search by Arazi code, plot no or title" class="form-control form-control-sm" style="min-width:320px;" />
+                        <button class="btn btn-sm btn-outline-secondary ms-2" type="submit">Search</button>
+                        @if(!empty($searchQuery))
+                            <a href="{{ url()->current() }}" class="btn btn-sm btn-outline-secondary ms-2">Clear</a>
+                        @endif
+                    </form>
+                </div>
+            @else
+                <h5 class="card-title mb-0">{{ $title }}</h5>
+            @endif
+
             @if(auth()->check() && in_array(auth()->user()->role, ['admin','manager']))
                 <div class="d-flex flex-wrap gap-2 align-items-center">
                     @if(isset($exportCsvUrl) && $exportCsvUrl)
@@ -22,7 +36,7 @@
         @if(!empty($isCustomerBondIndex))
             <div class="card-body border-top">
                 <form class="row g-2 align-items-end" method="GET">
-                    <div class="col-auto">
+                    <div class="col-2">
                         <label class="form-label small">Arazi</label>
                         <select id="filter-arazi" name="arazi_id" class="form-select form-select-sm">
                             <option value="">All</option>
@@ -38,7 +52,6 @@
                                     jQuery(function(){
                                         jQuery('#filter-arazi').select2({
                                             theme: 'bootstrap-5',
-                                            width: '220px',
                                             placeholder: 'All Arazis',
                                             allowClear: true,
                                             minimumResultsForSearch: 0,
@@ -69,6 +82,7 @@
         @endif
 
         <div class="card-body table-responsive p-0">
+          
             <table class="table table-striped table-hover mb-0 align-middle">
                 <thead>
                 <tr>

@@ -18,6 +18,159 @@
                     <h5 class="modal-title">Create Item</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
+
+                @if($isAraziForm && $method === 'POST')
+                    <hr />
+                    <h5 class="mt-3">Plots</h5>
+                    <div class="row g-3 mb-2">
+                        <div class="col-md-3 d-none">
+                            <label class="form-label">Number of Plots</label>
+                            <input id="no_of_plots_ui" type="number" min="0" class="form-control" value="0">
+                        </div>
+                        <div class="col-md-4 d-flex align-items-end gap-2">
+                            <button type="button" id="generatePlotsBtn" class="btn btn-secondary d-none">Generate</button>
+                            <button type="button" id="addPlotRowBtn" class="btn btn-outline-secondary">Add Plot</button>
+                            <button type="button" id="resequenceBtn" class="btn btn-outline-primary">Re-sequence</button>
+                        </div>
+                    </div>
+
+                    <div id="plotsContainer" class="mb-3"></div>
+
+                    <script>
+                        (function(){
+                            const container = document.getElementById('plotsContainer');
+                            const genBtn = document.getElementById('generatePlotsBtn');
+                            const addBtn = document.getElementById('addPlotRowBtn');
+                            const numInput = document.getElementById('no_of_plots_ui');
+
+                            function createRow(index, plotNumber = '', area = ''){
+                                const row = document.createElement('div');
+                                row.className = 'row g-2 align-items-end mb-2';
+                                row.innerHTML = `
+                                    <div class="col-md-6">
+                                        <label class="form-label">Plot Number <span class="text-danger">*</span></label>
+                                        <input name="plots[${index}][plot_number]" class="form-control" required value="${plotNumber}">
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label class="form-label">Area (optional)</label>
+                                        <input name="plots[${index}][area]" type="number" step="0.01" class="form-control" value="${area}">
+                                    </div>
+                                    <div class="col-md-2">
+                                        <button type="button" class="btn btn-outline-danger btn-sm remove-plot">Remove</button>
+                                    </div>
+                                `;
+                                container.appendChild(row);
+                                row.querySelector('.remove-plot').addEventListener('click', function(){
+                                    row.remove();
+                                    // reindex names
+                                    reindexRows();
+                                });
+                            }
+
+                            function reindexRows(){
+                                Array.from(container.children).forEach(function(row, idx){
+                                    const pn = row.querySelector('input[name^="plots"][name$="[plot_number]"]') || row.querySelector('input[name^="plots"][name$="[title]"]');
+                                    const area = row.querySelector('input[name^="plots"][name$="[area]"]');
+                                    if(pn) pn.setAttribute('name', `plots[${idx}][plot_number]`);
+                                    if(area) area.setAttribute('name', `plots[${idx}][area]`);
+                                });
+                            }
+
+                            function generateFromNumber(){
+                                const n = parseInt(numInput.value || '0', 10) || 0;
+                                container.innerHTML = '';
+                                for(let i=0;i<n;i++) createRow(i, (i+1));
+                            }
+
+                            // auto-generate when number input changes
+                            numInput.addEventListener('input', function(){
+                                // small debounce
+                                if(this._genTimeout) clearTimeout(this._genTimeout);
+                                this._genTimeout = setTimeout(generateFromNumber, 250);
+                            });
+
+                            genBtn.addEventListener('click', generateFromNumber);
+
+                            addBtn.addEventListener('click', function(){
+                                const idx = container.children.length;
+                                createRow(idx, (idx+1));
+                            });
+
+                            // (page re-sequence wired in page script block below)
+
+                            // Re-sequence button: continue numeric sequence after last custom label (e.g., 3a,3b -> 4,5...)
+                            const resequenceBtn = document.getElementById('resequenceBtn');
+                            if(resequenceBtn){
+                                resequenceBtn.addEventListener('click', function(){
+                                    const rows = Array.from(container.children);
+                                    let nextBase = 1;
+                                    let prevOriginalBase = null;
+                                    let prevAssignedBase = null;
+                                    rows.forEach(function(row, i){
+                                        const inp = row.querySelector('input[name^="plots"][name$="[plot_number]"]') || row.querySelector('input[name^="plots"][name$="[title]"]');
+                                        const orig = (inp?.value || '').toString().trim();
+                                        const m = orig.match(/^([0-9]+)(.*)$/);
+                                        if(m){
+                                            const ob = parseInt(m[1], 10);
+                                            const suffix = (m[2] || '').toString();
+                                            if(suffix){
+                                                // has suffix
+                                                if(i>0){
+                                                    const prevOrig = (rows[i-1].querySelector('input[name^="plots"][name$="[plot_number]"]') || rows[i-1].querySelector('input[name^="plots"][name$="[title]"]')).value || '';
+                                                    const pm = prevOrig.toString().trim().match(/^([0-9]+)(.*)$/);
+                                                    if(pm && parseInt(pm[1],10) === ob){
+                                                        // extra split of same numeric prefix -> assign same base as previous assigned
+                                                        if(prevAssignedBase !== null){
+                                                            inp.value = String(prevAssignedBase) + suffix;
+                                                            // do not change nextBase
+                                                            prevOriginalBase = ob;
+                                                            return;
+                                                        }
+                                                    }
+                                                }
+                                                if(ob === nextBase){
+                                                    // first occurrence for this base
+                                                    inp.value = String(nextBase) + suffix;
+                                                    prevAssignedBase = nextBase;
+                                                    prevOriginalBase = ob;
+                                                    nextBase++;
+                                                } else if(ob > nextBase){
+                                                    // mislabeled higher, assume they meant nextBase
+                                                    inp.value = String(nextBase) + suffix;
+                                                    prevAssignedBase = nextBase;
+                                                    prevOriginalBase = ob;
+                                                    nextBase++;
+                                                } else {
+                                                    // ob < nextBase, treat as split of previous assigned base
+                                                    const assignBase = prevAssignedBase ?? ob;
+                                                    inp.value = String(assignBase) + suffix;
+                                                    prevOriginalBase = ob;
+                                                }
+                                            } else {
+                                                // no suffix -> it's a full number, assign nextBase regardless
+                                                inp.value = String(nextBase);
+                                                prevAssignedBase = nextBase;
+                                                prevOriginalBase = ob;
+                                                nextBase++;
+                                            }
+                                        } else {
+                                            // no numeric prefix, assign nextBase
+                                            inp.value = String(nextBase);
+                                            prevAssignedBase = nextBase;
+                                            prevOriginalBase = null;
+                                            nextBase++;
+                                        }
+                                    });
+                                    reindexRows();
+                                });
+                            }
+
+                            
+
+                            
+                        })();
+                    </script>
+                @endif
                 <div class="modal-body">
                     <div class="text-center py-4">Loading...</div>
                 </div>
@@ -159,7 +312,7 @@
                             <input type="hidden" name="{{ $field['name'] }}" id="{{ $field['name'] }}" value="{{ $value }}">
                             @continue
                         @endif
-                        <div class="col-md-6">
+                        <div class="col-md-6 {{ !empty($field['hidden']) ? 'd-none' : '' }}">
                             <label class="form-label" for="{{ $field['name'] }}">
                                 {{ $field['label'] }}
                                 @if(!empty($field['required']))
@@ -245,6 +398,126 @@
                         </div>
                     @endforeach
                 </div>
+
+                @if($isAraziForm && $method === 'POST')
+                    <hr />
+                    <h5 class="mt-3">Plots</h5>
+                    <div class="row g-3 mb-2">
+                        <div class="col-md-3">
+                            <label class="form-label">Number of Plots</label>
+                            <input id="page_no_of_plots_ui" type="number" min="0" class="form-control" value="0">
+                        </div>
+                        <div class="col-md-4 d-flex align-items-end gap-2">
+                            <button type="button" id="page_generatePlotsBtn" class="btn btn-secondary">Generate</button>
+                            <button type="button" id="page_addPlotRowBtn" class="btn btn-outline-secondary">Add Plot</button>
+                            <button type="button" id="page_resequenceBtn" class="btn btn-outline-primary">Re-sequence</button>
+                        </div>
+                    </div>
+
+                    <div id="page_plotsContainer" class="mb-3"></div>
+
+                    <script>
+                        (function(){
+                            const container = document.getElementById('page_plotsContainer');
+                            const genBtn = document.getElementById('page_generatePlotsBtn');
+                            const addBtn = document.getElementById('page_addPlotRowBtn');
+                            const numInput = document.getElementById('page_no_of_plots_ui');
+
+                            function createRow(index, plotNumber = '', area = ''){
+                                const row = document.createElement('div');
+                                row.className = 'row g-2 align-items-end mb-2';
+                                row.innerHTML = `
+                                    <div class="col-md-6">
+                                        <label class="form-label">Plot Number <span class="text-danger">*</span></label>
+                                        <input name="plots[${index}][plot_number]" class="form-control" required value="${plotNumber}">
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label class="form-label">Area (optional)</label>
+                                        <input name="plots[${index}][area]" type="number" step="0.01" class="form-control" value="${area}">
+                                    </div>
+                                    <div class="col-md-2">
+                                        <button type="button" class="btn btn-outline-danger btn-sm remove-plot">Remove</button>
+                                    </div>
+                                `;
+                                container.appendChild(row);
+                                row.querySelector('.remove-plot').addEventListener('click', function(){
+                                    row.remove();
+                                    // reindex names
+                                    reindexRows();
+                                });
+                            }
+
+                            function reindexRows(){
+                                Array.from(container.children).forEach(function(row, idx){
+                                    const pn = row.querySelector('input[name^="plots"][name$="[plot_number]"]') || row.querySelector('input[name^="plots"][name$="[title]"]');
+                                    const area = row.querySelector('input[name^="plots"][name$="[area]"]');
+                                    if(pn) pn.setAttribute('name', `plots[${idx}][plot_number]`);
+                                    if(area) area.setAttribute('name', `plots[${idx}][area]`);
+                                });
+                            }
+
+                            function generateFromNumber(){
+                                const n = parseInt(numInput.value || '0', 10) || 0;
+                                container.innerHTML = '';
+                                for(let i=0;i<n;i++) createRow(i, (i+1));
+                            }
+
+                            // auto-generate when number input changes
+                            numInput.addEventListener('input', function(){
+                                if(this._genTimeout) clearTimeout(this._genTimeout);
+                                this._genTimeout = setTimeout(generateFromNumber, 250);
+                            });
+
+                            genBtn.addEventListener('click', generateFromNumber);
+
+                            addBtn.addEventListener('click', function(){
+                                const idx = container.children.length;
+                                createRow(idx, (idx+1));
+                            });
+
+                            const reseqBtn = document.getElementById('page_resequenceBtn');
+                            if(reseqBtn){
+                                reseqBtn.addEventListener('click', function(){
+                                    const rows = Array.from(container.children);
+                                    let nextNum = 1;
+                                    let prevOriginalBase = null;
+                                    let prevAssignedBase = null;
+                                    rows.forEach(function(row){
+                                        const inp = row.querySelector('input[name$="[plot_number]"]');
+                                        if(!inp) return;
+                                        const val = (inp.value || '').toString().trim();
+                                        const m = val.match(/^(\d+)([A-Za-z]*)$/);
+                                        if(!m){
+                                            inp.value = String(nextNum);
+                                            prevOriginalBase = null;
+                                            prevAssignedBase = nextNum;
+                                            nextNum++;
+                                            return;
+                                        }
+                                        const origBase = parseInt(m[1], 10);
+                                        const suffix = m[2];
+                                        if(!suffix){
+                                            inp.value = String(nextNum);
+                                            prevOriginalBase = origBase;
+                                            prevAssignedBase = nextNum;
+                                            nextNum++;
+                                        } else {
+                                            if(prevOriginalBase !== null && origBase === prevOriginalBase){
+                                                inp.value = String(prevAssignedBase) + suffix;
+                                            } else {
+                                                inp.value = String(nextNum) + suffix;
+                                                prevOriginalBase = origBase;
+                                                prevAssignedBase = nextNum;
+                                                nextNum++;
+                                            }
+                                        }
+                                    });
+                                    reindexRows();
+                                });
+                            }
+                        })();
+                    </script>
+                @endif
 
                 <div class="mt-4 d-flex gap-2 align-items-center">
                     <div class="form-check me-auto">
@@ -469,7 +742,10 @@
             if(window.jQuery && jQuery.fn.select2){
                 jQuery('select[name="kisan_id"], select[name="kisan_bond_id"], select[name="customer_id"], select[name="customer_bond_id"], select[name="customer_bond_cheque_id"]').select2({
                     theme: 'bootstrap-5',
-                    width: '100%'
+                    width: '100%',
+                    placeholder: function(){ return jQuery(this).data('placeholder') || 'Select'; },
+                    allowClear: true,
+                    minimumResultsForSearch: 0
                 });
             }
 

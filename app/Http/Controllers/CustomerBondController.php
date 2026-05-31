@@ -296,9 +296,18 @@ class CustomerBondController extends Controller
             ]);
         })->all();
 
-        $arazis = \App\Models\Arazi::orderBy('id')->get()->mapWithKeys(function ($a) {
-            return [$a->id => ($a->legacy_arazi_code ?: ($a->plot_number ?? ('Arazi-' . $a->id)))];
-        })->all();
+        $araziList = \App\Models\Arazi::orderBy('id')->get();
+        $unique = [];
+        foreach ($araziList as $a) {
+            $label = $a->legacy_arazi_code ?: ($a->plot_number ?? ('Arazi-' . $a->id));
+            if (! isset($unique[$label])) {
+                $unique[$label] = $a->id;
+            }
+        }
+        $arazis = [];
+        foreach ($unique as $label => $id) {
+            $arazis[$id] = $label;
+        }
 
         return view('crud.index', [
             'title' => $this->resourceTitle(),

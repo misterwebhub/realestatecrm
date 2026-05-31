@@ -17,6 +17,7 @@ class DatabaseSeeder extends Seeder
             AdminUserSeeder::class,
             AdminRoleSeeder::class,
             BasicSampleSeeder::class,
+            DummyAraziSeeder::class,
         ]);
     }
 }
