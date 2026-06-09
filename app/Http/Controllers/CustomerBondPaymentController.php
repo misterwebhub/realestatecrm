@@ -109,6 +109,8 @@ class CustomerBondPaymentController extends Controller
                     $chequeNumber = $c?->cheque_number ?? null;
                 }
 
+                $isDebit = in_array($payment->entry_type, ['return', 'discount']);
+
                 return [
                     'entry_no' => $payment->entry_no,
                     'bond_no' => $payment->customerBond?->bond_no ?? '-',
@@ -116,6 +118,7 @@ class CustomerBondPaymentController extends Controller
                     'date' => optional($payment->entry_date)->format('d-m-Y') ?? '-',
                     'type' => ucfirst($payment->entry_type),
                     'amount' => (float) $payment->amount,
+                    'is_debit' => $isDebit,
                     'method' => $payment->payment_method ?? '-',
                     'cheque_number' => $chequeNumber,
                     'remarks' => $payment->remarks ?? '-',
@@ -243,7 +246,7 @@ class CustomerBondPaymentController extends Controller
             ['name' => 'arazi_id', 'type' => 'hidden', 'value' => $item?->arazi_id],
             ['name' => 'plot_id', 'type' => 'hidden', 'value' => $item?->plot_id],
             ['name' => 'entry_date', 'label' => 'Entry Date', 'type' => 'date', 'value' => optional($item?->entry_date)->format('Y-m-d'), 'required' => true],
-            ['name' => 'entry_type', 'label' => 'Entry Type', 'type' => 'select', 'options' => ['advance' => 'Advance', 'installment' => 'Installment', 'final' => 'Final', 'penalty' => 'Penalty', 'other' => 'Other'], 'value' => $item?->entry_type ?? 'installment', 'required' => true],
+            ['name' => 'entry_type', 'label' => 'Entry Type', 'type' => 'select', 'options' => ['advance' => 'Advance', 'installment' => 'Installment', 'final' => 'Final', 'penalty' => 'Penalty', 'return' => 'Return', 'discount' => 'Discount', 'other' => 'Other'], 'value' => $item?->entry_type ?? 'installment', 'required' => true],
             ['name' => 'land_size', 'label' => 'Land Size', 'type' => 'number', 'step' => '0.01', 'value' => $item?->land_size],
             // witness_name removed per request
             ['name' => 'amount', 'label' => 'Amount', 'type' => 'number', 'step' => '0.01', 'value' => $item?->amount, 'required' => true],
@@ -288,7 +291,7 @@ class CustomerBondPaymentController extends Controller
                     }
                 }
             }],
-            'entry_type' => ['required', 'in:advance,installment,final,penalty,other'],
+            'entry_type' => ['required', 'in:advance,installment,final,penalty,return,discount,other'],
             'land_size' => ['nullable', 'numeric', 'min:0'],
             'amount' => ['required', 'numeric', 'min:0'],
             'payment_method' => ['nullable', 'string', 'max:40'],

@@ -121,7 +121,8 @@
                         <th>{{ $partyLabel }}</th>
                         <th>Date</th>
                         <th>Type</th>
-                        <th class="text-end">Amount</th>
+                        <th class="text-end text-success">Credit</th>
+                        <th class="text-end text-danger">Debit</th>
                         <th>Method</th>
                         <th>Remarks</th>
                     </tr>
@@ -134,7 +135,13 @@
                             <td>{{ $entry['party'] }}</td>
                             <td>{{ $entry['date'] }}</td>
                             <td>{{ $entry['type'] }}</td>
-                            <td class="text-end">{{ number_format((float) $entry['amount'], 2) }}</td>
+                            @if(!empty($entry['is_debit']))
+                                <td class="text-end"></td>
+                                <td class="text-end text-danger fw-semibold">-{{ number_format((float) $entry['amount'], 2) }}</td>
+                            @else
+                                <td class="text-end text-success fw-semibold">{{ number_format((float) $entry['amount'], 2) }}</td>
+                                <td class="text-end"></td>
+                            @endif
                             <td>
                                 {{ $entry['method'] }}
                                 @if(!empty($entry['cheque_number']))
@@ -145,7 +152,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="8" class="text-center py-4">No payment entries found.</td>
+                            <td colspan="9" class="text-center py-4">No payment entries found.</td>
                         </tr>
                     @endforelse
                 </tbody>

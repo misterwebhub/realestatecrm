@@ -21,6 +21,8 @@
                             <option value="installment" selected>Installment</option>
                             <option value="final">Final</option>
                             <option value="penalty">Penalty</option>
+                            <option value="return">Return (Debit)</option>
+                            <option value="discount">Discount (Debit)</option>
                             <option value="other">Other</option>
                         </select>
                     </div>
