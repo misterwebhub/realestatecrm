@@ -236,6 +236,8 @@ class AraziController extends Controller
 
             // derive status similarly to grid() logic
             $dbStatus = strtolower((string) ($p->status ?? ''));
+            $dbStatus = str_replace(['-',' '], '_', $dbStatus);
+            $dbStatus = str_replace('adwance', 'advance', $dbStatus);
             $explicitStatuses = ['available','booked_advance','booked','hold','registry','blacklist','not_for_sale','issue'];
             if ($dbStatus !== '' && in_array($dbStatus, $explicitStatuses, true)) {
                 $status = $dbStatus;
@@ -320,6 +322,8 @@ class AraziController extends Controller
         $plots = $arazi->plots()->get(['id', 'plot_number', 'title', 'block', 'area', 'description', 'status'])->map(function ($p) {
             $status = null;
             $dbStatus = strtolower((string) ($p->status ?? ''));
+            $dbStatus = str_replace(['-',' '], '_', $dbStatus);
+            $dbStatus = str_replace('adwance', 'advance', $dbStatus);
             $explicitStatuses = ['available','booked_advance','booked','hold','registry','blacklist','not_for_sale','issue'];
             if ($dbStatus !== '' && in_array($dbStatus, $explicitStatuses, true)) {
                 $status = $dbStatus;
@@ -410,6 +414,8 @@ class AraziController extends Controller
 
             // If an explicit status is set on the plot, prefer it (so user-set 'hold' shows immediately)
             $dbStatus = strtolower((string) ($p->status ?? ''));
+            $dbStatus = str_replace(['-',' '], '_', $dbStatus);
+            $dbStatus = str_replace('adwance', 'advance', $dbStatus);
             $explicitStatuses = ['available','booked_advance','booked','hold','registry','blacklist','not_for_sale','issue'];
             if ($dbStatus !== '' && in_array($dbStatus, $explicitStatuses, true)) {
                 $status = $dbStatus;
@@ -448,7 +454,6 @@ class AraziController extends Controller
 
             // Fallback to available if still null
             if ($status === null) $status = 'available';
-            $status = 'available';
             return [
                 'id' => $p->id,
                 'plot_number' => $p->plot_number ?? $p->title ?? ('Plot-' . $p->id),
@@ -586,6 +591,82 @@ class AraziController extends Controller
         })->values()->all();
 
         return response()->json(['customers' => $grouped]);
+    }
+
+    /**
+     * Flexible grid entrypoint: accepts numeric Arazi id or legacy arazi code / plot_number.
+     * If identifier matches an existing Arazi id, behaves like grid(Arazi).
+     * If identifier matches a legacy_arazi_code or plot_number shared by multiple records,
+     * aggregates plots across the group and renders the same grid view.
+     */
+    public function gridByIdentifier($identifier)
+    {
+        // Prefer lookup by legacy_arazi_code or plot_number (so numeric codes like "319" match code)
+        $arazis = Arazi::where('legacy_arazi_code', $identifier)
+            ->orWhere('plot_number', $identifier)
+            ->get();
+
+        // If no matches by code/plot_number, fall back to numeric id lookup
+        if ($arazis->isEmpty() && is_numeric($identifier)) {
+            $arazi = Arazi::find((int) $identifier);
+            if ($arazi) {
+                return $this->grid($arazi);
+            }
+            abort(404);
+        }
+
+        // collect plots across all matched arazis
+        $araziIds = $arazis->pluck('id')->all();
+        $plots = \App\Models\Plot::whereIn('arazi_id', $araziIds)->get(['id','plot_number','title','block','area','description','status'])->map(function ($p) {
+            $status = null;
+            $dbStatus = strtolower((string) ($p->status ?? ''));
+            $explicitStatuses = ['available','booked_advance','booked','hold','registry','blacklist','not_for_sale','issue'];
+            if ($dbStatus !== '' && in_array($dbStatus, $explicitStatuses, true)) {
+                $status = $dbStatus;
+            }
+
+            if ($status === null || $status === 'available') {
+                $hasRegistry = \App\Models\Registry::where('plot_id', $p->id)
+                    ->where(function($q){ $q->where('status', 'completed')->orWhere('payment_status', 'completed')->orWhereNull('status'); })
+                    ->exists();
+
+                if ($hasRegistry) {
+                    $status = 'registry';
+                } else {
+                    $booking = \App\Models\Booking::where('plot_id', $p->id)
+                        ->where(function($q){ $q->where('status', '!=', 'expired')->orWhereNull('status'); })
+                        ->latest()->first();
+                    if ($booking) {
+                        $status = 'booked';
+                    }
+                }
+            }
+
+            $desc = strtolower((string) ($p->description ?? ''));
+            if (str_contains($desc, 'issue') || empty($p->area) || (float) ($p->area ?? 0) <= 0) {
+                $status = 'issue';
+            }
+
+            if ($status === null) $status = 'available';
+
+            return [
+                'id' => $p->id,
+                'plot_number' => $p->plot_number ?? ($p->title ?? $p->id),
+                'title' => $p->title,
+                'block' => $p->block,
+                'area' => $p->area,
+                'status' => $status,
+            ];
+        })->all();
+
+        // Pass a representative arazi object (first) but adjust label to identifier
+        $representative = $arazis->first();
+        $representative->legacy_arazi_code = $identifier;
+
+        return view('arazis.grid', [
+            'arazi' => $representative,
+            'plots' => $plots,
+        ]);
     }
 
     /**

@@ -58,6 +58,7 @@ class PlotController extends Controller
             ['name' => 'description', 'label' => 'Description', 'type' => 'textarea', 'value' => $item?->description],
             ['name' => 'status', 'label' => 'Status', 'type' => 'select', 'options' => [
                 'available' => 'Available',
+                'booked' => 'Booked',
                 'booked_advance' => 'Booked (advance)',
                 'hold' => 'Hold',
                 'registry' => 'Registry done',
@@ -110,7 +111,7 @@ class PlotController extends Controller
             'latitude' => ['nullable', 'numeric'],
             'longitude' => ['nullable', 'numeric'],
             'description' => ['nullable', 'string'],
-            'status' => ['required', 'in:available,booked_advance,hold,registry,blacklist,not_for_sale,locked,sold'],
+            'status' => ['required', 'in:available,booked,booked_advance,hold,registry,blacklist,not_for_sale,locked,sold'],
         ];
     }
 

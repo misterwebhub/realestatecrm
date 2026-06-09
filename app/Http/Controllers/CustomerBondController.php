@@ -78,6 +78,8 @@ class CustomerBondController extends Controller
             }],
             'plot_amounts' => ['nullable', 'array'],
             'plot_amounts.*' => ['nullable', 'numeric', 'min:0'],
+            'plot_areas' => ['nullable', 'array'],
+            'plot_areas.*' => ['nullable', 'numeric', 'min:0'],
             'bond_date' => ['required', 'date'],
             'bond_amount' => ['nullable', 'numeric', 'min:0'],
             'total_amount' => ['nullable', 'numeric', 'min:0'],
@@ -113,7 +115,14 @@ class CustomerBondController extends Controller
         $payload['bond_no'] = ($payload['bond_no'] ?? null) ?: $this->nextBondNumber();
 
         if (! empty($plotIds)) {
-            $totalArea = Plot::whereIn('id', $plotIds)->sum('area');
+            // prefer explicit plot_areas submitted from client, otherwise fall back to DB values
+            $submittedAreas = $validated['plot_areas'] ?? [];
+            if (! empty($submittedAreas)) {
+                $totalArea = collect($submittedAreas)->only($plotIds)->map(fn($v) => (float) $v)->sum();
+            } else {
+                $totalArea = Plot::whereIn('id', $plotIds)->sum('area');
+            }
+
             $payload['land_size'] = (string) $totalArea;
             $payload['sale_land'] = $totalArea;
             $payload['total_amount'] = collect($request->input('plot_amounts', []))
@@ -163,6 +172,19 @@ class CustomerBondController extends Controller
             ->all();
 
         $item->plots()->sync($syncData);
+
+        // Update plot areas if client provided them
+        $plotAreas = $validated['plot_areas'] ?? [];
+        if (! empty($plotAreas)) {
+            foreach ($plotAreas as $plotId => $area) {
+                try {
+                    Plot::where('id', $plotId)->update(['area' => (float) $area]);
+                } catch (\Throwable $e) {
+                    // ignore individual update errors
+                }
+            }
+        }
+
         // Mark selected plots (or all plots for the arazi) as booked; do NOT change Arazi.status
         try {
             if (! empty($plotIds)) {
@@ -389,41 +411,80 @@ class CustomerBondController extends Controller
      */
     public function paymentContext(CustomerBond $customer_bond)
     {
-        $bond = $customer_bond->load(['arazi', 'plots']);
+        return response()->json($this->bondPaymentContext($customer_bond));
+    }
+
+    /**
+     * Find a bond by bond_no and return full payment context for compact UI.
+     */
+    public function byBondNo(\Illuminate\Http\Request $request)
+    {
+        $bondNo = trim((string) $request->query('bond_no', ''));
+        if ($bondNo === '') {
+            return response()->json(['found' => false, 'message' => 'Bond number is required.']);
+        }
+
+        $bond = CustomerBond::where('bond_no', $bondNo)->with(['arazi', 'plots', 'customer', 'witnesses', 'payments'])->latest()->first();
+
+        if (! $bond) {
+            return response()->json(['found' => false, 'message' => 'Bond not found.']);
+        }
+
+        return response()->json(array_merge(['found' => true], $this->bondPaymentContext($bond)));
+    }
+
+    /**
+     * Build the full payment-context payload for a bond (shared by byBondNo, paymentContext, byPlot).
+     */
+    private function bondPaymentContext(CustomerBond $bond): array
+    {
+        $bond->loadMissing(['arazi', 'plots', 'customer', 'witnesses', 'payments']);
 
         $araziLabel = '-';
         if ($bond->arazi) {
             $araziLabel = $bond->arazi->legacy_arazi_code ?: ($bond->arazi->plot_number ?? ('Arazi-' . $bond->arazi_id));
         }
 
-        $plots = $bond->plots->map(function ($p) {
-            $lbl = $p->title ?? ('Plot-' . $p->id);
+        $plots = $bond->plots->map(fn ($p) => [
+            'id'    => $p->id,
+            'label' => $p->title ?? ('Plot-' . $p->id),
+            'area'  => $p->area,
+        ])->values();
 
-            return [
-                'id' => $p->id,
-                'label' => $lbl,
-                'area' => $p->area,
-            ];
-        })->values();
+        $totalAmount  = (float) ($bond->total_amount ?? $bond->bond_amount ?? 0);
+        $paidAmount   = (float) $bond->payments->whereNotIn('entry_type', ['return', 'discount'])->sum('amount')
+                      - (float) $bond->payments->whereIn('entry_type', ['return', 'discount'])->sum('amount');
+        $balance      = max($totalAmount - $paidAmount, 0);
+        $paymentCount = $bond->payments->count();
+        $nextInstNo   = $paymentCount + 1;
 
-        $plotSummary = $bond->plots->isEmpty()
-            ? '-'
-            : $bond->plots->map(function ($p) {
-                $lbl = $p->title ?? ('Plot-' . $p->id);
+        $witnesses = $bond->witnesses->map(fn ($w) => [
+            'name'   => $w->name ?? '-',
+            'mobile' => $w->mobile ?? null,
+            'id_no'  => $w->id_no ?? null,
+        ])->values();
 
-                return $lbl.' / '.($p->area ?? '-').' gaz';
-            })->implode('; ');
-
-        $firstPlotId = $bond->plots->first()?->id;
-
-        return response()->json([
-            'arazi_id' => $bond->arazi_id,
-            'arazi_label' => $araziLabel,
-            'plots' => $plots,
-            'plot_summary' => $plotSummary,
-            'plot_id' => $firstPlotId,
-            'land_size' => $bond->land_size ?? $bond->sale_land,
-        ]);
+        return [
+            'bond_id'           => $bond->id,
+            'bond_no'           => $bond->bond_no,
+            'customer_id'       => $bond->customer_id,
+            'customer_label'    => $bond->customer?->name ?? '-',
+            'arazi_id'          => $bond->arazi_id,
+            'arazi_label'       => $araziLabel,
+            'plots'             => $plots,
+            'land_size'         => $bond->land_size ?? $bond->sale_land,
+            // bond summary
+            'bond_date'         => optional($bond->bond_date)->format('d-m-Y'),
+            'installment_end_date' => optional($bond->expiry_date ?? $bond->last_date)->format('d-m-Y'),
+            'no_of_months'      => $bond->no_of_months,
+            'installment_amount'=> (float) ($bond->installment_amount ?? 0),
+            'total_amount'      => $totalAmount,
+            'paid_amount'       => $paidAmount,
+            'balance_amount'    => $balance,
+            'payment_count'     => $paymentCount,
+            'next_installment_no' => $nextInstNo,
+            'witnesses'         => $witnesses,
+        ];
     }
 
     /**
@@ -433,20 +494,13 @@ class CustomerBondController extends Controller
     {
         $bond = CustomerBond::whereHas('plots', function ($q) use ($plot) {
             $q->where('plots.id', $plot->id);
-        })->with('customer')->latest()->first();
+        })->latest()->first();
 
         if (! $bond) {
             return response()->json(['found' => false]);
         }
 
-        return response()->json([
-            'found' => true,
-            'bond_id' => $bond->id,
-            'bond_no' => $bond->bond_no,
-            'customer_id' => $bond->customer_id,
-            'customer_label' => $bond->customer?->name ?? null,
-            'land_size' => $bond->land_size ?? $bond->sale_land,
-        ]);
+        return response()->json(array_merge(['found' => true], $this->bondPaymentContext($bond)));
     }
 
     public function print($id)

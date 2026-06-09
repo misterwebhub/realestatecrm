@@ -94,10 +94,11 @@ class PaymentReceiptPresenter
 
     public static function fromCustomerPayment(CustomerBondPayment $payment): array
     {
-        $bond = $payment->customerBond;
+        $payment->loadMissing(['customerBond.witnesses', 'customerBond.payments', 'customer']);
+        $bond     = $payment->customerBond;
         $customer = $payment->customer ?? $bond?->customer;
-        $amount = (float) ($payment->amount ?? 0);
-        $method = $payment->payment_method ?? '';
+        $amount   = (float) ($payment->amount ?? 0);
+        $method   = $payment->payment_method ?? '';
 
         $desc = ucfirst((string) $payment->entry_type).' payment';
         if ($bond?->bond_no) {
@@ -107,18 +108,41 @@ class PaymentReceiptPresenter
             $desc .= ' ('.$payment->remarks.')';
         }
 
+        // bond summary for receipt
+        $totalAmount   = (float) ($bond?->total_amount ?? $bond?->bond_amount ?? 0);
+        $allPayments   = $bond?->payments ?? collect();
+        $paidAmount    = (float) $allPayments->whereNotIn('entry_type', ['return','discount'])->sum('amount')
+                       - (float) $allPayments->whereIn('entry_type', ['return','discount'])->sum('amount');
+        $balance       = max($totalAmount - $paidAmount, 0);
+        $paymentCount  = $allPayments->count();
+
+        $witnesses = collect($bond?->witnesses ?? [])->map(fn ($w) => [
+            'name'   => $w->name ?? '-',
+            'mobile' => $w->mobile ?? null,
+        ])->values()->all();
+
         return [
-            'kind' => 'customer',
-            'receipt_no' => $payment->entry_no ?? '-',
-            'receipt_date' => optional($payment->entry_date)->format('d-m-Y') ?? '-',
-            'received_from' => $customer?->name ?? '-',
-            'hand_in' => $desc,
-            'amount' => $amount,
+            'kind'             => 'customer',
+            'receipt_no'       => $payment->entry_no ?? '-',
+            'receipt_date'     => optional($payment->entry_date)->format('d-m-Y') ?? '-',
+            'received_from'    => $customer?->name ?? '-',
+            'hand_in'          => $desc,
+            'amount'           => $amount,
             'amount_formatted' => 'Rs. '.number_format($amount, 2),
-            'amount_in_words' => self::amountInWordsInr($amount),
-            'method_flags' => self::paymentMethodFlags($method),
-            'method_raw' => $method !== '' ? $method : '-',
-            'payee_name' => config('app.name', 'Company'),
+            'amount_in_words'  => self::amountInWordsInr($amount),
+            'method_flags'     => self::paymentMethodFlags($method),
+            'method_raw'       => $method !== '' ? $method : '-',
+            'payee_name'       => config('app.name', 'Company'),
+            // bond details for receipt
+            'bond_no'              => $bond?->bond_no ?? '-',
+            'bond_date'            => optional($bond?->bond_date)->format('d-m-Y') ?? '-',
+            'installment_end_date' => optional($bond?->expiry_date ?? $bond?->last_date)->format('d-m-Y') ?? '-',
+            'installment_amount'   => (float) ($bond?->installment_amount ?? 0),
+            'installment_no'       => $paymentCount,
+            'total_amount'         => $totalAmount,
+            'paid_amount'          => $paidAmount,
+            'balance_amount'       => $balance,
+            'witnesses'            => $witnesses,
         ];
     }
 }

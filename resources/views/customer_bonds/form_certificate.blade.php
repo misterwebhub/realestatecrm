@@ -159,8 +159,9 @@
                             </select>
                             <button type="button" id="add-plot" class="btn btn-primary btn-sm">Add Plot</button>
                         </div>
-                        <div class="hidden-summary">
-                            <input type="text" name="land_size" id="land-size" value="{{ old('land_size', $item->land_size ?? '') }}" readonly />
+                        <div class="hidden-summary" style="display:block">
+                            <label class="form-label">Total Gaz (editable)</label>
+                            <input type="number" step="0.01" name="land_size" id="land-size" value="{{ old('land_size', $item->land_size ?? '') }}" class="form-control form-control-sm" />
                             <input type="hidden" name="sale_land" id="sale-land" value="{{ old('sale_land', $item->sale_land ?? $item->land_size ?? '') }}">
                             <input type="number" step="0.01" name="total_amount" class="total-amount-input" value="{{ old('total_amount', $item->total_amount ?? $item->bond_amount ?? 0) }}" readonly />
                         </div>
@@ -387,7 +388,9 @@
                         <strong>${escapeHtml(plotLabel(plot))}</strong>
                         <div class="small">${escapeHtml(plot.description || '')}</div>
                     </td>
-                    <td class="text-end">${formatGaz(plot.area)}</td>
+                    <td class="text-end">
+                        <input type="number" step="0.01" min="0" name="plot_areas[${plot.id}]" value="${plot.area || ''}" class="form-control form-control-sm text-end" data-plot-area="${plot.id}" placeholder="Gaz / area">
+                    </td>
                     <td class="text-end">
                         <input type="number" step="0.01" min="0" name="plot_amounts[${plot.id}]" value="${plot.amount || ''}" class="form-control form-control-sm text-end" data-plot-amount="${plot.id}" placeholder="Rate / gaz">
                     </td>
@@ -442,13 +445,21 @@
 
         selectedPlotsBody && selectedPlotsBody.addEventListener('input', function(event){
             const amountInput = event.target.closest('[data-plot-amount]');
-            if(!amountInput) return;
-
-            const plot = selectedPlots.get(String(amountInput.dataset.plotAmount));
-            if(!plot) return;
-
-            plot.amount = amountInput.value;
-            updateTotals();
+            const areaInput = event.target.closest('[data-plot-area]');
+            if(amountInput){
+                const plot = selectedPlots.get(String(amountInput.dataset.plotAmount));
+                if(!plot) return;
+                plot.amount = amountInput.value;
+                updateTotals();
+                return;
+            }
+            if(areaInput){
+                const plot = selectedPlots.get(String(areaInput.dataset.plotArea));
+                if(!plot) return;
+                plot.area = areaInput.value;
+                updateTotals();
+                return;
+            }
         });
 
         selectedPlotsBody && selectedPlotsBody.addEventListener('click', function(event){
@@ -463,6 +474,26 @@
             input.addEventListener('input', function(){
                 syncBookingInputs(input);
             });
+        });
+
+        // If total land_size edited and only one plot selected, update that plot's area
+        landSize && landSize.addEventListener('input', function(){
+            const v = parseFloat(this.value || 0);
+            if (Number.isNaN(v)) return;
+            if (selectedPlots.size === 1) {
+                const key = Array.from(selectedPlots.keys())[0];
+                const plot = selectedPlots.get(String(key));
+                if (plot) {
+                    plot.area = v;
+                    // update corresponding input in DOM if present
+                    const areaInput = document.querySelector('[data-plot-area="' + plot.id + '"]');
+                    if (areaInput) areaInput.value = (v || '');
+                    updateTotals();
+                }
+            } else {
+                // when multiple plots selected, just update sale_land hidden input
+                saleLand.value = this.value || '';
+            }
         });
 
         bondForm && bondForm.addEventListener('submit', function(){

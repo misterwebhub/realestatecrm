@@ -65,6 +65,7 @@ Route::middleware('auth')->group(function () {
     Route::get('kisan-payment/export/csv', [PaymentController::class, 'exportCsv'])->name('kisan-payment.export.csv');
     Route::resource('kisan-payment', PaymentController::class)->names('kisan-payment')->except(['show']);
     Route::resource('kisan-bonds', KisanBondController::class)->except(['show']);
+    Route::get('customer-bonds/by-bond-no', [CustomerBondController::class, 'byBondNo'])->name('customer-bonds.by-bond-no');
     Route::get('customer-bonds/{customer_bond}/payment-context', [CustomerBondController::class, 'paymentContext'])->name('customer-bonds.payment-context');
     Route::resource('customer-bonds', CustomerBondController::class)->except(['show']);
     Route::get('kisan-bonds/{kisan_bond}/print', [KisanBondController::class, 'print'])->name('kisan-bonds.print');
@@ -108,7 +109,8 @@ Route::middleware('auth')->group(function () {
     Route::get('arazi/{arazi}/plots', [\App\Http\Controllers\AraziController::class, 'plots'])->name('arazis.plots');
     Route::get('arazi/{arazi}/info', [\App\Http\Controllers\AraziController::class, 'info'])->name('arazis.info');
     Route::get('arazi/{arazi}/dashboard', [\App\Http\Controllers\AraziDashboardController::class, 'show'])->name('arazi.dashboard');
-    Route::get('arazi/{arazi}/grid', [\App\Http\Controllers\AraziController::class, 'grid'])->name('arazis.grid');
+    // Support both numeric id and legacy arazi code/plot_number via gridByIdentifier
+    Route::get('arazi/{identifier}/grid', [\App\Http\Controllers\AraziController::class, 'gridByIdentifier'])->name('arazis.grid');
     Route::get('arazi/{arazi}/saleable', [\App\Http\Controllers\AraziController::class, 'saleable'])->name('arazis.saleable');
     Route::get('arazi/{arazi}/bond-info', [\App\Http\Controllers\AraziController::class, 'bondInfo'])->name('arazis.bond-info');
     Route::get('arazi/{arazi}/customers', [\App\Http\Controllers\AraziController::class, 'customers'])->name('arazis.customers');
@@ -138,13 +140,58 @@ Route::middleware('auth')->group(function () {
     Route::get('reports/plot-details', [\App\Http\Controllers\ReportsController::class, 'plotDetails'])->name('reports.plot.details');
 
     // Arazis Map index: list folders under project root `arazis-map` and link to their index.php
-    Route::get('arazis-map', function () {
+    // Serve legacy map PHP files through Laravel to ensure environment variables (DB_*) are available.
+    Route::get('arazis-map/serve/{folder}/{file?}', function ($folder, $file = 'index.php') {
+        $base = base_path('arazis-map');
+        // basic sanitization: allow only simple folder names
+        if (! preg_match('/^[a-zA-Z0-9_\-]+$/', $folder)) {
+            abort(404);
+        }
+
+        $requested = realpath($base . DIRECTORY_SEPARATOR . $folder . DIRECTORY_SEPARATOR . $file);
+        if (! $requested || ! str_starts_with($requested, realpath($base . DIRECTORY_SEPARATOR . $folder))) {
+            abort(404);
+        }
+
+        // set DB env vars from Laravel config so legacy scripts relying on getenv/$_ENV find them
+        $defaultConn = config('database.default');
+        $conn = config('database.connections.' . $defaultConn, []);
+        $map = [
+            'DB_HOST' => $conn['host'] ?? env('DB_HOST'),
+            'DB_PORT' => $conn['port'] ?? env('DB_PORT'),
+            'DB_DATABASE' => $conn['database'] ?? env('DB_DATABASE'),
+            'DB_USERNAME' => $conn['username'] ?? env('DB_USERNAME'),
+            'DB_PASSWORD' => $conn['password'] ?? env('DB_PASSWORD'),
+        ];
+        foreach ($map as $k => $v) {
+            if ($v !== null) {
+                putenv("{$k}={$v}");
+                $_ENV[$k] = $v;
+                $_SERVER[$k] = $v;
+            }
+        }
+
+        // include the legacy script inside its folder (adjust cwd so relative includes work)
+        $cwd = getcwd();
+        chdir(dirname($requested));
+        ob_start();
+        try {
+            include $requested;
+        } finally {
+            $content = ob_get_clean();
+            chdir($cwd);
+        }
+
+        return response($content, 200)->header('Content-Type', 'text/html');
+    })->name('arazis.map.serve');
+    Route::get('all-arazis-maps', function () {
         $base = base_path('arazis-map');
         $list = [];
         if (is_dir($base)) {
             $items = scandir($base);
             foreach ($items as $it) {
                 if ($it === '.' || $it === '..') continue;
+                if (in_array($it, ['assets', 'arazis-assets'])) continue;
                 $path = $base . DIRECTORY_SEPARATOR . $it;
                 if (! is_dir($path)) continue;
 

@@ -118,6 +118,60 @@
         </tr>
     </table>
 
+    @if(!empty($receipt['bond_no']) && $receipt['bond_no'] !== '-')
+    <table class="box" cellspacing="0" cellpadding="0" width="100%" style="margin-top:10px;">
+        <tr>
+            <td class="lbl" style="background:#f8f8f8;font-weight:700;" colspan="4">Bond Details</td>
+        </tr>
+        <tr>
+            <td class="lbl">Bond No</td>
+            <td class="val">{{ $receipt['bond_no'] }}</td>
+            <td class="lbl">Bond Date</td>
+            <td class="val">{{ $receipt['bond_date'] ?? '-' }}</td>
+        </tr>
+        <tr>
+            <td class="lbl">Installment No</td>
+            <td class="val">{{ $receipt['installment_no'] ?? '-' }}</td>
+            <td class="lbl">Installment End Date</td>
+            <td class="val">{{ $receipt['installment_end_date'] ?? '-' }}</td>
+        </tr>
+        @if(!empty($receipt['installment_amount']) && $receipt['installment_amount'] > 0)
+        <tr>
+            <td class="lbl">Per Installment</td>
+            <td class="val">Rs. {{ number_format($receipt['installment_amount'], 2) }}</td>
+            <td></td><td></td>
+        </tr>
+        @endif
+        <tr>
+            <td class="lbl">Total Bond Amount</td>
+            <td class="val">Rs. {{ number_format($receipt['total_amount'] ?? 0, 2) }}</td>
+            <td class="lbl">Amount Paid</td>
+            <td class="val">Rs. {{ number_format($receipt['paid_amount'] ?? 0, 2) }}</td>
+        </tr>
+        <tr>
+            <td class="lbl" style="font-weight:700;">Balance Left</td>
+            <td class="val" style="font-weight:700;">Rs. {{ number_format($receipt['balance_amount'] ?? 0, 2) }}</td>
+            <td></td><td></td>
+        </tr>
+    </table>
+    @endif
+
+    @if(!empty($receipt['witnesses']) && count($receipt['witnesses']) > 0)
+    <table class="box" cellspacing="0" cellpadding="0" width="100%" style="margin-top:10px;">
+        <tr>
+            <td class="lbl" style="background:#f8f8f8;font-weight:700;" colspan="4">Witnesses</td>
+        </tr>
+        @foreach($receipt['witnesses'] as $i => $w)
+        <tr>
+            <td class="lbl">Witness {{ $i + 1 }}</td>
+            <td class="val">{{ $w['name'] }}</td>
+            <td class="lbl">Mobile</td>
+            <td class="val">{{ $w['mobile'] ?? '-' }}</td>
+        </tr>
+        @endforeach
+    </table>
+    @endif
+
     <table class="footer-sign" cellspacing="0">
         <tr>
             <td>Financial officer:<div class="line"></div></td>

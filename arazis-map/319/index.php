@@ -1065,4 +1065,163 @@
 	</form>
 
 
+<?php
+// Load shared DB credentials
+require __DIR__ . '/../db-config.php';
+$dbHost = MAP_DB_HOST;
+$dbPort = MAP_DB_PORT;
+$dbName = MAP_DB_NAME;
+$dbUser = MAP_DB_USER;
+$dbPass = MAP_DB_PASS;
+
+$plots = [];
+$serverDebug = [];
+try {
+    $dsn = "mysql:host={$dbHost};port={$dbPort};dbname={$dbName};charset=utf8mb4";
+    $pdo = new PDO($dsn, $dbUser, $dbPass, [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]);
+
+    // treat file number as legacy_arazi_code and resolve actual arazi id
+    $legacyCode = 319;
+    $araziId = null;
+    $aStmt = $pdo->prepare('SELECT id FROM arazis WHERE legacy_arazi_code = ? LIMIT 1');
+    $aStmt->execute([$legacyCode]);
+    $aRow = $aStmt->fetch(PDO::FETCH_ASSOC);
+    if ($aRow) {
+        $araziId = (int) $aRow['id'];
+        $serverDebug['resolved_arazi_id'] = $araziId;
+        $serverDebug['resolved_arazi_row'] = $aRow;
+    } else {
+        $araziId = (int) $legacyCode;
+        $serverDebug['resolved_arazi_id'] = $araziId;
+        $serverDebug['resolved_arazi_row'] = null;
+    }
+
+    // Try to fetch plots by joining arazis using legacy_arazi_code first
+    $stmt = $pdo->prepare('SELECT p.id, p.plot_number, p.area, p.status, p.title, p.description FROM plots p JOIN arazis a ON p.arazi_id = a.id WHERE a.legacy_arazi_code = ?');
+    $stmt->execute([$legacyCode]);
+    $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    $serverDebug['query_used'] = 'join_by_legacy_code';
+    if (empty($rows)) {
+        // fallback to direct arazi_id if join returned nothing
+        $stmt = $pdo->prepare('SELECT id, plot_number, area, status, title, description FROM plots WHERE arazi_id = ?');
+        $stmt->execute([$araziId]);
+        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        $serverDebug['query_used'] = 'fallback_by_arazi_id';
+    }
+
+    foreach ($rows as $r) {
+        $plotId = $r['id'];
+        $dbStatus = strtolower((string) ($r['status'] ?? ''));
+        $explicit = ['available','booked_advance','booked','hold','registry','blacklist','not_for_sale','issue'];
+        $status = null;
+        if ($dbStatus !== '' && in_array($dbStatus, $explicit, true)) {
+            $status = $dbStatus;
+        }
+
+        if ($status === null || $status === 'available') {
+            // check registry
+            $regStmt = $pdo->prepare("SELECT COUNT(*) FROM registries WHERE plot_id = ? AND (status = 'completed' OR payment_status = 'completed' OR status IS NULL)");
+            $regStmt->execute([$plotId]);
+            $hasReg = (int)$regStmt->fetchColumn() > 0;
+            if ($hasReg) {
+                $status = 'registry';
+            } else {
+                // check latest booking
+                $bkStmt = $pdo->prepare("SELECT status, advance_amount FROM bookings WHERE plot_id = ? AND (status IS NULL OR status != 'expired') ORDER BY id DESC LIMIT 1");
+                $bkStmt->execute([$plotId]);
+                $bk = $bkStmt->fetch(PDO::FETCH_ASSOC);
+                if ($bk) {
+                    $status = 'booked';
+                }
+            }
+        }
+
+        $desc = strtolower((string) ($r['description'] ?? ''));
+        if (strpos($desc, 'issue') !== false || empty($r['area']) || (float)($r['area'] ?? 0) <= 0) {
+            $status = 'issue';
+        }
+
+        if ($status === null) $status = 'available';
+
+        $plots[] = [
+            'id' => $plotId,
+            'plot_number' => $r['plot_number'],
+            'status' => $status,
+            'area' => $r['area'],
+        ];
+    }
+    $serverDebug['plots_count'] = count($plots);
+} catch (Throwable $e) {
+    $serverDebug['error'] = $e->getMessage();
+}
+?>
+<script>
+window.plots = <?php echo json_encode($plots, JSON_UNESCAPED_SLASHES|JSON_UNESCAPED_UNICODE); ?> || [];
+document.addEventListener('DOMContentLoaded', function(){
+    const serverDebug = <?php echo json_encode($serverDebug, JSON_UNESCAPED_SLASHES|JSON_UNESCAPED_UNICODE); ?> || {};
+    console.log('serverDebug', serverDebug);
+    const colorMap = {
+        'available':'#FFC107',
+        'booked':'#28A745',
+        'booked-advance':'#28A745',
+        'booked_advance':'#28A745',
+        'not_for_sale':'#9E9E9E',
+        'not-for-sale':'#9E9E9E',
+        'blacklist':'#212529',
+        'hold':'#A0522D',
+        'registry':'#E53935',
+        'issue':'#6C757D'
+    };
+
+    const plots = window.plots || [];
+    // build lookup by numeric part of plot_number; normalize status (fix typos like adwance)
+    const plotStatusByNumber = {};
+    plots.forEach(p => {
+        const numMatch = String(p.plot_number || p.id || '').match(/\d+/);
+        const rawStatus = String(p.status || 'available').toLowerCase().replace(/adwance/g,'advance');
+        const statusKey = rawStatus.replace(/[_\s]+/g,'-');
+        if (numMatch) plotStatusByNumber[numMatch[0]] = statusKey || 'available';
+    });
+
+    // detect offset similar to /397
+    let detectedOffset = null;
+    const numericKeys = Object.keys(plotStatusByNumber).map(k => parseInt(k, 10)).filter(n => !isNaN(n)).sort((a,b) => a - b);
+    if (numericKeys.length) {
+        const minK = numericKeys[0];
+        const maxK = numericKeys[numericKeys.length - 1];
+        if ((maxK - minK + 1) === numericKeys.length && minK > 1) {
+            detectedOffset = minK - 1;
+            console.log('detected plot_number offset:', detectedOffset);
+        }
+    }
+
+    function mapTileNumberToPlotNumber(tileNumStr) {
+        if (!tileNumStr) return tileNumStr;
+        if (plotStatusByNumber[tileNumStr]) return tileNumStr;
+        if (detectedOffset !== null) {
+            const candidate = String((parseInt(tileNumStr, 10) || 0) + detectedOffset);
+            if (plotStatusByNumber[candidate]) return candidate;
+        }
+        return tileNumStr;
+    }
+
+    // Find all span elements containing only digits and color their parent divs
+    const spans = Array.from(document.querySelectorAll('form span'));
+    spans.forEach(sp => {
+        const txt = (sp.textContent || '').trim();
+        const m = txt.match(/^\d+$/);
+        if (!m) return;
+        const tileNum = m[0];
+        const mapped = mapTileNumberToPlotNumber(tileNum);
+        const status = (mapped && plotStatusByNumber[mapped]) ? plotStatusByNumber[mapped] : 'available';
+        const parent = sp.closest('div');
+        if (!parent) return;
+        parent.style.backgroundImage = 'none';
+        const clr = colorMap[status] || colorMap['available'];
+        parent.style.backgroundColor = clr;
+        parent.style.color = (['#212529', '#28A745', '#E53935', '#A0522D'].includes(clr)) ? '#fff' : '#000';
+    });
+
+});
+</script>
 </body></html>

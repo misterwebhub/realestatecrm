@@ -21,7 +21,7 @@
 <script>
 (function(){
     const arazisPlotsUrl = @json(route('arazis.plots', ['arazi' => '__ARAZI_ID__']));
-    const araziGridBase = @json(route('arazis.grid', ['arazi' => '__ARAZI_ID__']));
+    const araziGridBase = @json(route('arazis.grid', ['identifier' => '__ARAZI_ID__']));
 
     function createTabsHtml(araziId, plots){
         const statuses = [
