@@ -77,8 +77,8 @@ class CustomerBondPaymentController extends Controller
             ->whereNotNull('customer_bond_id')
             ->when($selectedCustomerId, fn ($query) => $query->whereHas('customerBond', fn ($bondQuery) => $bondQuery->where('customer_id', $selectedCustomerId)))
             ->when($selectedBondId, fn ($query) => $query->where('customer_bond_id', $selectedBondId))
-            ->latest('entry_date')
-            ->latest('id')
+            ->orderBy('entry_date')
+            ->orderBy('id')
             ->get();
 
         return view('ledgers.bond_payments', [
@@ -148,8 +148,8 @@ class CustomerBondPaymentController extends Controller
             ->whereNotNull('customer_bond_id')
             ->when($selectedCustomerId, fn ($query) => $query->whereHas('customerBond', fn ($bondQuery) => $bondQuery->where('customer_id', $selectedCustomerId)))
             ->when($selectedBondId, fn ($query) => $query->where('customer_bond_id', $selectedBondId))
-            ->latest('entry_date')
-            ->latest('id')
+            ->orderByDesc('entry_date')
+            ->orderByDesc('id')
             ->get();
 
         $columns = ['Entry No', 'Customer Bond', 'Customer', 'Date', 'Type', 'Amount', 'Method', 'Cheque No', 'Remarks'];
