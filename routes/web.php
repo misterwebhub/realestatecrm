@@ -6,6 +6,7 @@ use App\Http\Controllers\UploadCategoryController;
 use App\Http\Controllers\KisanRegistryController;
 
 use App\Http\Controllers\AgentController;
+use App\Http\Controllers\UserMasterController;
 use App\Http\Controllers\AraziController;
 use App\Http\Controllers\AraziDocumentController;
 use App\Http\Controllers\AuthController;
@@ -121,6 +122,10 @@ Route::middleware('auth')->group(function () {
     Route::get('arazi/by-code', [\App\Http\Controllers\AraziController::class, 'byCode'])->name('arazis.by-code');
     Route::get('customer-bonds/by-plot/{plot}', [CustomerBondController::class, 'byPlot'])->name('customer-bonds.by-plot');
     
+    // User Master
+    Route::get('user-master/list', [UserMasterController::class, 'list'])->name('user-master.list');
+    Route::resource('user-master', UserMasterController::class)->except(['show'])->parameters(['user-master' => 'userMaster']);
+
     // Expenses
     Route::get('expenses', [\App\Http\Controllers\ExpenseController::class, 'index'])->name('expenses.index');
     Route::get('expenses/create', [\App\Http\Controllers\ExpenseController::class, 'create'])->name('expenses.create');

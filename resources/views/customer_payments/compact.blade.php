@@ -85,6 +85,15 @@
                             <label class="form-label">Amount</label>
                             <input type="number" step="0.01" name="amount" id="amount_input" class="form-control">
                         </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold">Taken By <span class="text-danger">*</span></label>
+                            <select name="taken_by_user_id" id="taken_by_user_id" class="form-select" required>
+                                <option value="">— Select User —</option>
+                                @foreach($activeUsers as $user)
+                                    <option value="{{ $user->id }}">{{ $user->name }}{{ $user->username ? ' ('.$user->username.')' : '' }}</option>
+                                @endforeach
+                            </select>
+                        </div>
                         <div class="col-md-12">
                             <label class="form-label">Remarks</label>
                             <textarea name="remarks" id="remarks" class="form-control" rows="2" placeholder="Optional remarks"></textarea>
@@ -397,6 +406,7 @@
             if(window.jQuery && jQuery.fn.select2){
                 try{ jQuery('#cheque_select').on('select2:select select2:unselect', function(){ handleChequeSelection(chequeSelect); }); }catch(e){}
                 try{ jQuery('#cheque_select').select2({ theme:'bootstrap-5', width:'100%', placeholder:'Select Cheque', allowClear:true }); }catch(e){}
+                try{ jQuery('#taken_by_user_id').select2({ theme:'bootstrap-5', width:'100%', placeholder:'— Select User —', allowClear:false }); }catch(e){}
             }
         }catch(e){}
     }

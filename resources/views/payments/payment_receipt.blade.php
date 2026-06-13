@@ -2,186 +2,250 @@
 <html lang="en">
 <head>
     <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>@if($receipt) Receipt {{ $receipt['receipt_no'] }} @else Payment receipt @endif</title>
+    <title>Receipt {{ $receipt['receipt_no'] ?? '' }}</title>
     <style>
-        * { box-sizing: border-box; }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
         body {
-            font-family: DejaVu Sans, Helvetica, Arial, sans-serif;
-            font-size: 12px;
+            font-family: Arial, Helvetica, sans-serif;
+            font-size: 13px;
             color: #000;
-            margin: 0;
-            padding: 16px 20px 24px;
             background: #fff;
+            padding: 16px;
         }
-        .no-print { margin-bottom: 12px; }
         @media print {
             .no-print { display: none !important; }
-            body { padding: 8px; }
+            body { padding: 4px; }
+            .cut-line { page-break-inside: avoid; }
         }
-        .toolbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+
+        /* Toolbar */
+        .toolbar { display: flex; gap: 8px; margin-bottom: 14px; align-items: center; }
         .toolbar a, .toolbar button {
-            display: inline-block;
-            padding: 6px 12px;
-            border: 1px solid #333;
-            background: #f5f5f5;
-            color: #000;
-            text-decoration: none;
-            font-size: 12px;
-            cursor: pointer;
+            padding: 5px 14px; border: 1px solid #555;
+            background: #f5f5f5; cursor: pointer; font-size: 12px;
+            text-decoration: none; color: #000;
         }
-        .toolbar .btn-primary { background: #0d6efd; color: #fff; border-color: #0d6efd; }
-        .receipt-head { text-align: center; margin-bottom: 14px; }
-        .receipt-head h1 { font-size: 18px; margin: 0 0 6px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; }
-        .receipt-head .rn { font-size: 13px; font-weight: 700; margin: 4px 0; }
-        .receipt-head .dt { font-size: 12px; }
-        .box { border: 2px solid #000; width: 100%; border-collapse: collapse; }
-        .box td { border: 1px solid #000; padding: 10px 12px; vertical-align: top; }
-        .box .lbl { font-weight: 700; width: 28%; white-space: nowrap; }
-        .box .val { width: 72%; }
-        .amount-row td { vertical-align: middle; }
-        .seal { width: 32%; font-weight: 700; font-size: 11px; min-height: 56px; }
-        .amount-big { width: 28%; text-align: center; font-size: 16px; font-weight: 700; }
-        .methods { width: 40%; font-size: 11px; line-height: 1.6; }
-        .methods span { margin-right: 10px; white-space: nowrap; }
-        .tick { font-weight: 700; }
-        .footer-sign { margin-top: 20px; width: 100%; border-collapse: collapse; }
-        .footer-sign td { padding: 8px 6px; vertical-align: bottom; font-size: 11px; width: 25%; }
-        .footer-sign .line { border-bottom: 1px solid #000; min-height: 28px; margin-top: 4px; }
-        .alert { padding: 10px; border: 1px solid #856404; background: #fff3cd; color: #856404; margin-bottom: 12px; }
-        form.lookup { margin-bottom: 12px; }
-        form.lookup input { padding: 6px 8px; border: 1px solid #999; width: 220px; }
+        .toolbar .btn-print { background: #0d6efd; color: #fff; border-color: #0d6efd; }
+
+        /* Cut line between copies */
+        .cut-line {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin: 6px 0;
+            color: #aaa;
+            font-size: 10px;
+        }
+        .cut-line::before, .cut-line::after {
+            content: '';
+            flex: 1;
+            border-top: 1.5px dashed #bbb;
+        }
+
+        /* ── Receipt card ── */
+        .receipt {
+            width: 100%;
+            border: 2px solid #1a3a6b;
+            border-radius: 6px;
+            overflow: hidden;
+        }
+
+        /* Header band */
+        .receipt-header {
+            background: #1a3a6b;
+            color: #fff;
+            padding: 10px 16px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .receipt-header .brand-name {
+            font-size: 18px;
+            font-weight: 700;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+        }
+        .receipt-header .brand-sub {
+            font-size: 11px;
+            opacity: .75;
+            margin-top: 1px;
+        }
+        .receipt-header .receipt-label {
+            text-align: right;
+            font-size: 12px;
+            font-weight: 700;
+            letter-spacing: .5px;
+            text-transform: uppercase;
+            opacity: .9;
+        }
+
+        /* Body two columns */
+        .receipt-body {
+            display: flex;
+            border-top: none;
+        }
+        .col-left {
+            flex: 1;
+            padding: 12px 16px;
+            border-right: 2px solid #1a3a6b;
+        }
+        .col-right {
+            width: 200px;
+            padding: 12px 16px;
+            background: #f0f4fa;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-around;
+        }
+
+        /* Info rows */
+        .info-row { margin-bottom: 9px; }
+        .info-row:last-child { margin-bottom: 0; }
+        .lbl {
+            font-size: 10px;
+            text-transform: uppercase;
+            letter-spacing: .5px;
+            color: #5a6a8a;
+            font-weight: 700;
+        }
+        .val {
+            font-size: 15px;
+            font-weight: 700;
+            color: #0d1f44;
+            margin-top: 1px;
+        }
+
+        /* Amount rows */
+        .amt-row { margin-bottom: 10px; text-align: right; }
+        .amt-row:last-child { margin-bottom: 0; }
+        .amt-lbl {
+            font-size: 10px;
+            text-transform: uppercase;
+            letter-spacing: .5px;
+            color: #5a6a8a;
+            font-weight: 700;
+        }
+        .amt-val {
+            font-size: 17px;
+            font-weight: 700;
+            color: #0d1f44;
+            margin-top: 1px;
+        }
+        .amt-val.balance { color: #b91c1c; }
+        .amt-val.paid    { color: #15803d; }
+        .amt-val.total   { color: #1a3a6b; }
+
+        /* Thin divider inside left col */
+        .inner-divider {
+            border: none;
+            border-top: 1px dashed #c8d5e8;
+            margin: 8px 0;
+        }
     </style>
-    @if(!empty($autoPrint) && $receipt)
-        <script>window.addEventListener('load', function () { window.print(); });</script>
+    @if(!empty($autoPrint) && ($receipt ?? false))
+        <script>window.addEventListener('load', function(){ window.print(); });</script>
     @endif
 </head>
 <body>
-@if(($toolbar ?? true) === true)
-    <div class="no-print">
-        @if(!$receipt && ($lookupKey ?? '') !== '')
-            <div class="alert">No receipt found for this number.</div>
-        @endif
-        <div class="toolbar">
-            <a href="{{ url()->previous() !== url()->current() ? url()->previous() : route('dashboard') }}">Back</a>
-            @if($receipt)
-                <button type="button" class="btn-primary" onclick="window.print()">Print</button>
-                @if(!empty($pdfUrl))
-                    <a href="{{ $pdfUrl }}" target="_blank" rel="noopener">Download PDF</a>
-                @endif
-            @endif
+
+{{-- Toolbar --}}
+<div class="no-print toolbar">
+    <a href="{{ url()->previous() !== url()->current() ? url()->previous() : route('dashboard') }}">← Back</a>
+    @if($receipt ?? false)
+        <button class="btn-print" onclick="window.print()">🖨 Print</button>
+    @endif
+    <form method="get" action="{{ $lookupAction ?? route('customer-bond-payments.receipt') }}" style="display:inline-flex;gap:6px;">
+        <input type="text" name="{{ $lookupParam ?? 'entry_no' }}" value="{{ $lookupKey ?? '' }}"
+               placeholder="e.g. CP00001"
+               style="padding:4px 8px;border:1px solid #999;font-size:12px;width:140px;">
+        <button type="submit" style="padding:4px 10px;border:1px solid #555;font-size:12px;cursor:pointer;">Open</button>
+    </form>
+</div>
+
+@if($receipt ?? false)
+@php $r = $receipt; @endphp
+
+{{-- Print 3 copies --}}
+@for($copy = 1; $copy <= 3; $copy++)
+
+@if($copy > 1)
+<div class="cut-line">✂ &nbsp; Copy {{ $copy }}</div>
+@endif
+
+<div class="receipt">
+
+    {{-- Header --}}
+    <div class="receipt-header">
+        <div>
+            <div class="brand-name">Kisan Land Management</div>
+            <div class="brand-sub">Payment Receipt</div>
         </div>
-        <form class="lookup" method="get" action="{{ $lookupAction ?? route('kisan-payment.print') }}">
-            <label>Receipt / entry no.&nbsp;</label>
-            <input type="text" name="{{ $lookupParam ?? 'receipt_no' }}" value="{{ $lookupKey ?? '' }}" placeholder="e.g. KP00001 or CP00001">
-            <button type="submit">Open</button>
-        </form>
-    </div>
-@endif
-
-@if($receipt)
-    @php($f = $receipt['method_flags'])
-    <div class="receipt-head">
-        <h1>Payment receipt</h1>
-        <div class="rn">Receipt No. {{ $receipt['receipt_no'] }}</div>
-        <div class="dt">Date: {{ $receipt['receipt_date'] }}</div>
+        <div class="receipt-label">
+            Copy {{ $copy }} of 3
+        </div>
     </div>
 
-    <table class="box" cellspacing="0" cellpadding="0" width="100%">
-        <tr>
-            <td class="lbl">Received today:</td>
-            <td class="val" colspan="2">{{ $receipt['received_from'] }}</td>
-        </tr>
-        <tr>
-            <td class="lbl">Towards (details):</td>
-            <td class="val" colspan="2">{{ $receipt['hand_in'] }}</td>
-        </tr>
-        <tr>
-            <td class="lbl">Amount in words (INR):</td>
-            <td class="val" colspan="2">{{ $receipt['amount_in_words'] }}</td>
-        </tr>
-        <tr class="amount-row">
-            <td class="seal">Payee (official seal)<br><span style="font-weight:400;font-size:10px;">{{ $receipt['payee_name'] }}</span></td>
-            <td class="amount-big">{{ $receipt['amount_formatted'] }}</td>
-            <td class="methods">
-                <span><span class="tick">{{ $f['cash'] ? '☑' : '☐' }}</span> Cash</span>
-                <span><span class="tick">{{ $f['transfer'] ? '☑' : '☐' }}</span> Bank transfer</span>
-                <span><span class="tick">{{ $f['upi'] ? '☑' : '☐' }}</span> UPI</span>
-                <span><span class="tick">{{ $f['cheque'] ? '☑' : '☐' }}</span> Cheque</span>
-                @if($f['other'] || (!$f['cash'] && !$f['transfer'] && !$f['upi'] && !$f['cheque'] && $receipt['method_raw'] !== '-'))
-                    <span><span class="tick">{{ $f['other'] ? '☑' : '☐' }}</span> Other</span>
-                @endif
-                @if($receipt['method_raw'] !== '-')
-                    <div style="margin-top:6px;font-size:10px;">Noted: {{ $receipt['method_raw'] }}</div>
-                @endif
-            </td>
-        </tr>
-    </table>
+    {{-- Body --}}
+    <div class="receipt-body">
 
-    @if(!empty($receipt['bond_no']) && $receipt['bond_no'] !== '-')
-    <table class="box" cellspacing="0" cellpadding="0" width="100%" style="margin-top:10px;">
-        <tr>
-            <td class="lbl" style="background:#f8f8f8;font-weight:700;" colspan="4">Bond Details</td>
-        </tr>
-        <tr>
-            <td class="lbl">Bond No</td>
-            <td class="val">{{ $receipt['bond_no'] }}</td>
-            <td class="lbl">Bond Date</td>
-            <td class="val">{{ $receipt['bond_date'] ?? '-' }}</td>
-        </tr>
-        <tr>
-            <td class="lbl">Installment No</td>
-            <td class="val">{{ $receipt['installment_no'] ?? '-' }}</td>
-            <td class="lbl">Installment End Date</td>
-            <td class="val">{{ $receipt['installment_end_date'] ?? '-' }}</td>
-        </tr>
-        @if(!empty($receipt['installment_amount']) && $receipt['installment_amount'] > 0)
-        <tr>
-            <td class="lbl">Per Installment</td>
-            <td class="val">Rs. {{ number_format($receipt['installment_amount'], 2) }}</td>
-            <td></td><td></td>
-        </tr>
-        @endif
-        <tr>
-            <td class="lbl">Total Bond Amount</td>
-            <td class="val">Rs. {{ number_format($receipt['total_amount'] ?? 0, 2) }}</td>
-            <td class="lbl">Amount Paid</td>
-            <td class="val">Rs. {{ number_format($receipt['paid_amount'] ?? 0, 2) }}</td>
-        </tr>
-        <tr>
-            <td class="lbl" style="font-weight:700;">Balance Left</td>
-            <td class="val" style="font-weight:700;">Rs. {{ number_format($receipt['balance_amount'] ?? 0, 2) }}</td>
-            <td></td><td></td>
-        </tr>
-    </table>
-    @endif
+        {{-- Left: labels --}}
+        <div class="col-left">
+            <div class="info-row">
+                <div class="lbl">Bond No</div>
+                <div class="val">{{ $r['bond_no'] ?? '—' }}</div>
+            </div>
+            <hr class="inner-divider">
+            <div style="display:flex; gap:24px;">
+                <div class="info-row">
+                    <div class="lbl">Receipt No</div>
+                    <div class="val">{{ $r['receipt_no'] ?? '—' }}</div>
+                </div>
+                <div class="info-row">
+                    <div class="lbl">Installment No</div>
+                    <div class="val">{{ $r['installment_no'] ?? '—' }}</div>
+                </div>
+            </div>
+            <hr class="inner-divider">
+            <div style="display:flex; gap:24px;">
+                <div class="info-row">
+                    <div class="lbl">Date of Entry</div>
+                    <div class="val">{{ $r['receipt_date'] ?? '—' }}</div>
+                </div>
+                <div class="info-row">
+                    <div class="lbl">Bond Date</div>
+                    <div class="val">{{ $r['bond_date'] ?? '—' }}</div>
+                </div>
+                <div class="info-row">
+                    <div class="lbl">Bond End Date</div>
+                    <div class="val">{{ $r['installment_end_date'] ?? '—' }}</div>
+                </div>
+            </div>
+        </div>
 
-    @if(!empty($receipt['witnesses']) && count($receipt['witnesses']) > 0)
-    <table class="box" cellspacing="0" cellpadding="0" width="100%" style="margin-top:10px;">
-        <tr>
-            <td class="lbl" style="background:#f8f8f8;font-weight:700;" colspan="4">Witnesses</td>
-        </tr>
-        @foreach($receipt['witnesses'] as $i => $w)
-        <tr>
-            <td class="lbl">Witness {{ $i + 1 }}</td>
-            <td class="val">{{ $w['name'] }}</td>
-            <td class="lbl">Mobile</td>
-            <td class="val">{{ $w['mobile'] ?? '-' }}</td>
-        </tr>
-        @endforeach
-    </table>
-    @endif
+        {{-- Right: amounts --}}
+        <div class="col-right">
+            <div class="amt-row">
+                <div class="amt-lbl">Bond Amount</div>
+                <div class="amt-val total">Rs. {{ number_format($r['total_amount'] ?? 0, 2) }}</div>
+            </div>
+            <div class="amt-row">
+                <div class="amt-lbl">Total Paid</div>
+                <div class="amt-val paid">Rs. {{ number_format($r['paid_amount'] ?? 0, 2) }}</div>
+            </div>
+            <div class="amt-row">
+                <div class="amt-lbl">Balance</div>
+                <div class="amt-val balance">Rs. {{ number_format($r['balance_amount'] ?? 0, 2) }}</div>
+            </div>
+        </div>
 
-    <table class="footer-sign" cellspacing="0">
-        <tr>
-            <td>Financial officer:<div class="line"></div></td>
-            <td>Cashier:<div class="line"></div></td>
-            <td>Audit:<div class="line"></div></td>
-            <td>Attn:<div class="line"></div></td>
-        </tr>
-    </table>
-@elseif(($toolbar ?? true) && ($lookupKey ?? '') === '')
-    <p class="no-print" style="color:#555;">Enter a receipt number above, or open print from the payment list.</p>
+    </div>
+</div>
+
+@endfor
+
+@else
+    <p class="no-print" style="color:#666; margin-top:10px;">Enter a receipt number above to load the receipt.</p>
 @endif
+
 </body>
 </html>

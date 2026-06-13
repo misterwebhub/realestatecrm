@@ -295,6 +295,7 @@ class CustomerBondPaymentController extends Controller
             'land_size' => ['nullable', 'numeric', 'min:0'],
             'amount' => ['required', 'numeric', 'min:0'],
             'payment_method' => ['nullable', 'string', 'max:40'],
+            'taken_by_user_id' => ['required', 'exists:users,id'],
             'remarks' => ['nullable', 'string'],
         ];
     }
@@ -442,12 +443,15 @@ class CustomerBondPaymentController extends Controller
             'other' => 'Other',
         ];
 
+        $activeUsers = \App\Models\User::where('is_active', true)->orderBy('name')->get(['id', 'name', 'username']);
+
         return view('customer_payments.compact', [
-            'title' => 'Compact Customer Payment',
-            'arazis' => $arazis,
+            'title'       => 'Compact Customer Payment',
+            'arazis'      => $arazis,
             'paymentMethods' => $paymentMethods,
-            'action' => route('customer-bond-payments.store'),
-            'method' => 'POST',
+            'activeUsers' => $activeUsers,
+            'action'      => route('customer-bond-payments.store'),
+            'method'      => 'POST',
         ]);
     }
 

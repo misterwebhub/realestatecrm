@@ -176,6 +176,15 @@
                         </li>
                     @endif
 
+                    @if(auth()->check() && auth()->user()->role === 'admin')
+                    <li class="nav-item">
+                        <a href="{{ route('user-master.index') }}" class="nav-link {{ request()->routeIs('user-master.*') ? 'active' : '' }}">
+                            <i class="nav-icon bi bi-person-gear"></i>
+                            <p>User Master</p>
+                        </a>
+                    </li>
+                    @endif
+
                     <li class="nav-item {{ request()->routeIs('customer-bond-cheques.index') || request()->routeIs('connected-accounts.*') ? 'menu-open' : '' }}">
                         <a href="#" class="nav-link {{ request()->routeIs('customer-bond-cheques.index') || request()->routeIs('connected-accounts.*') ? 'active' : '' }}">
                             <i class="nav-icon bi bi-credit-card-2-front"></i>
