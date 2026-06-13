@@ -1,16 +1,12 @@
 @extends('layouts.app')
 
 @section('content')
-<div class="container py-3">
-    <div class="d-flex justify-content-between align-items-center mb-3">
-        <h4 class="mb-0">Uploads</h4>
-        <div>
-            <a href="{{ route('uploads.create') }}" class="btn btn-sm btn-primary">New Upload</a>
+    <div class="card card-outline card-primary mb-3">
+        <div class="card-header d-flex align-items-center justify-content-between">
+            <h5 class="card-title mb-0 fw-bold">Uploads</h5>
+            <a href="{{ route('uploads.create') }}" class="btn btn-primary btn-sm"><i class="bi bi-plus-lg"></i> New Upload</a>
         </div>
-    </div>
-
-    <div class="card mb-3">
-        <div class="card-body">
+        <div class="card-body border-bottom">
             <form method="get" class="row g-2">
                 <div class="col-md-3">
                     <label class="form-label small">Category</label>
@@ -52,7 +48,7 @@
         </div>
     </div>
 
-    <div class="card">
+    <div class="card card-outline card-primary">
         <div class="card-body p-0">
             <div class="table-responsive">
                 <table class="table table-sm table-striped mb-0">
@@ -65,7 +61,7 @@
                             <th>MIME</th>
                             <th class="text-end">Size (KB)</th>
                             <th>Uploaded</th>
-                            <th>Actions</th>
+                            <th class="text-end">Actions</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -100,8 +96,8 @@
                                 <td class="text-muted small">{{ $u->mime }}</td>
                                 <td class="text-end"><span class="text-muted small">{{ number_format($u->size/1024,2) }}</span></td>
                                 <td class="text-nowrap">{{ $u->created_at->format('M d, Y H:i') }}</td>
-                                <td>
-                                    <a href="{{ route('uploads.download', $u) }}" class="btn btn-sm btn-primary" title="Download"><i class="bi bi-download"></i></a>
+                                <td class="text-end" style="white-space:nowrap;">
+                                    <a href="{{ route('uploads.download', $u) }}" class="btn btn-sm btn-primary" title="Download"><i class="bi bi-download"></i> Download</a>
                                 </td>
                             </tr>
                         @endforeach
@@ -112,7 +108,6 @@
     </div>
 
     <div class="mt-3">{{ $uploads->links() }}</div>
-</div>
 
 @push('scripts')
 <script>

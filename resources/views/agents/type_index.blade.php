@@ -3,7 +3,7 @@
 @section('content')
     <div class="card card-outline card-primary">
         <div class="card-header d-flex align-items-center justify-content-between">
-            <h5 class="card-title mb-0">{{ $title }}</h5>
+            <h5 class="card-title mb-0 fw-bold">{{ $title }}</h5>
             @if(auth()->check() && in_array(auth()->user()->role, ['admin','manager']))
                 <button type="button" class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#addBrokerModal">
                     <i class="bi bi-plus-lg"></i> Add {{ $typeLabel }} Broker

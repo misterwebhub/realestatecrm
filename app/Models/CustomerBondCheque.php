@@ -11,6 +11,7 @@ class CustomerBondCheque extends Model
 
     protected $fillable = [
         'customer_bond_id',
+        'connected_account_id',
         'customer_id',
         'cheque_number',
         'bank_name',
@@ -27,6 +28,11 @@ class CustomerBondCheque extends Model
         'cheque_date' => 'date',
         'amount' => 'decimal:2',
     ];
+
+    public function connectedAccount()
+    {
+        return $this->belongsTo(\App\Models\ConnectedAccount::class);
+    }
 
     public function customerBond()
     {

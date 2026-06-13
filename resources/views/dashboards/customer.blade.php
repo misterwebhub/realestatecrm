@@ -3,7 +3,7 @@
 @section('content')
     <div class="card card-outline card-primary">
         <div class="card-header d-flex justify-content-between align-items-center">
-            <h5 class="card-title mb-0">Customer Dashboard — {{ $customer->name }}</h5>
+            <h5 class="card-title mb-0 fw-bold">Customer Dashboard — {{ $customer->name }}</h5>
             <div>
                 <a href="{{ $shareUrl }}" class="btn btn-outline-secondary btn-sm" target="_blank">Shareable Link</a>
             </div>

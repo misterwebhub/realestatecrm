@@ -33,7 +33,7 @@ class CustomerBondController extends Controller
 
     protected function resourceColumns(): array
     {
-        return ['Bond No', 'Customer', 'Arazi', 'Plots', 'Bond Date', 'Amount', 'Paid', 'Balance', 'Installment Paid', 'Installment Remaining'];
+        return ['Bond No', 'Customer', 'Arazi', 'Plots', 'Bond Date', 'Amount', 'Paid', 'Balance'];
     }
 
     protected function resourceFields(?Model $item = null): array
@@ -389,21 +389,81 @@ class CustomerBondController extends Controller
                 number_format((float) $item->bond_amount, 2),
                 number_format((float) ($item->paid_amount ?? 0), 2),
                 number_format(max(0, ((float) ($item->bond_amount ?? 0) - (float) ($item->paid_amount ?? 0))), 2),
-                number_format((float) ($item->installment_paid ?? 0), 2),
-                number_format(max(0, ((float) ($item->bond_amount ?? 0) - (float) ($item->installment_paid ?? 0))), 2),
             ],
             'print_url' => route('customer-bonds.print', $item->id),
             'pdf_url' => route('customer-bonds.pdf', $item->id),
             'action_buttons' => [
                 [
-                    'url' => route('customer-bond-cheques.create', ['customer_bond_id' => $item->id]),
+                    'url' => route('customer-bonds.cheques-modal', $item->id),
                     'label' => 'Cheques',
                     'class' => 'btn-outline-info',
+                    'data_modal' => true,
+                    'data_toggle' => 'modal',
+                    'data_target' => 'chequesModal',
                 ],
             ],
             // mark that links for this resource should open in a new tab
             'open_in_new_tab' => true,
         ];
+    }
+
+    /**
+     * Return modal data for cheques management (for modal popup).
+     */
+    public function chequesModal(CustomerBond $customer_bond)
+    {
+        $customer_bond->loadMissing(['customer', 'cheques', 'arazi', 'plots', 'payments']);
+
+        // balance
+        $totalAmount = (float) ($customer_bond->total_amount ?? $customer_bond->bond_amount ?? 0);
+        $paidAmount  = (float) $customer_bond->payments
+            ->whereNotIn('entry_type', ['return', 'discount'])->sum('amount')
+            - (float) $customer_bond->payments
+            ->whereIn('entry_type', ['return', 'discount'])->sum('amount');
+        $balance = max($totalAmount - $paidAmount, 0);
+
+        // last installment paid
+        $lastPayment = $customer_bond->payments
+            ->whereNotIn('entry_type', ['return', 'discount'])
+            ->sortByDesc('entry_date')
+            ->first();
+
+        // arazi label
+        $araziLabel = '-';
+        if ($customer_bond->arazi) {
+            $araziLabel = $customer_bond->arazi->legacy_arazi_code
+                ?: ($customer_bond->arazi->plot_number ?? ('Arazi-' . $customer_bond->arazi_id));
+        }
+
+        // plots
+        $plotsLabel = $customer_bond->plots->isNotEmpty()
+            ? $customer_bond->plots->map(fn ($p) => $p->title ?? ('Plot-' . $p->id))->implode(', ')
+            : '-';
+
+        return response()->json([
+            'bond_id'          => $customer_bond->id,
+            'bond_no'          => $customer_bond->bond_no,
+            'customer_name'    => $customer_bond->customer?->name ?? '-',
+            'bond_date'        => optional($customer_bond->bond_date)->format('d-m-Y') ?? '-',
+            'end_date'         => optional($customer_bond->expiry_date ?? $customer_bond->last_date)->format('d-m-Y') ?? '-',
+            'arazi'            => $araziLabel,
+            'plots'            => $plotsLabel,
+            'total_amount'     => number_format($totalAmount, 2),
+            'paid_amount'      => number_format($paidAmount, 2),
+            'balance'          => number_format($balance, 2),
+            'last_payment_date'=> $lastPayment ? optional($lastPayment->entry_date)->format('d-m-Y') : '-',
+            'last_payment_amt' => $lastPayment ? number_format((float)$lastPayment->amount, 2) : '-',
+            'cheques' => $customer_bond->cheques->map(fn ($c) => [
+                'id'           => $c->id,
+                'cheque_number'=> $c->cheque_number,
+                'cheque_date'  => optional($c->cheque_date)->format('d-m-Y'),
+                'amount'       => number_format((float)$c->amount, 2),
+                'status'       => $c->status,
+                'type'         => $c->type ?? 'mentioned',
+                'notes'        => $c->notes,
+            ])->all(),
+            'manage_url' => route('customer-bond-cheques.manage', $customer_bond->id),
+        ]);
     }
 
     /**

@@ -10,13 +10,34 @@ use Illuminate\Support\Facades\DB;
 
 class CustomerBondChequeController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
-        $cheques = CustomerBondCheque::with(['customerBond.customer', 'customer'])->latest()->get();
+        $filterStatus = $request->query('status', '');
+        $filterBond   = $request->query('bond_no', '');
+
+        $query = CustomerBondCheque::with(['customerBond.customer', 'connectedAccount'])
+            ->when($filterStatus, fn ($q) => $q->where('status', $filterStatus))
+            ->when($filterBond,   fn ($q) => $q->whereHas('customerBond', fn ($bq) => $bq->where('bond_no', 'like', '%' . $filterBond . '%')))
+            ->latest('cheque_date')
+            ->latest('id');
+
+        $cheques = $query->get();
+
+        // summary totals
+        $all     = CustomerBondCheque::selectRaw('status, SUM(amount) as total, COUNT(*) as count')->groupBy('status')->get()->keyBy('status');
+        $summary = [
+            'pending'   => $all->get('pending'),
+            'cleared'   => $all->get('cleared'),
+            'bounced'   => $all->get('bounced'),
+            'cancelled' => $all->get('cancelled'),
+        ];
 
         return view('customer_bond_cheques.index', [
-            'title' => 'Customer Bond Cheques',
-            'cheques' => $cheques,
+            'title'         => 'Connected Accounts Cheques',
+            'cheques'       => $cheques,
+            'summary'       => $summary,
+            'filterStatus'  => $filterStatus,
+            'filterBond'    => $filterBond,
         ]);
     }
 
@@ -57,6 +78,7 @@ class CustomerBondChequeController extends Controller
                     return $q->where('customer_bond_id', $bondId);
                 }),
             ],
+            'connected_account_id' => ['required', 'exists:connected_accounts,id'],
             'bank_name' => ['nullable', 'string', 'max:150'],
             'branch_name' => ['nullable', 'string', 'max:150'],
             'cheque_date' => ['nullable', 'date'],
@@ -98,11 +120,27 @@ class CustomerBondChequeController extends Controller
 
     public function manage(CustomerBond $customer_bond)
     {
-        $cheques = CustomerBondCheque::where('customer_bond_id', $customer_bond->id)->orderBy('id')->get();
+        $customer_bond->loadMissing(['customer', 'arazi', 'plots', 'witnesses', 'payments']);
+
+        $cheques = CustomerBondCheque::with('connectedAccount')
+            ->where('customer_bond_id', $customer_bond->id)
+            ->orderBy('id')
+            ->get();
+
+        // Payment summary (debit-aware)
+        $debitTypes  = ['return', 'discount'];
+        $totalPaid   = $customer_bond->payments->whereNotIn('entry_type', $debitTypes)->sum('amount');
+        $totalDebit  = $customer_bond->payments->whereIn('entry_type', $debitTypes)->sum('amount');
+        $netPaid     = $totalPaid - $totalDebit;
+        $balance     = ($customer_bond->total_amount ?? 0) - $netPaid;
+        $installmentNo = $customer_bond->payments->whereNotIn('entry_type', $debitTypes)->count();
 
         return view('customer_bond_cheques.manage', [
-            'bond' => $customer_bond,
-            'cheques' => $cheques,
+            'bond'          => $customer_bond,
+            'cheques'       => $cheques,
+            'netPaid'       => $netPaid,
+            'balance'       => $balance,
+            'installmentNo' => $installmentNo,
         ]);
     }
 
@@ -121,6 +159,7 @@ class CustomerBondChequeController extends Controller
             'cheques.*.amount' => ['required', 'numeric', 'min:0'],
             'cheques.*.status' => ['nullable', 'in:pending,cleared,bounced,cancelled'],
             'cheques.*.type' => ['nullable', 'in:mentioned,not_mentioned'],
+            'cheques.*.connected_account_id' => ['required', 'exists:connected_accounts,id'],
             'cheques.*.notes' => ['nullable', 'string'],
         ]);
 
@@ -167,6 +206,7 @@ class CustomerBondChequeController extends Controller
                 $c = CustomerBondCheque::where('id', $row['id'])->where('customer_bond_id', $bondId)->first();
                 if (! $c) continue;
                 $c->update([
+                    'connected_account_id' => $row['connected_account_id'],
                     'cheque_number' => $row['cheque_number'],
                     'bank_name' => $row['bank_name'] ?? null,
                     'branch_name' => $row['branch_name'] ?? null,
@@ -180,6 +220,7 @@ class CustomerBondChequeController extends Controller
                 CustomerBondCheque::create([
                     'customer_bond_id' => $bondId,
                     'customer_id' => CustomerBond::find($bondId)?->customer_id ?? null,
+                    'connected_account_id' => $row['connected_account_id'],
                     'cheque_number' => $row['cheque_number'],
                     'bank_name' => $row['bank_name'] ?? null,
                     'branch_name' => $row['branch_name'] ?? null,

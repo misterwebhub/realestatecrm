@@ -15,7 +15,7 @@
                     </form>
                 </div>
             @else
-                <h5 class="card-title mb-0">{{ $title }}</h5>
+                <h5 class="card-title mb-0 fw-bold">{{ $title }}</h5>
             @endif
 
             @if(auth()->check() && in_array(auth()->user()->role, ['admin','manager']))
@@ -98,7 +98,7 @@
                         @foreach($row['cells'] as $cell)
                             <td>{{ $cell }}</td>
                         @endforeach
-                        <td class="text-end">
+                        <td class="text-end" style="white-space:nowrap;">
                             @if(!empty($row['print_url']))
                                 <a href="{{ $row['print_url'] }}?print=1" target="_blank" class="btn btn-outline-success btn-sm">Print</a>
                             @endif
@@ -109,7 +109,9 @@
                                 <a href="{{ $row['add_url'] }}" @if(!empty($row['open_in_new_tab'])) target="_blank" rel="noopener" @endif class="btn btn-outline-primary btn-sm ms-1">Add Bond</a>
                             @endif
                             @foreach($row['action_buttons'] ?? [] as $button)
-                                <a href="{{ $button['url'] }}" class="btn {{ $button['class'] ?? 'btn-outline-primary' }} btn-sm ms-1">
+                                <a href="{{ $button['url'] }}" 
+                                   class="btn {{ $button['class'] ?? 'btn-outline-primary' }} btn-sm ms-1"
+                                   @if(!empty($button['data_modal'])) data-bs-toggle="modal" data-bs-target="#{{ $button['data_target'] ?? 'modal' }}" @endif>
                                     {{ $button['label'] }}
                                 </a>
                             @endforeach
@@ -132,4 +134,154 @@
             </table>
         </div>
     </div>
+
+    <!-- Cheques Modal -->
+    <div class="modal fade" id="chequesModal" tabindex="-1" role="dialog" aria-labelledby="chequesModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-xl" role="document">
+            <div class="modal-content">
+                <div class="modal-header bg-light">
+                    <div>
+                        <h4 class="modal-title mb-1 fw-bold" id="chequesModalLabel">
+                            Bond Cheques — <span id="modalBondNo" class="text-primary">Loading...</span>
+                        </h4>
+                        <div class="text-muted" style="font-size:16px;" id="modalCustomerName"></div>
+                    </div>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body p-0">
+
+                    {{-- Bond summary strip --}}
+                    <div id="modalBondSummary" style="display:none; background:#f8fafc; border-bottom:1px solid #e2e8f0; padding:18px 22px;">
+                        <div class="row g-3 align-items-start">
+                            <div class="col-6 col-md-3">
+                                <div class="text-muted" style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;">Bond Date</div>
+                                <div class="fw-semibold" style="font-size:16px;" id="mBondDate">—</div>
+                            </div>
+                            <div class="col-6 col-md-3">
+                                <div class="text-muted" style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;">End Date</div>
+                                <div class="fw-semibold" style="font-size:16px;" id="mEndDate">—</div>
+                            </div>
+                            <div class="col-6 col-md-3">
+                                <div class="text-muted" style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;">Arazi</div>
+                                <div class="fw-semibold" style="font-size:16px;" id="mArazi">—</div>
+                            </div>
+                            <div class="col-6 col-md-3">
+                                <div class="text-muted" style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;">Plot(s)</div>
+                                <div class="fw-semibold" style="font-size:16px;" id="mPlots">—</div>
+                            </div>
+                            <div class="col-6 col-md-3 mt-1">
+                                <div class="text-muted" style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;">Total Amount</div>
+                                <div class="fw-bold text-primary" style="font-size:16px;" id="mTotal">—</div>
+                            </div>
+                            <div class="col-6 col-md-3 mt-1">
+                                <div class="text-muted" style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;">Paid</div>
+                                <div class="fw-bold text-success" style="font-size:16px;" id="mPaid">—</div>
+                            </div>
+                            <div class="col-6 col-md-3 mt-1">
+                                <div class="text-muted" style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;">Balance</div>
+                                <div class="fw-bold text-danger" style="font-size:16px;" id="mBalance">—</div>
+                            </div>
+                            <div class="col-6 col-md-3 mt-1">
+                                <div class="text-muted" style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;">Last Installment</div>
+                                <div class="fw-semibold" style="font-size:16px;" id="mLastPayment">—</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {{-- Cheques body --}}
+                    <div id="chequesModalBody" class="p-3">
+                        <div class="text-center py-4">
+                            <div class="spinner-border text-primary" role="status">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    <a href="#" id="manageChequesBtnLink" target="_blank" class="btn btn-primary">Manage Cheques</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.getElementById('chequesModal').addEventListener('show.bs.modal', function (e) {
+            const button = e.relatedTarget;
+            const modalUrl = button.getAttribute('href');
+            const modalBody = document.getElementById('chequesModalBody');
+
+            // reset
+            document.getElementById('modalBondNo').textContent = 'Loading...';
+            document.getElementById('modalCustomerName').textContent = '';
+            document.getElementById('modalBondSummary').style.display = 'none';
+            modalBody.innerHTML = '<div class="text-center py-4"><div class="spinner-border text-primary" role="status"></div></div>';
+
+            fetch(modalUrl)
+                .then(r => { if (!r.ok) throw new Error('Network error'); return r.json(); })
+                .then(data => {
+                    // header
+                    document.getElementById('modalBondNo').textContent     = data.bond_no || '-';
+                    document.getElementById('modalCustomerName').textContent = data.customer_name || '';
+
+                    // bond summary strip
+                    document.getElementById('mBondDate').textContent    = data.bond_date || '-';
+                    document.getElementById('mEndDate').textContent      = data.end_date || '-';
+                    document.getElementById('mArazi').textContent        = data.arazi || '-';
+                    document.getElementById('mPlots').textContent        = data.plots || '-';
+                    document.getElementById('mTotal').textContent        = '₹' + (data.total_amount || '0.00');
+                    document.getElementById('mPaid').textContent         = '₹' + (data.paid_amount  || '0.00');
+                    document.getElementById('mBalance').textContent      = '₹' + (data.balance      || '0.00');
+                    const lastPmt = data.last_payment_date !== '-'
+                        ? data.last_payment_date + ' · ₹' + data.last_payment_amt
+                        : 'No payments yet';
+                    document.getElementById('mLastPayment').textContent  = lastPmt;
+                    document.getElementById('modalBondSummary').style.display = '';
+
+                    // manage button
+                    document.getElementById('manageChequesBtnLink').href = data.manage_url;
+
+                    // cheques table
+                    if (!data.cheques || data.cheques.length === 0) {
+                        modalBody.innerHTML = '<p class="text-center text-muted py-4">No cheques recorded yet.</p>';
+                        return;
+                    }
+
+                    const statusColors = { pending:'warning', cleared:'success', bounced:'danger', cancelled:'secondary' };
+                    let rows = '';
+                    data.cheques.forEach(c => {
+                        const color = statusColors[c.status] || 'info';
+                        rows += `<tr>
+                            <td class="ps-3 fw-semibold" style="font-size:16px;">${c.cheque_number || '-'}</td>
+                            <td style="font-size:16px;">${c.cheque_date || '-'}</td>
+                            <td class="fw-bold" style="font-size:16px;">₹${c.amount}</td>
+                            <td><span class="badge bg-${color}-subtle text-${color} border border-${color}-subtle" style="font-size:13px;padding:5px 11px;">${c.status}</span></td>
+                            <td style="font-size:16px;" class="text-muted">${c.type || '-'}</td>
+                            <td style="font-size:16px;color:#64748b;">${c.notes || ''}</td>
+                        </tr>`;
+                    });
+
+                    modalBody.innerHTML = `
+                        <div class="table-responsive">
+                            <table class="table table-hover mb-0 align-middle">
+                                <thead style="background:#f8fafc;">
+                                    <tr>
+                                        <th class="ps-3 py-3" style="font-size:12px;font-weight:700;text-transform:uppercase;color:#64748b;letter-spacing:.5px;">Cheque #</th>
+                                        <th style="font-size:12px;font-weight:700;text-transform:uppercase;color:#64748b;letter-spacing:.5px;">Date</th>
+                                        <th style="font-size:12px;font-weight:700;text-transform:uppercase;color:#64748b;letter-spacing:.5px;">Amount</th>
+                                        <th style="font-size:12px;font-weight:700;text-transform:uppercase;color:#64748b;letter-spacing:.5px;">Status</th>
+                                        <th style="font-size:12px;font-weight:700;text-transform:uppercase;color:#64748b;letter-spacing:.5px;">Type</th>
+                                        <th style="font-size:12px;font-weight:700;text-transform:uppercase;color:#64748b;letter-spacing:.5px;">Notes</th>
+                                    </tr>
+                                </thead>
+                                <tbody>${rows}</tbody>
+                            </table>
+                        </div>`;
+                })
+                .catch(err => {
+                    console.error(err);
+                    modalBody.innerHTML = '<div class="alert alert-danger m-3">Error loading cheques data.</div>';
+                });
+        });
+    </script>
 @endsection

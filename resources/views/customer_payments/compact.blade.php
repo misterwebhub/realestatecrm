@@ -6,7 +6,7 @@
     {{-- LEFT: Payment Form --}}
     <div class="col-lg-8">
         <div class="card card-outline card-primary h-100">
-            <div class="card-header"><h5 class="card-title mb-0">{{ $title }}</h5></div>
+            <div class="card-header"><h5 class="card-title mb-0 fw-bold">{{ $title }}</h5></div>
             <div class="card-body">
                 <form action="{{ $action }}" method="POST" id="compact_payment_form">
                     @csrf
@@ -103,7 +103,7 @@
     {{-- RIGHT: Bond Lookup + Summary Panel --}}
     <div class="col-lg-4">
         <div class="card card-outline card-success">
-            <div class="card-header"><h5 class="card-title mb-0">Quick Bond Lookup</h5></div>
+            <div class="card-header"><h5 class="card-title mb-0 fw-bold">Quick Bond Lookup</h5></div>
             <div class="card-body pb-2">
                 <p class="text-muted small mb-2">Enter Bond No. OR select Arazi → Plot to auto-fill.</p>
                 <div class="input-group mb-2">
@@ -116,7 +116,7 @@
 
         {{-- Bond Details Summary Card --}}
         <div id="bond_info_card" class="card card-outline card-info mt-3" style="display:none;">
-            <div class="card-header py-2"><h6 class="card-title mb-0">Bond Summary</h6></div>
+            <div class="card-header py-2"><h6 class="card-title mb-0 fw-bold">Bond Summary</h6></div>
             <div class="card-body p-0">
                 <table class="table table-sm mb-0">
                     <tbody>
@@ -135,7 +135,7 @@
 
         {{-- Witnesses Card --}}
         <div id="bond_witnesses_card" class="card card-outline card-warning mt-3" style="display:none;">
-            <div class="card-header py-2"><h6 class="card-title mb-0">Witnesses</h6></div>
+            <div class="card-header py-2"><h6 class="card-title mb-0 fw-bold">Witnesses</h6></div>
             <div class="card-body p-0">
                 <table class="table table-sm mb-0" id="witnesses_table">
                     <thead><tr><th class="ps-3">Name</th><th>Mobile</th></tr></thead>

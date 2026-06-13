@@ -4,7 +4,7 @@
 <div class="card card-outline card-primary">
     <div class="card-header d-flex align-items-center justify-content-between flex-wrap gap-2">
         <div class="d-flex align-items-center gap-3 flex-grow-1">
-            <h5 class="card-title mb-0">{{ $title }}</h5>
+            <h5 class="card-title mb-0 fw-bold">{{ $title }}</h5>
             <form method="get" class="d-flex ms-3" action="{{ route('arazis.index') }}">
                 <input name="q" value="{{ request()->query('q') }}" placeholder="Search Arazi code, plot no, location or kisan" class="form-control form-control-sm" style="min-width:320px;" />
                 <button class="btn btn-sm btn-outline-secondary ms-2" type="submit">Search</button>

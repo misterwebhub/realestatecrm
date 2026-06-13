@@ -3,7 +3,7 @@
 @section('content')
     <div class="card card-outline card-primary">
         <div class="card-header d-flex justify-content-between align-items-center">
-            <h5 class="card-title mb-0">Arazi Dashboard — {{ $arazi->legacy_arazi_code ?? ($arazi->plot_number ?? 'Arazi-'.$arazi->id) }}</h5>
+            <h5 class="card-title mb-0 fw-bold">Arazi Dashboard — {{ $arazi->legacy_arazi_code ?? ($arazi->plot_number ?? 'Arazi-'.$arazi->id) }}</h5>
             <div>
                 <a href="{{ $shareUrl }}" class="btn btn-outline-secondary btn-sm" target="_blank">Shareable Link</a>
             </div>

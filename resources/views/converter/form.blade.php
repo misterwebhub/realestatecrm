@@ -1,7 +1,10 @@
 @extends('layouts.app')
 
 @section('content')
-    <div class="card">
+    <div class="card card-outline card-primary">
+        <div class="card-header">
+            <h5 class="card-title mb-0 fw-bold">Area Converter</h5>
+        </div>
         <div class="card-body">
             <form method="POST" action="{{ route('converter.convert') }}">
                 @csrf

@@ -175,25 +175,35 @@
                             </a>
                         </li>
                     @endif
+
+                    <li class="nav-item {{ request()->routeIs('customer-bond-cheques.index') || request()->routeIs('connected-accounts.*') ? 'menu-open' : '' }}">
+                        <a href="#" class="nav-link {{ request()->routeIs('customer-bond-cheques.index') || request()->routeIs('connected-accounts.*') ? 'active' : '' }}">
+                            <i class="nav-icon bi bi-credit-card-2-front"></i>
+                            <p>
+                                Cheques
+                                <i class="nav-arrow bi bi-chevron-right"></i>
+                            </p>
+                        </a>
+                        <ul class="nav nav-treeview">
+                            <li class="nav-item">
+                                <a href="{{ route('customer-bond-cheques.index') }}" class="nav-link {{ request()->routeIs('customer-bond-cheques.index') ? 'active' : '' }}">
+                                    <i class="nav-icon bi bi-circle"></i><p>Account Cheques</p>
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a href="{{ route('connected-accounts.index') }}" class="nav-link {{ request()->routeIs('connected-accounts.*') ? 'active' : '' }}">
+                                    <i class="nav-icon bi bi-circle"></i><p>Connected Accounts</p>
+                                </a>
+                            </li>
+                        </ul>
+                    </li>
                 </ul>
             </nav>
         </div>
     </aside>
 
     <main class="app-main">
-        <div class="app-content-header">
-            <div class="container-fluid">
-                <div class="row align-items-center">
-                    <div class="col-sm-6">
-                        @if(!empty($title))
-                            <h3 class="mb-0">{{ $title }}</h3>
-                        @endif
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <div class="app-content">
+        <div class="app-content" style="padding-top:20px;">
             <div class="container-fluid pb-4">
                 @if(session('success'))
                     <div class="alert alert-success alert-dismissible fade show" role="alert">

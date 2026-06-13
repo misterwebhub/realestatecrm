@@ -3,7 +3,7 @@
 @section('content')
     <div class="card card-outline card-primary">
         <div class="card-header d-flex justify-content-between align-items-center">
-            <h5 class="card-title mb-0">{{ $title }}</h5>
+            <h5 class="card-title mb-0 fw-bold">{{ $title }}</h5>
             <a href="{{ route('customer-bonds.index') }}" class="btn btn-secondary btn-sm">Back to Bonds</a>
         </div>
 
@@ -15,7 +15,24 @@
 
                 <div class="mb-3">
                     <label class="form-label">Customer Bond</label>
-                    <div class="form-control">{{ $bond?->bond_no ?? '-' }} - {{ $bond?->customer?->name ?? '-' }}</div>
+                    <div class="form-control bg-light">{{ $bond?->bond_no ?? '-' }} — {{ $bond?->customer?->name ?? '-' }}</div>
+                </div>
+
+                {{-- Connected Account (required) --}}
+                <div class="mb-3">
+                    <label class="form-label fw-semibold">
+                        Connected Account <span class="text-danger">*</span>
+                        <a href="{{ route('connected-accounts.create') }}" target="_blank" class="ms-2 small text-primary">+ Add new</a>
+                    </label>
+                    <select name="connected_account_id" id="connected_account_id" class="form-select @error('connected_account_id') is-invalid @enderror" required>
+                        <option value="">— Select Account —</option>
+                        @foreach(\App\Models\ConnectedAccount::orderBy('name')->get() as $acc)
+                            <option value="{{ $acc->id }}" @selected(old('connected_account_id') == $acc->id)>
+                                {{ $acc->name }} — {{ $acc->mobile }}
+                            </option>
+                        @endforeach
+                    </select>
+                    @error('connected_account_id')<div class="invalid-feedback">{{ $message }}</div>@enderror
                 </div>
 
                 <div class="mb-3">
@@ -66,4 +83,17 @@
             </form>
         </div>
     </div>
+
+@push('scripts')
+<script>
+$(function(){
+    $('#connected_account_id').select2({
+        theme: 'bootstrap-5',
+        placeholder: '— Select Account —',
+        allowClear: true,
+        width: '100%',
+    });
+});
+</script>
+@endpush
 @endsection

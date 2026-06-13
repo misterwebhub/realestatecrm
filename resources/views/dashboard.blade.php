@@ -73,7 +73,7 @@
     <div class="row g-3 mt-1">
         <div class="col-lg-6">
             <div class="card card-outline card-primary h-100">
-                <div class="card-header"><h5 class="card-title mb-0">Land Status</h5></div>
+                <div class="card-header"><h5 class="card-title mb-0 fw-bold">Land Status</h5></div>
                 <div class="card-body">
                     <canvas id="landStatusChart" height="220"></canvas>
                 </div>
@@ -81,7 +81,7 @@
         </div>
         <div class="col-lg-6">
             <div class="card card-outline card-success h-100">
-                <div class="card-header"><h5 class="card-title mb-0">Recent Payments</h5></div>
+                <div class="card-header"><h5 class="card-title mb-0 fw-bold">Recent Payments</h5></div>
                 <div class="card-body table-responsive p-0">
                     <table class="table table-striped mb-0 align-middle">
                         <thead>

@@ -67,6 +67,7 @@ Route::middleware('auth')->group(function () {
     Route::resource('kisan-bonds', KisanBondController::class)->except(['show']);
     Route::get('customer-bonds/by-bond-no', [CustomerBondController::class, 'byBondNo'])->name('customer-bonds.by-bond-no');
     Route::get('customer-bonds/{customer_bond}/payment-context', [CustomerBondController::class, 'paymentContext'])->name('customer-bonds.payment-context');
+    Route::get('customer-bonds/{customer_bond}/cheques-modal', [CustomerBondController::class, 'chequesModal'])->name('customer-bonds.cheques-modal');
     Route::resource('customer-bonds', CustomerBondController::class)->except(['show']);
     Route::get('kisan-bonds/{kisan_bond}/print', [KisanBondController::class, 'print'])->name('kisan-bonds.print');
     Route::get('kisan-bonds/{kisan_bond}/pdf', [KisanBondController::class, 'pdf'])->name('kisan-bonds.pdf');
@@ -85,6 +86,8 @@ Route::middleware('auth')->group(function () {
     Route::get('customer-bond-cheques/by-bond/{customer_bond}', [CustomerBondChequeController::class, 'forBond'])->name('customer-bond-cheques.for-bond');
     Route::get('customer-bond-cheques/manage/{customer_bond}', [CustomerBondChequeController::class, 'manage'])->name('customer-bond-cheques.manage');
     Route::post('customer-bond-cheques/bulk-save', [CustomerBondChequeController::class, 'storeBulk'])->name('customer-bond-cheques.bulk-save');
+    Route::get('connected-accounts/list', [\App\Http\Controllers\ConnectedAccountController::class, 'list'])->name('connected-accounts.list');
+    Route::resource('connected-accounts', \App\Http\Controllers\ConnectedAccountController::class)->except(['show']);
     Route::resource('investors', InvestorController::class)->except(['show']);
     Route::resource('partners', PartnerController::class)->except(['show']);
     Route::resource('arazi-documents', AraziDocumentController::class)->parameters([

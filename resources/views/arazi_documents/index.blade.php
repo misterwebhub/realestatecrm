@@ -3,7 +3,7 @@
 @section('content')
     <div class="card card-outline card-primary">
         <div class="card-header d-flex align-items-center justify-content-between">
-            <h5 class="card-title mb-0">{{ $title }}</h5>
+            <h5 class="card-title mb-0 fw-bold">{{ $title }}</h5>
             @if(auth()->check() && in_array(auth()->user()->role, ['admin','manager']))
                 <a href="{{ $createUrl }}" class="btn btn-primary btn-sm">
                     <i class="bi bi-plus-lg"></i> Add Arazi Registry
@@ -66,7 +66,7 @@
                             <td>{{ $document->mime_type ?? '-' }}</td>
                             <td>{{ $document->file_size ? number_format($document->file_size / 1024, 2) : '-' }}</td>
                             <td>{{ optional($document->uploaded_at)->format('d-m-Y h:i A') ?? '-' }}</td>
-                            <td class="text-end">
+                            <td class="text-end" style="white-space:nowrap;">
                                 <a href="{{ route('arazi-documents.download', $document) }}" class="btn btn-outline-success btn-sm">Download</a>
                                 @if(auth()->check() && in_array(auth()->user()->role, ['admin','manager']))
                                     <a href="{{ route('arazi-documents.edit', $document) }}" class="btn btn-outline-secondary btn-sm">Edit</a>

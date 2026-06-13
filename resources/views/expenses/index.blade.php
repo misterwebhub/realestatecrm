@@ -1,22 +1,13 @@
 @extends('layouts.app')
 
 @section('content')
-<div class="container py-3">
-    <div class="d-flex justify-content-between align-items-center mb-3">
-        <h4 class="mb-0">Expenses</h4>
-        <a href="{{ route('expenses.create') }}" class="btn btn-sm btn-primary">New Expense</a>
-    </div>
-
-    <div class="card mb-3 shadow-sm">
+    <div class="card card-outline card-primary mb-3">
         <div class="card-header d-flex align-items-center justify-content-between">
-            <div>
-                <h4 class="mb-0">Expenses</h4>
-                <div class="text-muted small">Manage and review recorded expenses</div>
-            </div>
-            <div class="d-flex gap-2 align-items-center">
-                <input id="expenses-search" type="search" class="form-control form-control-sm" placeholder="Search expenses (label, arazi, type)" style="min-width:260px">
-                <a href="{{ route('expenses.create') }}" class="btn btn-sm btn-primary">New Expense</a>
-            </div>
+            <h5 class="card-title mb-0 fw-bold">Expenses</h5>
+            <a href="{{ route('expenses.create') }}" class="btn btn-primary btn-sm"><i class="bi bi-plus-lg"></i> New Expense</a>
+        </div>
+        <div class="card-body border-bottom py-2 px-3">
+            <input id="expenses-search" type="search" class="form-control form-control-sm" placeholder="Search expenses (label, arazi, type)..." style="max-width:320px;">
         </div>
 
         <div class="card-body p-0">
@@ -68,38 +59,26 @@
             <div>{{ $expenses->links() }}</div>
         </div>
     </div>
-                        @push('styles')
-                        <style>
-                            /* Slight visual polish for expenses table */
-                            .table-hover tbody tr:hover { background: #fbfbfd; }
-                            .badge { font-size: 0.8rem; }
-                            #expenses-search { max-width: 420px; }
-                        </style>
-                        @endpush
 
-                        @push('scripts')
-                        <script>
-                        // Small client-side filter for convenience (filters label, arazi code, type badge text)
-                        document.addEventListener('DOMContentLoaded', function(){
-                            var input = document.getElementById('expenses-search');
-                            if(!input) return;
-                            var tbody = document.getElementById('expenses-table-body');
-                            var rows = Array.from(tbody.querySelectorAll('tr'));
+@push('scripts')
+<script>
+document.addEventListener('DOMContentLoaded', function(){
+    var input = document.getElementById('expenses-search');
+    if(!input) return;
+    var tbody = document.getElementById('expenses-table-body');
+    var rows = Array.from(tbody.querySelectorAll('tr'));
+    function filter(){
+        var q = input.value.trim().toLowerCase();
+        if(q === ''){ rows.forEach(r=> r.style.display=''); return; }
+        rows.forEach(function(r){
+            r.style.display = r.textContent.toLowerCase().indexOf(q) !== -1 ? '' : 'none';
+        });
+    }
+    var timer = null;
+    input.addEventListener('input', function(){ clearTimeout(timer); timer = setTimeout(filter, 200); });
+});
+</script>
+@endpush
 
-                            function filter(){
-                                var q = input.value.trim().toLowerCase();
-                                if(q === ''){ rows.forEach(r=> r.style.display=''); return; }
-                                rows.forEach(function(r){
-                                    var text = r.textContent.toLowerCase();
-                                    r.style.display = text.indexOf(q) !== -1 ? '' : 'none';
-                                });
-                            }
-
-                            var timer = null;
-                            input.addEventListener('input', function(){ clearTimeout(timer); timer = setTimeout(filter, 200); });
-                        });
-                        </script>
-                        @endpush
-
-                        @endsection
+@endsection
 
