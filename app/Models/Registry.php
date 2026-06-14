@@ -24,6 +24,7 @@ class Registry extends Model
         'registry_amount',
         'payment_words',
         'id_card_no',
+        'associate_address',
         'witness_name',
         'nominee_name',
         'document_path',

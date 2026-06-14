@@ -117,32 +117,54 @@ class RegistryController extends Controller
     protected function resourceRules(?Model $item = null): array
     {
         return [
-            'customer_id' => ['required', 'exists:customers,id'],
-            'arazi_id' => ['required', 'exists:arazis,id', Rule::unique('registries', 'arazi_id')->ignore($item?->id)],
-            'agent_id' => ['required', 'exists:agents,id'],
-            'check_by_agent_id' => ['nullable', 'exists:agents,id'],
-            'registry_code' => ['nullable', 'string', 'max:40', Rule::unique('registries', 'registry_code')->ignore($item?->id)],
-            'customer_reg_no' => ['nullable', 'string', 'max:40', Rule::unique('registries', 'customer_reg_no')->ignore($item?->id)],
-            'registry_date' => ['required', 'date'],
-            'booking_mode' => ['required', 'in:cash,emi,mixed,other'],
-            'plot_id' => ['nullable', 'exists:plots,id'],
-            'land_size' => ['required', 'numeric', 'min:0'],
-            'registry_amount' => ['nullable', 'numeric', 'min:0'],
-            'witness_name' => ['required', 'string', 'max:150'],
-            'nominee_name' => ['nullable', 'string', 'max:150'],
-            'broker_commission' => ['required', 'numeric', 'min:0', 'max:100'],
-            'advance_amount' => ['nullable', 'numeric', 'min:0'],
-            'down_payment' => ['nullable', 'numeric', 'min:0'],
-            'installment_amount' => ['nullable', 'numeric', 'min:0'],
-            'due_date' => ['nullable', 'date'],
-            'expected_registry_date' => ['nullable', 'date'],
-            'payment_words' => ['nullable', 'string', 'max:255'],
-            'id_card_no' => ['nullable', 'string', 'max:60'],
-            'status' => ['required', 'in:pending,completed,cancelled'],
-            'payment_status' => ['required', 'in:pending,partial,completed,expired'],
-            'lock_status' => ['required', 'in:unlock,lock'],
-            'document' => ['nullable', 'file', 'mimes:pdf,jpeg,png,jpg', 'max:5120'],
+            'customer_id'      => ['required', 'exists:customers,id'],
+            'arazi_id'         => ['required', 'exists:arazis,id'],
+            'plot_id'          => ['nullable', 'exists:plots,id'],
+            'registry_date'    => ['required', 'date'],
+            'booking_mode'     => ['nullable', 'in:cash,emi,mixed,other'],
+            'land_size'        => ['nullable', 'numeric', 'min:0'],
+            'registry_amount'  => ['nullable', 'numeric', 'min:0'],
+            'status'           => ['required', 'in:pending,completed,cancelled'],
+            'payment_status'   => ['required', 'in:pending,partial,completed,expired'],
+            'lock_status'      => ['required', 'in:unlock,lock'],
+            // witnesses array → mapped to witness_name in resourcePrepareData
+            'witnesses'        => ['nullable', 'array'],
+            'witnesses.*.name'   => ['required', 'string', 'max:150'],
+            'witnesses.*.mobile' => ['nullable', 'string', 'max:30'],
+            // non-fillable extras
+            'secondary_mobile' => ['nullable', 'string', 'max:30'],
+            'pending_amount'   => ['nullable', 'numeric', 'min:0'],
+            'customer_bond_id' => ['nullable', 'integer'],
+            'receipt_no'       => ['nullable', 'string', 'max:40'],
+            'document'         => [$item ? 'nullable' : 'required', 'file', 'mimes:pdf,jpeg,png,jpg', 'max:5120'],
         ];
+    }
+
+    protected function resourcePrepareData(array $validated, Request $request, ?Model $item = null): array
+    {
+        // Map witnesses array → witness_name (comma-joined names)
+        $witnesses = $validated['witnesses'] ?? [];
+        $witnessName = '';
+        if (!empty($witnesses)) {
+            $names = array_filter(array_column($witnesses, 'name'));
+            $witnessName = implode(', ', array_values($names));
+        }
+
+        // Strip keys that are not in Registry $fillable
+        $strip = ['witnesses', 'secondary_mobile', 'pending_amount', 'customer_bond_id'];
+        $payload = array_diff_key($validated, array_flip($strip));
+
+        // Defaults for hidden required-ish fields
+        $payload['booking_mode']   = $payload['booking_mode'] ?? 'other';
+        $payload['land_size']      = $payload['land_size'] ?? 0;
+        $payload['witness_name']   = $witnessName ?: null;
+
+        // On update, don't overwrite receipt_no
+        if ($item) {
+            unset($payload['receipt_no']);
+        }
+
+        return $payload;
     }
 
     protected function resourceQuery()
@@ -153,45 +175,65 @@ class RegistryController extends Controller
     // Override index to support search filters for plot registry listing
     public function index(Request $request)
     {
-        $q = Registry::with(['customer', 'arazi', 'agent']);
+        $q = Registry::with(['customer', 'arazi', 'agent', 'plot']);
 
-        if ($request->filled('arazi_number')) {
-            $term = $request->input('arazi_number');
-            $q->whereHas('arazi', fn ($q2) => $q2->where('plot_number', 'like', "%{$term}%"));
+        $filterAraziCode = trim((string) $request->input('arazi_code', ''));
+        $filterPlotId    = $request->input('plot_id');
+        $filterRegNo     = trim((string) $request->input('reg_no', ''));
+
+        if ($filterAraziCode !== '') {
+            $araziIds = Arazi::where('legacy_arazi_code', $filterAraziCode)->pluck('id');
+            $q->whereIn('arazi_id', $araziIds);
         }
 
-        if ($request->filled('customer_name')) {
-            $term = $request->input('customer_name');
-            $q->whereHas('customer', fn ($q2) => $q2->where('name', 'like', "%{$term}%"));
+        if ($filterPlotId) {
+            $q->where('plot_id', $filterPlotId);
         }
 
-        if ($request->filled('broker_name')) {
-            $term = $request->input('broker_name');
-            $q->whereHas('agent', fn ($q2) => $q2->where('name', 'like', "%{$term}%"));
-        }
-
-        if ($request->filled('plot_number')) {
-            $term = $request->input('plot_number');
-            $q->whereHas('arazi.plots', fn ($q2) => $q2->where('plot_number', 'like', "%{$term}%")->orWhere('title', 'like', "%{$term}%"));
+        if ($filterRegNo !== '') {
+            $q->where(function ($q2) use ($filterRegNo) {
+                $q2->where('registry_code', 'like', "%{$filterRegNo}%")
+                   ->orWhere('receipt_no', 'like', "%{$filterRegNo}%")
+                   ->orWhere('customer_reg_no', 'like', "%{$filterRegNo}%");
+            });
         }
 
         $records = $q->latest()->get();
 
         $rows = $records->map(function (Model $record) {
             return array_merge($this->resourceRow($record), [
-                'edit_url' => route($this->resourceRouteName() . '.edit', $record),
+                'edit_url'   => route($this->resourceRouteName() . '.edit', $record),
                 'delete_url' => route($this->resourceRouteName() . '.destroy', $record),
-                'print_url' => route($this->resourceRouteName() . '.print', $record),
-                'pdf_url' => route($this->resourceRouteName() . '.pdf', $record),
+                'print_url'  => route($this->resourceRouteName() . '.print', $record),
+                'pdf_url'    => route($this->resourceRouteName() . '.pdf', $record),
             ]);
         })->all();
 
+        // Plots for selected arazi code (all arazis with that code)
+        $filterPlots = collect();
+        if ($filterAraziCode !== '') {
+            $araziIds    = Arazi::where('legacy_arazi_code', $filterAraziCode)->pluck('id');
+            $filterPlots = \App\Models\Plot::whereIn('arazi_id', $araziIds)->orderBy('plot_number')->get(['id','plot_number','title']);
+        }
+
+        // Unique arazi codes for dropdown
+        $araziOptions = Arazi::whereNotNull('legacy_arazi_code')
+            ->where('legacy_arazi_code', '!=', '')
+            ->orderBy('legacy_arazi_code')
+            ->pluck('legacy_arazi_code')
+            ->unique()
+            ->values();
+
         return view('registries.index', [
-            'title' => $this->resourceTitle(),
-            'columns' => $this->resourceColumns(),
-            'rows' => $rows,
-            'createUrl' => route($this->resourceRouteName() . '.create'),
-            'filters' => $request->only(['arazi_number', 'customer_name', 'broker_name']),
+            'title'           => $this->resourceTitle(),
+            'columns'         => $this->resourceColumns(),
+            'rows'            => $rows,
+            'createUrl'       => route($this->resourceRouteName() . '.create'),
+            'araziOptions'    => $araziOptions,
+            'filterPlots'     => $filterPlots,
+            'filterAraziCode' => $filterAraziCode,
+            'filterPlotId'    => $filterPlotId,
+            'filterRegNo'     => $filterRegNo,
         ]);
     }
 
@@ -203,16 +245,19 @@ class RegistryController extends Controller
         // auto-generate receipt number for new registries
         $item->receipt_no = $this->nextRegistryNumber();
 
-        $customers = Customer::orderBy('name')->pluck('name', 'id')->all();
-        $arazis = Arazi::orderBy('plot_number')->pluck('plot_number', 'id')->all();
+        $customers = Customer::orderBy('name')->get(['id','name','mobile','secondary_mobile']);
+        $arazis = Arazi::orderBy('legacy_arazi_code')->get(['id','legacy_arazi_code','plot_number'])
+                        ->mapWithKeys(fn($a) => [$a->id => ($a->legacy_arazi_code ?: $a->plot_number)])
+                        ->all();
         $agents = Agent::orderBy('name')->pluck('name', 'id')->all();
 
         return view('registries.add', [
-            'title' => 'Add ' . $this->resourceTitle(),
+            'title'  => 'Add ' . $this->resourceTitle(),
             'action' => route($this->resourceRouteName() . '.store'),
             'method' => 'POST',
-            'item' => $item,
-            'customers' => $customers,
+            'item'   => $item,
+            'customers' => $customers->pluck('name', 'id')->all(),
+            'customersJson' => $customers->keyBy('id')->map(fn($c) => ['name'=>$c->name,'mobile'=>$c->mobile,'secondary_mobile'=>$c->secondary_mobile]),
             'arazis' => $arazis,
             'agents' => $agents,
         ]);
@@ -223,18 +268,21 @@ class RegistryController extends Controller
         $modelClass = $this->resourceModel();
         $item = $modelClass::findOrFail($id);
 
-        $customers = Customer::orderBy('name')->pluck('name', 'id')->all();
-        $arazis = Arazi::orderBy('plot_number')->pluck('plot_number', 'id')->all();
+        $customers = Customer::orderBy('name')->get(['id','name','mobile','secondary_mobile']);
+        $arazis = Arazi::orderBy('legacy_arazi_code')->get(['id','legacy_arazi_code','plot_number'])
+                        ->mapWithKeys(fn($a) => [$a->id => ($a->legacy_arazi_code ?: $a->plot_number)])
+                        ->all();
         $agents = Agent::orderBy('name')->pluck('name', 'id')->all();
 
         return view('registries.add', [
-            'title' => 'Edit ' . $this->resourceTitle(),
-            'action' => route($this->resourceRouteName() . '.update', $item),
-            'method' => 'PUT',
-            'item' => $item,
-            'customers' => $customers,
-            'arazis' => $arazis,
-            'agents' => $agents,
+            'title'        => 'Edit ' . $this->resourceTitle(),
+            'action'       => route($this->resourceRouteName() . '.update', $item),
+            'method'       => 'PUT',
+            'item'         => $item,
+            'customers'    => $customers->pluck('name', 'id')->all(),
+            'customersJson'=> $customers->keyBy('id')->map(fn($c) => ['name'=>$c->name,'mobile'=>$c->mobile,'secondary_mobile'=>$c->secondary_mobile]),
+            'arazis'       => $arazis,
+            'agents'       => $agents,
         ]);
     }
 
@@ -308,6 +356,78 @@ class RegistryController extends Controller
             ])->save();
             $this->registryLifecycleService->markRegistryPending($item);
         }
+    }
+
+    public function bondLookup(Request $request)
+    {
+        $name    = trim((string) $request->query('name', ''));
+        $araziQ  = trim((string) $request->query('arazi', ''));
+        $plotQ   = trim((string) $request->query('plot', ''));
+        $bondNo  = trim((string) $request->query('bond_no', ''));
+
+        // Need at least one param
+        if (!$name && !$araziQ && !$plotQ && !$bondNo) {
+            return response()->json(['found' => false, 'results' => []]);
+        }
+
+        $query = \App\Models\CustomerBond::with(['customer', 'arazi', 'plots', 'payments']);
+
+        if ($bondNo) {
+            $query->where('bond_no', 'like', '%'.$bondNo.'%');
+        }
+        if ($name) {
+            $query->whereHas('customer', fn ($c) =>
+                $c->where('name', 'like', '%'.$name.'%')
+                  ->orWhere('mobile', 'like', '%'.$name.'%')
+            );
+        }
+        if ($araziQ) {
+            $query->whereHas('arazi', fn ($a) =>
+                $a->where('legacy_arazi_code', 'like', '%'.$araziQ.'%')
+                  ->orWhere('plot_number', 'like', '%'.$araziQ.'%')
+            );
+        }
+        if ($plotQ) {
+            $query->whereHas('plots', fn ($p) =>
+                $p->where('title', 'like', '%'.$plotQ.'%')
+                  ->orWhere('plot_number', 'like', '%'.$plotQ.'%')
+            );
+        }
+
+        $bonds = $query->latest()->limit(10)->get();
+
+        if ($bonds->isEmpty()) {
+            return response()->json(['found' => false, 'results' => []]);
+        }
+
+        $results = $bonds->map(function ($bond) {
+            $paid    = (float) $bond->payments->whereNotIn('entry_type', ['return','discount'])->sum('amount');
+            $debit   = (float) $bond->payments->whereIn('entry_type', ['return','discount'])->sum('amount');
+            $netPaid = $paid - $debit;
+            $total   = (float) ($bond->total_amount ?? $bond->bond_amount ?? 0);
+            $pending = max($total - $netPaid, 0);
+
+            return [
+                'found'            => true,
+                'bond_id'          => $bond->id,
+                'bond_no'          => $bond->bond_no,
+                'customer_id'      => $bond->customer_id,
+                'customer_name'    => $bond->customer?->name ?? '',
+                'mobile'           => $bond->customer?->mobile ?? '',
+                'secondary_mobile' => $bond->customer?->secondary_mobile ?? '',
+                'arazi_id'         => $bond->arazi_id,
+                'arazi_code'       => $bond->arazi?->legacy_arazi_code ?: ($bond->arazi?->plot_number ?? ''),
+                'plots'            => $bond->plots->map(fn ($p) => ['id' => $p->id, 'title' => $p->title ?? $p->plot_number])->values(),
+                'bond_amount'      => $total,
+                'paid_amount'      => $netPaid,
+                'pending_amount'   => $pending,
+            ];
+        })->values()->all();
+
+        return response()->json([
+            'found'   => true,
+            'results' => $results,
+        ]);
     }
 
     private function nextRegistryNumber(): string

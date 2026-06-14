@@ -2,300 +2,448 @@
     $isEdit = isset($item) && $item->exists;
     $action = $action ?? route('registries.store');
     $method = $method ?? 'POST';
-    $customers = $customers ?? [];
-    $arazis = $arazis ?? [];
-    $agents = $agents ?? [];
 @endphp
 
 @extends('layouts.app')
 
 @section('content')
-    <div class="card card-outline card-primary receipt-like" style="max-width:720px;margin:12px auto;border:4px solid #000;background:#fff;color:#000;">
-        <div class="card-header p-2 d-flex align-items-center gap-2" style="border-bottom:2px solid #000;">
-            <div>
-                <div style="font-size:18px;font-weight:800;">HEED REAL ESTATE</div>
-                <div style="font-size:12px;">Registry / Receipt</div>
-            </div>
-            <div style="text-align:right;font-size:12px" class="ms-auto">{{ $isEdit ? 'Edit' : 'New' }}</div>
-        </div>
-        <div class="card-body p-2">
-            <form action="{{ $action }}" method="POST" id="registryForm" enctype="multipart/form-data">
-                @csrf
-                @if($method !== 'POST') @method($method) @endif
-
-                @if($errors->any())
-                    <div class="alert alert-danger">
-                        <ul class="mb-0">
-                            @foreach($errors->all() as $error)
-                                <li>{{ $error }}</li>
-                            @endforeach
-                        </ul>
-                    </div>
-                @endif
-
-                <div class="receipt-fields" style="font-size:13px;">
-                    <div style="display:flex;gap:8px;margin-bottom:6px;" class="field-group">
-                        <div style="flex:1">
-                            <div class="small-label">Mobile</div>
-                            <input type="text" name="mobile" value="{{ old('mobile', $item->mobile ?? '') }}" class="form-control form-control-sm">
-                        </div>
-                        <div style="width:150px">
-                            <div class="small-label">Receipt#</div>
-                            <input type="text" name="receipt_no" value="{{ old('receipt_no', $item->receipt_no ?? '') }}" class="form-control form-control-sm bg-light" readonly>
-                        </div>
-                    </div>
-
-                    <div style="margin-bottom:6px;" class="field-group">
-                        <div class="small-label required">Associate</div>
-                        <select name="customer_id" class="form-select form-select-sm mb-1 @error('customer_id') is-invalid @enderror">
-                            <option value="">--Select Customer--</option>
-                            @foreach($customers as $id => $name)
-                                <option value="{{ $id }}" {{ (string)$id === (string) old('customer_id', $item->customer_id ?? '') ? 'selected' : '' }}>{{ $name }}</option>
-                            @endforeach
-                        </select>
-                        @error('customer_id')<div class="invalid-feedback">{{ $message }}</div>@enderror
-                        <input type="text" name="associate_address" value="{{ old('associate_address', $item->associate_address ?? '') }}" class="form-control form-control-sm">
-                    </div>
-
-                    <div style="display:flex;gap:8px;margin-bottom:6px;align-items:center;" class="field-group">
-                        <div style="flex:1">
-                            <div class="small-label required">Arazi</div>
-                            <select name="arazi_id" id="arazi_id" class="form-select form-select-sm @error('arazi_id') is-invalid @enderror">
-                                <option value="">--Select Arazi--</option>
-                                @foreach($arazis as $id => $label)
-                                    <option value="{{ $id }}" {{ (string)$id === (string) old('arazi_id', $item->arazi_id ?? '') ? 'selected' : '' }}>{{ $label }}</option>
-                                @endforeach
-                            </select>
-                            @error('arazi_id')<div class="invalid-feedback">{{ $message }}</div>@enderror
-                        </div>
-
-                        <div style="width:140px">
-                            <div class="small-label">Plot</div>
-                            <select name="plot_id" id="plot_id" class="form-select form-select-sm">
-                                <option value="">--Select Plot--</option>
-                            </select>
-                        </div>
-
-                        <div style="width:140px">
-                            <div class="small-label required">Date</div>
-                            <input type="date" name="registry_date" value="{{ old('registry_date', optional($item->registry_date)->format('Y-m-d') ?? '') }}" class="form-control form-control-sm @error('registry_date') is-invalid @enderror">
-                            @error('registry_date')<div class="invalid-feedback">{{ $message }}</div>@enderror
-                        </div>
-                    </div>
-
-                    <div style="display:flex;gap:8px;margin-bottom:6px;">
-                        <div style="flex:1">
-                            <div class="small-label required">Booking Mode</div>
-                            <select name="booking_mode" class="form-select form-select-sm @error('booking_mode') is-invalid @enderror">
-                                <option value="cash" @selected(old('booking_mode', $item->booking_mode ?? '')=='cash')>Cash</option>
-                                <option value="emi" @selected(old('booking_mode', $item->booking_mode ?? '')=='emi')>EMI</option>
-                                <option value="other" @selected(old('booking_mode', $item->booking_mode ?? '')=='other')>Other</option>
-                            </select>
-                            @error('booking_mode')<div class="invalid-feedback">{{ $message }}</div>@enderror
-                        </div>
-
-                        <div style="width:120px">
-                            <div class="small-label required">Land Size</div>
-                            <input type="number" step="0.01" name="land_size" value="{{ old('land_size', $item->land_size ?? '') }}" class="form-control form-control-sm text-end @error('land_size') is-invalid @enderror" placeholder="required">
-                            @error('land_size')<div class="invalid-feedback">{{ $message }}</div>@enderror
-                        </div>
-
-                        <div style="width:120px">
-                            <div class="small-label required">Broker %</div>
-                            <input type="number" step="0.01" name="broker_commission" value="{{ old('broker_commission', $item->broker_commission ?? '') }}" class="form-control form-control-sm text-end @error('broker_commission') is-invalid @enderror" placeholder="0 - 100">
-                            @error('broker_commission')<div class="invalid-feedback">{{ $message }}</div>@enderror
-                        </div>
-
-                        <div style="width:140px">
-                            <div class="small-label">Registry Amount</div>
-                            <input type="number" step="0.01" name="registry_amount" value="{{ old('registry_amount', $item->registry_amount ?? '') }}" class="form-control form-control-sm text-end @error('registry_amount') is-invalid @enderror">
-                            @error('registry_amount')<div class="invalid-feedback">{{ $message }}</div>@enderror
-                        </div>
-                    </div>
-
-                    <div style="margin-bottom:6px;">
-                        <div class="small-label">Amount (words)</div>
-                        <input type="text" name="payment_words" value="{{ old('payment_words', $item->payment_words ?? '') }}" class="form-control form-control-sm">
-                    </div>
-
-                    <div style="display:flex;gap:8px;margin-bottom:6px;">
-                        <div style="width:120px">
-                            <div class="small-label">Advance</div>
-                            <input type="number" step="0.01" name="advance_amount" value="{{ old('advance_amount', $item->advance_amount ?? '') }}" class="form-control form-control-sm text-end @error('advance_amount') is-invalid @enderror">
-                            @error('advance_amount')<div class="invalid-feedback">{{ $message }}</div>@enderror
-                        </div>
-                        <div style="width:120px">
-                            <div class="small-label">Down Payment</div>
-                            <input type="number" step="0.01" name="down_payment" value="{{ old('down_payment', $item->down_payment ?? '') }}" class="form-control form-control-sm text-end @error('down_payment') is-invalid @enderror">
-                            @error('down_payment')<div class="invalid-feedback">{{ $message }}</div>@enderror
-                        </div>
-                        <div style="width:160px">
-                            <div class="small-label">Installment</div>
-                            <input type="number" step="0.01" name="installment_amount" value="{{ old('installment_amount', $item->installment_amount ?? '') }}" class="form-control form-control-sm text-end @error('installment_amount') is-invalid @enderror">
-                            @error('installment_amount')<div class="invalid-feedback">{{ $message }}</div>@enderror
-                        </div>
-                        <div style="width:140px">
-                            <div class="small-label">Due Date</div>
-                            <input type="date" name="due_date" value="{{ old('due_date', optional($item->due_date)->format('Y-m-d') ?? '') }}" class="form-control form-control-sm @error('due_date') is-invalid @enderror">
-                            @error('due_date')<div class="invalid-feedback">{{ $message }}</div>@enderror
-                        </div>
-                    </div>
-
-                    <div style="display:flex;gap:8px;margin-bottom:6px;">
-                        <div style="flex:1">
-                            <div class="small-label">Registry Code</div>
-                            <input type="text" name="registry_code" value="{{ old('registry_code', $item->registry_code ?? '') }}" class="form-control form-control-sm @error('registry_code') is-invalid @enderror">
-                            @error('registry_code')<div class="invalid-feedback">{{ $message }}</div>@enderror
-                        </div>
-                        <div style="width:160px">
-                            <div class="small-label">Customer Reg No</div>
-                            <input type="text" name="customer_reg_no" value="{{ old('customer_reg_no', $item->customer_reg_no ?? '') }}" class="form-control form-control-sm @error('customer_reg_no') is-invalid @enderror">
-                            @error('customer_reg_no')<div class="invalid-feedback">{{ $message }}</div>@enderror
-                        </div>
-                    </div>
-
-                    <div style="display:flex;gap:8px;margin-bottom:6px;" class="field-group">
-                        <div style="flex:1">
-                            <div class="small-label required">Witness</div>
-                            <input type="text" name="witness_name" value="{{ old('witness_name', $item->witness_name ?? '') }}" class="form-control form-control-sm @error('witness_name') is-invalid @enderror">
-                            @error('witness_name')<div class="invalid-feedback">{{ $message }}</div>@enderror
-                        </div>
-                        <div style="flex:1">
-                            <div class="small-label">Nominee</div>
-                            <input type="text" name="nominee_name" value="{{ old('nominee_name', $item->nominee_name ?? '') }}" class="form-control form-control-sm @error('nominee_name') is-invalid @enderror">
-                            @error('nominee_name')<div class="invalid-feedback">{{ $message }}</div>@enderror
-                        </div>
-                        <div style="width:160px">
-                            <div class="small-label">Agent</div>
-                            <select name="agent_id" class="form-select form-select-sm">
-                                <option value="">--Select--</option>
-                                @foreach($agents as $id => $name)
-                                    <option value="{{ $id }}" @selected((string)$id===(string)old('agent_id',$item->agent_id ?? ''))>{{ $name }}</option>
-                                @endforeach
-                            </select>
-                        </div>
-                    </div>
-
-                    <div style="margin-bottom:6px;">
-                        <div class="small-label">Checked By</div>
-                        <select name="check_by_agent_id" class="form-select form-select-sm">
-                            <option value="">--Select Broker--</option>
-                            @foreach($agents as $id => $name)
-                                <option value="{{ $id }}" @selected((string)$id===(string)old('check_by_agent_id',$item->check_by_agent_id ?? ''))>{{ $name }}</option>
-                            @endforeach
-                        </select>
-                    </div>
-
-                    <div style="margin-bottom:6px;">
-                        <div class="small-label">Registry Document</div>
-                        @if(!empty($item->document_path))
-                            <div style="margin-bottom:6px;"><a href="{{ asset('storage/' . $item->document_path) }}" target="_blank">Download existing document</a></div>
-                        @endif
-                        <input type="file" name="document" class="form-control form-control-sm @error('document') is-invalid @enderror">
-                        @error('document')<div class="invalid-feedback">{{ $message }}</div>@enderror
-                    </div>
-
-                    <div style="display:flex;gap:8px;margin-bottom:6px;align-items:center;" class="field-group">
-                        <div style="width:140px">
-                            <div class="small-label required">Status</div>
-                            <select name="status" class="form-select form-select-sm @error('status') is-invalid @enderror">
-                                <option value="pending" @selected(old('status', $item->status ?? '')=='pending')>Pending</option>
-                                <option value="completed" @selected(old('status', $item->status ?? '')=='completed')>Completed</option>
-                                <option value="cancelled" @selected(old('status', $item->status ?? '')=='cancelled')>Cancelled</option>
-                            </select>
-                            @error('status')<div class="invalid-feedback">{{ $message }}</div>@enderror
-                        </div>
-
-                        <div style="width:160px">
-                            <div class="small-label required">Payment Status</div>
-                            <select name="payment_status" class="form-select form-select-sm @error('payment_status') is-invalid @enderror">
-                                <option value="pending" @selected(old('payment_status', $item->payment_status ?? '')=='pending')>Pending</option>
-                                <option value="partial" @selected(old('payment_status', $item->payment_status ?? '')=='partial')>Partial</option>
-                                <option value="completed" @selected(old('payment_status', $item->payment_status ?? '')=='completed')>Completed</option>
-                                <option value="expired" @selected(old('payment_status', $item->payment_status ?? '')=='expired')>Expired</option>
-                            </select>
-                            @error('payment_status')<div class="invalid-feedback">{{ $message }}</div>@enderror
-                        </div>
-
-                        <div style="width:120px">
-                            <div class="small-label required">Lock</div>
-                            <select name="lock_status" class="form-select form-select-sm @error('lock_status') is-invalid @enderror">
-                                <option value="unlock" @selected(old('lock_status', $item->lock_status ?? '')=='unlock')>Unlock</option>
-                                <option value="lock" @selected(old('lock_status', $item->lock_status ?? '')=='lock')>Lock</option>
-                            </select>
-                            @error('lock_status')<div class="invalid-feedback">{{ $message }}</div>@enderror
-                        </div>
-                    </div>
-                </div>
-
-                <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:8px;">
-                    <a href="{{ route('registries.index') }}" class="btn btn-sm btn-outline-secondary">Back</a>
-                    @if($isEdit)
-                        <button type="button" id="esignBtn" class="btn btn-sm btn-info">E-Sign</button>
-                    @endif
-                    <button type="submit" class="btn btn-sm btn-primary">{{ $isEdit ? 'Update' : 'Create' }}</button>
-                </div>
-            </form>
-        </div>
+<div class="card card-outline card-primary">
+    <div class="card-header d-flex align-items-center gap-2">
+        <h5 class="card-title mb-0 fw-bold">{{ $isEdit ? 'Edit Registry' : 'New Registry' }}</h5>
+        <a href="{{ route('registries.index') }}" class="btn btn-outline-secondary btn-sm ms-auto">
+            <i class="bi bi-arrow-left"></i> Back
+        </a>
     </div>
 
-    @push('scripts')
-    <script>
-        (function(){
-            const araziSelect = document.getElementById('arazi_id');
-            const plotSelect = document.getElementById('plot_id');
-            const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
+    <div class="card-body">
 
-            async function loadPlots(araziId, selected){
-                plotSelect.innerHTML = '<option value="">--Select Plot--</option>';
-                if(!araziId) return;
-                try{
-                    const res = await fetch('{{ route('arazis.plots', ['arazi' => '__ARAZI__']) }}'.replace('__ARAZI__', encodeURIComponent(araziId)), { headers: { 'Accept': 'application/json' } });
-                    if(!res.ok) return;
-                    const data = await res.json();
-                    data.forEach(function(p){
-                        const opt = document.createElement('option');
-                        opt.value = p.id;
-                        opt.textContent = p.label + (p.block ? ' ('+p.block+')' : '');
-                        if(String(p.id) === String(selected)) opt.selected = true;
-                        plotSelect.appendChild(opt);
-                    });
-                }catch(e){ }
-            }
+        @if($errors->any())
+            <div class="alert alert-danger">
+                <ul class="mb-0">@foreach($errors->all() as $e)<li>{{ $e }}</li>@endforeach</ul>
+            </div>
+        @endif
 
-            if(araziSelect){
-                araziSelect.addEventListener('change', function(){ loadPlots(this.value, null); });
-                if(araziSelect.value){ loadPlots(araziSelect.value, '{{ old('plot_id', $item->plot_id ?? '') }}'); }
-            }
+        {{-- ══════════════════════════════════════════
+             SEARCH BAR  (create only)
+        ══════════════════════════════════════════ --}}
+        @if(!$isEdit)
+        <div class="card bg-light border-0 rounded-3 mb-4">
+            <div class="card-body py-3">
+                <p class="small fw-bold text-muted mb-2 text-uppercase" style="letter-spacing:.05em;">
+                    <i class="bi bi-search me-1"></i> Search Bond to Auto-fill
+                </p>
+                <div class="d-flex gap-2 align-items-center flex-wrap">
+                    {{-- <input type="text" id="s_name" class="form-control form-control-sm" placeholder="Name / Phone" style="max-width:160px;"> --}}
+                    <input type="text" id="s_arazi"   class="form-control form-control-sm" placeholder="Arazi No"        style="max-width:140px;">
+                    <input type="text" id="s_plot"    class="form-control form-control-sm" placeholder="Plot No / Title" style="max-width:160px;">
+                    <input type="text" id="s_bond_no" class="form-control form-control-sm" placeholder="Bond No"         style="max-width:140px;">
+                    <button type="button" id="searchBondBtn" class="btn btn-primary btn-sm">
+                        <i class="bi bi-search"></i> Search
+                    </button>
+                    <button type="button" id="clearSearchBtn" class="btn btn-outline-secondary btn-sm">Clear</button>
+                </div>
 
-            const esignBtn = document.getElementById('esignBtn');
-            if(esignBtn){
-                esignBtn.addEventListener('click', function(){
-                    if(!confirm('Apply e-signature placeholder for this registry?')) return;
-                    fetch('{{ $isEdit ? route('registries.esign', $item->id) : '' }}', {method:'POST', headers:{'X-CSRF-TOKEN': csrf,'Content-Type':'application/json'}, body: JSON.stringify({placeholder: true})})
-                        .then(r => r.json()).then(j => alert(j.message || 'Signed'))
-                        .catch(e => alert('Error'));
-                });
-            }
-        })();
-    </script>
-    @endpush
+                {{-- Search Results --}}
+                <div id="searchResults" class="mt-3 d-none">
+                    <p class="small fw-semibold text-muted mb-1">Results — click to apply:</p>
+                    <div id="resultsList" class="list-group" style="max-height:220px;overflow-y:auto;font-size:13px;"></div>
+                </div>
+                <div id="searchNoResult" class="mt-3 d-none">
+                    <div class="alert alert-warning py-2 mb-0 small">No bond found. Try different keywords.</div>
+                </div>
+            </div>
+        </div>
+        @endif
 
+        {{-- ══════════════════════════════════════════
+             MAIN FORM
+        ══════════════════════════════════════════ --}}
+        <form action="{{ $action }}" method="POST" id="registryForm" enctype="multipart/form-data">
+            @csrf
+            @if($method !== 'POST') @method($method) @endif
+
+            {{-- Hidden system fields --}}
+            <input type="hidden" name="receipt_no"        id="h_receipt_no"   value="{{ old('receipt_no', $item->receipt_no ?? '') }}">
+            <input type="hidden" name="customer_bond_id"  id="h_bond_id"      value="{{ old('customer_bond_id', '') }}">
+            <input type="hidden" name="customer_id"       id="h_customer_id"  value="{{ old('customer_id', $item->customer_id ?? '') }}">
+            <input type="hidden" name="arazi_id"          id="h_arazi_id"     value="{{ old('arazi_id', $item->arazi_id ?? '') }}">
+            <input type="hidden" name="plot_id"           id="h_plot_id"      value="{{ old('plot_id', $item->plot_id ?? '') }}">
+            <input type="hidden" name="registry_amount"   id="h_bond_amount"  value="{{ old('registry_amount', $item->registry_amount ?? '') }}">
+            <input type="hidden" name="pending_amount"    id="h_pending"      value="">
+            <input type="hidden" name="booking_mode"      value="other">
+            <input type="hidden" name="land_size"         value="0">
+            <input type="hidden" name="status"            value="pending">
+            <input type="hidden" name="payment_status"    value="pending">
+            <input type="hidden" name="lock_status"       value="unlock">
+
+            {{-- ── Applied Bond Banner ── --}}
+            <div id="bondAppliedBanner" class="alert alert-success d-flex align-items-center gap-3 py-2 mb-3 flex-wrap {{ old('customer_id', $item->customer_id ?? '') ? '' : 'd-none' }}" style="font-size:13px;">
+                <i class="bi bi-patch-check-fill text-success fs-5"></i>
+                <span><strong>Bond:</strong> <span id="b_bond_no">{{ $item->registry_code ?? '-' }}</span></span>
+                <span><strong>Customer:</strong> <span id="b_customer">{{ $item->customer?->name ?? '-' }}</span></span>
+                <span><strong>Arazi:</strong> <span id="b_arazi">{{ $item->arazi?->plot_number ?? '-' }}</span></span>
+                <span><strong>Plot:</strong> <span id="b_plot">{{ $item->plot?->title ?? $item->plot?->plot_number ?? '-' }}</span></span>
+                <button type="button" id="clearBondBtn" class="btn btn-outline-secondary btn-sm py-0 ms-auto">
+                    <i class="bi bi-x"></i> Clear
+                </button>
+            </div>
+
+            @error('customer_id')
+                <div class="alert alert-danger py-2 small">Please search and select a bond first. ({{ $message }})</div>
+            @enderror
+            @error('arazi_id')
+                <div class="alert alert-danger py-2 small">{{ $message }}</div>
+            @enderror
+
+            {{-- ── Section: Auto-filled Info (read-only display) ── --}}
+            <h6 class="fw-bold text-muted mb-3 border-bottom pb-1">Bond Information</h6>
+            <div class="row g-3 mb-4">
+                <div class="col-md-3">
+                    <label class="form-label small fw-semibold">Receipt No</label>
+                    <input type="text" class="form-control form-control-sm bg-light" id="d_receipt_no"
+                        value="{{ old('receipt_no', $item->receipt_no ?? '') }}" readonly>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label small fw-semibold">Customer Name</label>
+                    <input type="text" class="form-control form-control-sm bg-light" id="d_customer_name"
+                        value="{{ old('', $item->customer?->name ?? '') }}" readonly placeholder="Auto-filled from search">
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label small fw-semibold">Mobile</label>
+                    <input type="text" class="form-control form-control-sm bg-light" id="d_mobile"
+                        value="{{ $item->customer?->mobile ?? '' }}" readonly placeholder="Auto-filled">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label small fw-semibold">Alt. Mobile <span class="text-muted">(editable)</span></label>
+                    <input type="text" name="secondary_mobile" id="d_alt_mobile"
+                        value="{{ old('secondary_mobile', $item->customer?->secondary_mobile ?? '') }}"
+                        class="form-control form-control-sm" placeholder="Alternate number">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label small fw-semibold">Arazi No</label>
+                    <input type="text" class="form-control form-control-sm bg-light" id="d_arazi_code"
+                        value="{{ $item->arazi?->legacy_arazi_code ?: ($item->arazi?->plot_number ?? '') }}" readonly placeholder="Auto-filled">
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label small fw-semibold">Plots in Bond</label>
+                    <div id="d_plots_info" class="form-control form-control-sm bg-light" style="min-height:31px; height:auto; white-space:normal;">
+                        @if($isEdit && $item->plot)
+                            <span class="badge bg-secondary me-1">{{ $item->plot->title ?? $item->plot->plot_number }}</span>
+                        @else
+                            <span class="text-muted" style="font-size:12px;">Auto-filled from bond</span>
+                        @endif
+                    </div>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label small fw-semibold">Bond Amount</label>
+                    <input type="text" class="form-control form-control-sm bg-light" id="d_bond_amount"
+                        value="{{ $item->registry_amount ? number_format($item->registry_amount,2) : '' }}" readonly placeholder="Auto-filled">
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label small fw-semibold">Balance Amount</label>
+                    <input type="text" class="form-control form-control-sm bg-light" id="d_pending"
+                        value="" readonly placeholder="Auto-filled">
+                </div>
+            </div>
+            <div class="row g-3 mb-2">
+                <div class="col-md-2">
+                    <label class="form-label small fw-semibold">Registry Date <span class="text-danger">*</span></label>
+                    <input type="date" name="registry_date" id="d_registry_date"
+                        value="{{ old('registry_date', optional($item->registry_date)->format('Y-m-d') ?? date('Y-m-d')) }}"
+                        class="form-control form-control-sm @error('registry_date') is-invalid @enderror">
+                    @error('registry_date')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                </div>
+            </div>
+
+            {{-- ── Low Payment Warning ── --}}
+            <div id="lowPaymentAlert" class="alert alert-warning d-flex align-items-center gap-2 py-2 mb-3 d-none" style="font-size:13px;">
+                <i class="bi bi-exclamation-triangle-fill text-warning fs-5"></i>
+                <span><strong>Less than 50% paid</strong> — Paid: ₹<span id="w_paid">0</span> out of ₹<span id="w_total">0</span> &nbsp;(<span id="w_pct">0</span>% paid &nbsp;|&nbsp; Balance: ₹<span id="w_bal">0</span>)</span>
+            </div>
+
+            {{-- ── Section: Witnesses ── --}}
+            <h6 class="fw-bold text-muted mb-2 border-bottom pb-1">Witnesses <span class="text-danger">*</span></h6>
+            <div class="mb-2">
+                <table class="table table-sm table-bordered align-middle mb-1" style="font-size:13px;max-width:600px;">
+                    <thead style="background:#f5f7fa;">
+                        <tr>
+                            <th style="width:36px;">#</th>
+                            <th>Witness Name</th>
+                            <th style="width:190px;">Mobile</th>
+                            <th style="width:36px;"></th>
+                        </tr>
+                    </thead>
+                    <tbody id="witnessBody">
+                        @php
+                            $witnessRows = old('witnesses', []);
+                            if (empty($witnessRows) && !empty($item->witness_name)) {
+                                foreach (explode(',', $item->witness_name) as $wn) {
+                                    $witnessRows[] = ['name' => trim($wn), 'mobile' => ''];
+                                }
+                            }
+                            if (empty($witnessRows)) $witnessRows = [['name'=>'','mobile'=>'']];
+                        @endphp
+                        @foreach($witnessRows as $wi => $wrow)
+                        <tr class="witness-row">
+                            <td class="text-muted text-center row-num">{{ $wi + 1 }}</td>
+                            <td><input type="text" name="witnesses[{{ $wi }}][name]" value="{{ $wrow['name'] ?? '' }}" class="form-control form-control-sm witness-name-input" placeholder="Full name" required></td>
+                            <td><input type="text" name="witnesses[{{ $wi }}][mobile]" value="{{ $wrow['mobile'] ?? '' }}" class="form-control form-control-sm" placeholder="Mobile number"></td>
+                            <td class="text-center">
+                                <button type="button" class="btn btn-outline-danger btn-sm py-0 px-1 remove-witness" title="Remove">
+                                    <i class="bi bi-x-lg"></i>
+                                </button>
+                            </td>
+                        </tr>
+                        @endforeach
+                    </tbody>
+                </table>
+            </div>
+            <button type="button" id="addWitnessBtn" class="btn btn-outline-primary btn-sm mb-4">
+                <i class="bi bi-plus-lg"></i> Add Witness
+            </button>
+
+            {{-- ── Registry Document Upload ── --}}
+            <h6 class="fw-bold text-muted mb-2 border-bottom pb-1">Registry Document <span class="text-danger">*</span></h6>
+            <div class="row g-3 mb-4">
+                <div class="col-md-6">
+                    <label class="form-label small fw-semibold">Upload Document <span class="text-muted">(PDF / Image)</span></label>
+                    <input type="file" name="document" accept=".pdf,.jpg,.jpeg,.png"
+                        class="form-control form-control-sm @error('document') is-invalid @enderror"
+                        {{ $isEdit && !empty($item->document_path) ? '' : 'required' }}>
+                    @error('document')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                    @if(!empty($item->document_path))
+                        <div class="form-text mt-1">
+                            <i class="bi bi-paperclip"></i> Existing file:
+                            <a href="{{ asset('storage/' . $item->document_path) }}" target="_blank" class="fw-semibold">View / Download</a>
+                            <span class="text-muted ms-1">(upload new to replace)</span>
+                        </div>
+                    @endif
+                </div>
+            </div>
+
+            {{-- ── Submit ── --}}
+            <div class="d-flex gap-2">
+                <button type="submit" class="btn btn-primary px-4">
+                    <i class="bi bi-save"></i> {{ $isEdit ? 'Update Registry' : 'Save Registry' }}
+                </button>
+                <a href="{{ route('registries.index') }}" class="btn btn-outline-secondary">Cancel</a>
+            </div>
+        </form>
+
+    </div>{{-- /card-body --}}
+</div>{{-- /card --}}
 @endsection
 
 @push('styles')
 <style>
-    .receipt-like { font-family: Arial, Helvetica, sans-serif; }
-    .receipt-like .small-label { font-size:11px; font-weight:700; color:#111; margin-bottom:3px; }
-    .receipt-like .small-label.required::after { content: " *"; color: #c0392b; margin-left:4px; font-weight:800; }
-    .receipt-like .field-group { padding:6px 0; border-bottom:1px dashed rgba(0,0,0,0.06); }
-    .receipt-like .card-body { padding:12px; }
-    .receipt-like .form-control-sm, .receipt-like .form-select-sm { padding:4px 6px; height:32px; }
-    .receipt-like input[type="file"] { padding:2px; }
-    .receipt-like .text-end { text-align:right; }
-    @media print {
-        .receipt-like { max-width:720px; margin:0 auto; }
-        .no-print { display:none !important; }
-    }
+#witnessBody tr:only-child .remove-witness { opacity:.35; pointer-events:none; }
 </style>
+@endpush
+
+@push('scripts')
+<script>
+(function(){
+    const LOOKUP_URL = @json(route('registries.bond-lookup'));
+    const CSRF       = document.querySelector('meta[name="csrf-token"]')?.content ?? '';
+
+    /* ── helpers ── */
+    const $  = id => document.getElementById(id);
+    const fmt = n  => Number(n||0).toLocaleString('en-IN',{minimumFractionDigits:2});
+
+    function applyBond(b){
+        $('h_bond_id').value      = b.bond_id    || '';
+        $('h_customer_id').value  = b.customer_id || '';
+        $('h_arazi_id').value     = b.arazi_id   || '';
+        $('h_bond_amount').value  = b.bond_amount || '';
+        $('h_pending').value      = b.pending_amount || '';
+
+        // ── Plot handling: show all as info badges ──
+        const plots    = b.plots || [];
+        const plotInfo = $('d_plots_info');
+
+        if (plots.length === 0) {
+            plotInfo.innerHTML = '<span class="text-muted" style="font-size:12px;">No plots found</span>';
+            $('h_plot_id').value = '';
+        } else {
+            plotInfo.innerHTML = plots.map(p =>
+                `<span class="badge bg-secondary me-1 mb-1">${p.title || p.id}</span>`
+            ).join('');
+            // Store first plot id as the primary (informational — all visible above)
+            $('h_plot_id').value = plots[0].id;
+        }
+
+        const plotLabel = plots.map(p => p.title).join(', ') || '-';
+        $('b_plot').textContent = plotLabel;
+
+        // Display fields
+        $('d_customer_name').value = b.customer_name || '';
+        $('d_mobile').value        = b.mobile        || '';
+        $('d_alt_mobile').value    = b.secondary_mobile || '';
+        $('d_arazi_code').value    = b.arazi_code    || '';
+        $('d_bond_amount').value   = b.bond_amount   ? fmt(b.bond_amount)   : '';
+        $('d_pending').value       = b.pending_amount !== undefined ? fmt(b.pending_amount) : '';
+
+        // ── Low payment warning ──
+        const total   = parseFloat(b.bond_amount    || 0);
+        const paid    = parseFloat(b.paid_amount    || 0);
+        const balance = parseFloat(b.pending_amount || 0);
+        const pct     = total > 0 ? Math.round((paid / total) * 100) : 0;
+        const alertEl = $('lowPaymentAlert');
+        if (total > 0 && pct < 50) {
+            $('w_paid').textContent  = fmt(paid);
+            $('w_total').textContent = fmt(total);
+            $('w_pct').textContent   = pct;
+            $('w_bal').textContent   = fmt(balance);
+            alertEl.classList.remove('d-none');
+        } else {
+            alertEl.classList.add('d-none');
+        }
+
+        // Banner
+        $('b_bond_no').textContent  = b.bond_no      || '-';
+        $('b_customer').textContent = b.customer_name || '-';
+        $('b_arazi').textContent    = b.arazi_code   || '-';
+        const banner = $('bondAppliedBanner');
+        banner.classList.remove('d-none');
+        banner.style.display = '';
+
+        // Date default
+        if (!$('d_registry_date').value)
+            $('d_registry_date').value = new Date().toISOString().slice(0,10);
+
+        // Hide results
+        $('searchResults').classList.add('d-none');
+        $('searchNoResult').classList.add('d-none');
+    }
+
+    /* ── Search ── */
+    async function doSearch(){
+        const name   = $('s_name')?.value.trim()    || '';
+        const arazi  = $('s_arazi')?.value.trim()   || '';
+        const plot   = $('s_plot')?.value.trim()    || '';
+        const bondNo = $('s_bond_no')?.value.trim() || '';
+
+        if (!name && !arazi && !plot && !bondNo) return;
+
+        const btn = $('searchBondBtn');
+        btn.disabled = true; btn.textContent = 'Searching…';
+
+        try {
+            const params = new URLSearchParams();
+            if (name)   params.set('name',    name);
+            if (arazi)  params.set('arazi',   arazi);
+            if (plot)   params.set('plot',    plot);
+            if (bondNo) params.set('bond_no', bondNo);
+
+            const res  = await fetch(LOOKUP_URL + '?' + params.toString(), {headers:{Accept:'application/json'}});
+            const data = await res.json();
+
+            const listEl = $('resultsList');
+            listEl.innerHTML = '';
+
+            if (!data.found || !data.results?.length) {
+                $('searchResults').classList.add('d-none');
+                $('searchNoResult').classList.remove('d-none');
+                return;
+            }
+
+            $('searchNoResult').classList.add('d-none');
+
+            data.results.forEach(b => {
+                const plot0 = b.plots?.[0];
+                const item = document.createElement('button');
+                item.type = 'button';
+                item.className = 'list-group-item list-group-item-action py-2 px-3';
+                item.innerHTML = `
+                    <div class="d-flex justify-content-between align-items-start gap-2 flex-wrap">
+                        <div>
+                            <span class="badge bg-primary me-1">${b.bond_no||'-'}</span>
+                            <strong>${b.customer_name||'-'}</strong>
+                            <span class="text-muted ms-2">${b.mobile||''}</span>
+                        </div>
+                        <div class="text-end text-muted small">
+                            Arazi: ${b.arazi_code||'-'} &nbsp;|&nbsp;
+                            Plot: ${plot0?.title||'-'} &nbsp;|&nbsp;
+                            Balance: ₹${fmt(b.pending_amount)}
+                        </div>
+                    </div>`;
+                item.addEventListener('click', () => applyBond(b));
+                listEl.appendChild(item);
+            });
+
+            $('searchResults').classList.remove('d-none');
+        } catch(e) {
+            $('searchNoResult').classList.remove('d-none');
+        } finally {
+            btn.disabled = false; btn.textContent = '';
+            btn.innerHTML = '<i class="bi bi-search"></i> Search';
+        }
+    }
+
+    $('searchBondBtn')?.addEventListener('click', doSearch);
+    ['s_name','s_arazi','s_plot','s_bond_no'].forEach(id => {
+        $(id)?.addEventListener('keydown', e => { if(e.key==='Enter'){ e.preventDefault(); doSearch(); } });
+    });
+
+    $('clearSearchBtn')?.addEventListener('click', () => {
+        ['s_name','s_arazi','s_plot','s_bond_no'].forEach(id => { const el=$(id); if(el) el.value=''; });
+        $('searchResults')?.classList.add('d-none');
+        $('searchNoResult')?.classList.add('d-none');
+    });
+
+    /* ── Clear applied bond ── */
+    $('clearBondBtn')?.addEventListener('click', () => {
+        ['h_bond_id','h_customer_id','h_arazi_id','h_plot_id','h_bond_amount','h_pending'].forEach(id => {
+            const el=$(id); if(el) el.value='';
+        });
+        ['d_customer_name','d_mobile','d_alt_mobile','d_arazi_code','d_plot_title','d_bond_amount','d_pending'].forEach(id => {
+            const el=$(id); if(el) el.value='';
+        });
+        $('bondAppliedBanner').classList.add('d-none');
+    });
+
+    /* ── Witnesses ── */
+    const witnessBody = $('witnessBody');
+
+    function reindex(){
+        witnessBody.querySelectorAll('tr.witness-row').forEach((tr, i) => {
+            tr.querySelector('.row-num').textContent = i + 1;
+            tr.querySelectorAll('input').forEach(inp => {
+                inp.name = inp.name.replace(/witnesses\[\d+\]/, 'witnesses['+i+']');
+            });
+        });
+        // disable remove on last row
+        const rows = witnessBody.querySelectorAll('tr.witness-row');
+        rows.forEach((tr, i) => {
+            const btn = tr.querySelector('.remove-witness');
+            if (btn) { btn.style.opacity = rows.length === 1 ? '.35' : '1'; btn.style.pointerEvents = rows.length === 1 ? 'none' : 'auto'; }
+        });
+    }
+
+    $('addWitnessBtn')?.addEventListener('click', () => {
+        const idx = witnessBody.querySelectorAll('tr.witness-row').length;
+        const tr  = document.createElement('tr');
+        tr.className = 'witness-row';
+        tr.innerHTML = `
+            <td class="text-muted text-center row-num">${idx+1}</td>
+            <td><input type="text" name="witnesses[${idx}][name]" class="form-control form-control-sm witness-name-input" placeholder="Full name" required></td>
+            <td><input type="text" name="witnesses[${idx}][mobile]" class="form-control form-control-sm" placeholder="Mobile number"></td>
+            <td class="text-center"><button type="button" class="btn btn-outline-danger btn-sm py-0 px-1 remove-witness" title="Remove"><i class="bi bi-x-lg"></i></button></td>`;
+        witnessBody.appendChild(tr);
+        reindex();
+        tr.querySelector('input').focus();
+    });
+
+    witnessBody?.addEventListener('click', e => {
+        const btn = e.target.closest('.remove-witness');
+        if (!btn) return;
+        const rows = witnessBody.querySelectorAll('tr.witness-row');
+        if (rows.length <= 1) return;
+        btn.closest('tr').remove();
+        reindex();
+    });
+
+    reindex(); // init
+})();
+</script>
 @endpush
