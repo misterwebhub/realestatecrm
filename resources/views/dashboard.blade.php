@@ -95,7 +95,7 @@
                         <tbody>
                         @forelse($recentPayments as $payment)
                             <tr>
-                                <td>{{ $payment->registry?->arazi?->plot_number ?? '-' }}</td>
+                                <td>{{ $payment->registry?->arazi?->legacy_arazi_code ?? '-' }}</td>
                                 <td>{{ $payment->customer?->name ?? $payment->kisan?->name ?? '-' }}</td>
                                 <td>{{ number_format((float) $payment->amount, 2) }}</td>
                                 <td>{{ optional($payment->payment_date)->format('d-m-Y') }}</td>

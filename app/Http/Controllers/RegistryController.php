@@ -321,7 +321,7 @@ class RegistryController extends Controller
                 $item->registry_code ?? '-',
                 $item->customer_reg_no ?? '-',
                 $item->customer?->name ?? '-',
-                $item->arazi?->plot_number ?? '-',
+                $item->arazi?->legacy_arazi_code ?? '-',
                 $item->plot?->title ?? $item->plot?->plot_number ?? '-',
                 strtoupper((string) $item->booking_mode),
                 optional($item->registry_date)->format('d-m-Y') ?? '-',
@@ -384,7 +384,7 @@ class RegistryController extends Controller
         if ($araziQ) {
             $query->whereHas('arazi', fn ($a) =>
                 $a->where('legacy_arazi_code', 'like', '%'.$araziQ.'%')
-                  ->orWhere('plot_number', 'like', '%'.$araziQ.'%')
+                  ->orWhere('legacy_arazi_code', 'like', '%'.$araziQ.'%')
             );
         }
         if ($plotQ) {

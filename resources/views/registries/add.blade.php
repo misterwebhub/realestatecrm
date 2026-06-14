@@ -81,7 +81,7 @@
                 <i class="bi bi-patch-check-fill text-success fs-5"></i>
                 <span><strong>Bond:</strong> <span id="b_bond_no">{{ $item->registry_code ?? '-' }}</span></span>
                 <span><strong>Customer:</strong> <span id="b_customer">{{ $item->customer?->name ?? '-' }}</span></span>
-                <span><strong>Arazi:</strong> <span id="b_arazi">{{ $item->arazi?->plot_number ?? '-' }}</span></span>
+                <span><strong>Arazi:</strong> <span id="b_arazi">{{ $item->arazi?->legacy_arazi_code ?? '-' }}</span></span>
                 <span><strong>Plot:</strong> <span id="b_plot">{{ $item->plot?->title ?? $item->plot?->plot_number ?? '-' }}</span></span>
                 <button type="button" id="clearBondBtn" class="btn btn-outline-secondary btn-sm py-0 ms-auto">
                     <i class="bi bi-x"></i> Clear

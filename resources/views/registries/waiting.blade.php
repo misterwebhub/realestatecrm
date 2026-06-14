@@ -26,7 +26,7 @@
                     <tr>
                         <td>{{ $registry->registry_code ?? ('REG-' . $registry->id) }}</td>
                         <td>{{ $registry->customer?->name ?? '-' }}</td>
-                        <td>{{ $registry->arazi?->plot_number ?? '-' }}</td>
+                        <td>{{ $registry->arazi?->legacy_arazi_code ?? '-' }}</td>
                         <td>{{ optional($registry->due_date)->format('d-m-Y') ?? '-' }}</td>
                         <td>
                             @if($daysLeft < 0)

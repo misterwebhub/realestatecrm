@@ -155,8 +155,7 @@ class CustomerController extends Controller
         $bondSummary = $bonds->map(function ($bond) use ($registries) {
             $araziCode = '-';
             if ($bond->arazi) {
-                $araziCode = $bond->arazi->legacy_arazi_code
-                    ?: ($bond->arazi->plot_number ?? ('Arazi-' . $bond->arazi->id));
+                $araziCode = $bond->arazi->legacy_arazi_code ?: ('Arazi-' . $bond->arazi->id);
             }
             $plots = $bond->plots->map(fn($p) => $p->title ?? $p->plot_number ?? ('Plot-'.$p->id))->implode(', ');
 

@@ -128,7 +128,7 @@
                         @endforeach
                     </ul>
                 @else
-                    {{ $bond->arazi?->plot_number ?? '-' }} /{{ ($fmtArea($bond->land_size ?? $bond->arazi?->size ?? '-') !== '-') ? $fmtArea($bond->land_size ?? $bond->arazi?->size ?? '-') . ' gaz' : '-' }}
+                    {{ $bond->arazi?->legacy_arazi_code ?? '-' }} /{{ ($fmtArea($bond->land_size ?? $bond->arazi?->size ?? '-') !== '-') ? $fmtArea($bond->land_size ?? $bond->arazi?->size ?? '-') . ' gaz' : '-' }}
                 @endif
             </td>
         </tr>
