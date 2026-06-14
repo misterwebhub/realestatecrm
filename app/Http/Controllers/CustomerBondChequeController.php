@@ -12,12 +12,14 @@ class CustomerBondChequeController extends Controller
 {
     public function index(Request $request)
     {
-        $filterStatus = $request->query('status', '');
-        $filterBond   = $request->query('bond_no', '');
+        $filterStatus  = $request->query('status', '');
+        $filterBond    = $request->query('bond_no', '');
+        $filterAccount = $request->query('account_id', '');
 
         $query = CustomerBondCheque::with(['customerBond.customer', 'connectedAccount'])
-            ->when($filterStatus, fn ($q) => $q->where('status', $filterStatus))
-            ->when($filterBond,   fn ($q) => $q->whereHas('customerBond', fn ($bq) => $bq->where('bond_no', 'like', '%' . $filterBond . '%')))
+            ->when($filterStatus,  fn ($q) => $q->where('status', $filterStatus))
+            ->when($filterBond,    fn ($q) => $q->whereHas('customerBond', fn ($bq) => $bq->where('bond_no', 'like', '%' . $filterBond . '%')))
+            ->when($filterAccount, fn ($q) => $q->where('connected_account_id', $filterAccount))
             ->latest('cheque_date')
             ->latest('id');
 
@@ -32,12 +34,16 @@ class CustomerBondChequeController extends Controller
             'cancelled' => $all->get('cancelled'),
         ];
 
+        $accounts = \App\Models\ConnectedAccount::orderBy('name')->get();
+
         return view('customer_bond_cheques.index', [
-            'title'         => 'Connected Accounts Cheques',
-            'cheques'       => $cheques,
-            'summary'       => $summary,
-            'filterStatus'  => $filterStatus,
-            'filterBond'    => $filterBond,
+            'title'          => 'Connected Accounts Cheques',
+            'cheques'        => $cheques,
+            'summary'        => $summary,
+            'filterStatus'   => $filterStatus,
+            'filterBond'     => $filterBond,
+            'filterAccount'  => $filterAccount,
+            'accounts'       => $accounts,
         ]);
     }
 

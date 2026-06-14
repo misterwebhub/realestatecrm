@@ -33,6 +33,37 @@
             @endif
         </div>
 
+        @if(!empty($isCustomerPaymentIndex))
+            <div class="card-body border-top py-2 px-3">
+                <form method="GET" class="row g-2 align-items-end">
+                    <div class="col-md-3">
+                        <label class="form-label small fw-semibold mb-1">Name / Mobile</label>
+                        <input type="text" name="q" value="{{ $cp_q ?? '' }}"
+                               class="form-control form-control-sm" placeholder="Customer name or mobile…">
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label small fw-semibold mb-1">Bond No</label>
+                        <input type="text" name="bond" value="{{ $cp_bond ?? '' }}"
+                               class="form-control form-control-sm" placeholder="e.g. CB00001…">
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label small fw-semibold mb-1">Arazi No</label>
+                        <input type="text" name="arazi_code" value="{{ $cp_arazi ?? '' }}"
+                               class="form-control form-control-sm" placeholder="e.g. 419…">
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label small fw-semibold mb-1">Plot Title</label>
+                        <input type="text" name="plot" value="{{ $cp_plot ?? '' }}"
+                               class="form-control form-control-sm" placeholder="Plot title…">
+                    </div>
+                    <div class="col-auto d-flex gap-2">
+                        <button type="submit" class="btn btn-primary btn-sm">Search</button>
+                        <a href="{{ route('customer-bond-payments.index') }}" class="btn btn-outline-secondary btn-sm">Clear</a>
+                    </div>
+                </form>
+            </div>
+        @endif
+
         @if(!empty($isKisanPaymentIndex))
             <div class="card-body border-top py-2 px-3">
                 <form method="GET" class="row g-2 align-items-end">
@@ -133,8 +164,8 @@
                         })();
                     </script>
                     <div class="col-auto">
-                        <label class="form-label small">Plot (id or title)</label>
-                        <input type="text" name="plot" value="{{ $filter_plot ?? '' }}" class="form-control form-control-sm" placeholder="Plot id or title">
+                        <label class="form-label small">Plot Title</label>
+                        <input type="text" name="plot" value="{{ $filter_plot ?? '' }}" class="form-control form-control-sm" placeholder="Plot title…">
                     </div>
                     <div class="col-auto">
                         <button class="btn btn-sm btn-primary">Filter</button>
@@ -157,17 +188,52 @@
                 </thead>
                 <tbody>
                 @forelse($rows as $row)
-                    <tr>
-                        @foreach($row['cells'] as $cell)
-                            <td>{{ $cell }}</td>
+                    @php $hasBondArazi = isset($row['bond_arazi']); @endphp
+                    <tr class="{{ $hasBondArazi ? 'align-top' : 'align-middle' }}" style="{{ $hasBondArazi ? 'border-top:2px solid #d0ddf0;' : '' }}">
+                        @foreach($row['cells'] as $colIndex => $cell)
+                            @if($hasBondArazi && $colIndex === 2)
+                                {{-- Arazi column --}}
+                                <td style="padding:10px 8px;">
+                                    <span style="background:#1a3a6b;color:#fff;border-radius:4px;padding:3px 10px;font-size:11.5px;font-weight:700;letter-spacing:.3px;white-space:nowrap;">
+                                        {{ $row['bond_arazi'] }}
+                                    </span>
+                                </td>
+                            @elseif($hasBondArazi && $colIndex === 3)
+                                {{-- Plots column --}}
+                                <td style="padding:8px;min-width:200px;">
+                                    @if(empty($row['bond_plots']))
+                                        <span class="text-muted px-2" style="font-size:12px;">—</span>
+                                    @else
+                                        <table style="width:100%;border-collapse:collapse;font-size:12px;border:1px solid #d0ddf0;border-radius:6px;overflow:hidden;box-shadow:0 1px 4px rgba(26,58,107,.09);">
+                                            <thead>
+                                                <tr style="background:linear-gradient(90deg,#1a3a6b,#2a52a0);">
+                                                    <th style="padding:4px 8px;color:rgba(255,255,255,.75);font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;border-right:1px solid rgba(255,255,255,.12);">Plot</th>
+                                                    <th style="padding:4px 8px;color:rgba(255,255,255,.75);font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;">Area</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                @foreach($row['bond_plots'] as $pi => $plot)
+                                                    <tr style="background:{{ $pi % 2 === 0 ? '#fff' : '#f6f9ff' }};border-bottom:1px solid #e4ecf7;"
+                                                        onmouseover="this.style.background='#edf3ff'" onmouseout="this.style.background='{{ $pi % 2 === 0 ? '#fff' : '#f6f9ff' }}'">
+                                                        <td style="padding:4px 8px;font-weight:600;color:#1a3a6b;border-right:1px solid #e4ecf7;white-space:nowrap;">{{ $plot['title'] }}</td>
+                                                        <td style="padding:4px 8px;color:#374151;white-space:nowrap;">{{ $plot['area'] }}</td>
+                                                    </tr>
+                                                @endforeach
+                                            </tbody>
+                                        </table>
+                                    @endif
+                                </td>
+                            @else
+                                <td style="{{ $hasBondArazi ? 'padding:10px 8px;' : '' }}">{{ $cell }}</td>
+                            @endif
                         @endforeach
                         <td class="text-end" style="white-space:nowrap;">
                             @if(!empty($row['print_url']))
                                 <a href="{{ $row['print_url'] }}?print=1" target="_blank" class="btn btn-outline-success btn-sm">Print</a>
                             @endif
-                            @if(!empty($row['pdf_url']))
+                            {{-- @if(!empty($row['pdf_url']))
                                 <a href="{{ $row['pdf_url'] }}" target="_blank" class="btn btn-outline-secondary btn-sm ms-1">PDF</a>
-                            @endif
+                            @endif --}}
                             @if(!empty($row['add_url']))
                                 <a href="{{ $row['add_url'] }}" @if(!empty($row['open_in_new_tab'])) target="_blank" rel="noopener" @endif class="btn btn-outline-primary btn-sm ms-1">Add Bond</a>
                             @endif

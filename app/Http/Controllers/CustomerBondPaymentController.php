@@ -38,28 +38,73 @@ class CustomerBondPaymentController extends Controller
         return 'customer-bond-payments';
     }
 
-    public function index()
+    public function index(\Illuminate\Http\Request $request)
     {
-        $records = $this->resourceQuery()->get();
+        $q         = trim((string) $request->input('q', ''));
+        $bondQ     = trim((string) $request->input('bond', ''));
+        $araziCode = trim((string) $request->input('arazi_code', ''));
+        $plotQ     = trim((string) $request->input('plot', ''));
+
+        $query = $this->resourceQuery();
+
+        // Search by customer name or mobile
+        if ($q !== '') {
+            $query->where(function ($qb) use ($q) {
+                $qb->whereHas('customer', fn($c) =>
+                    $c->where('name', 'like', '%'.$q.'%')
+                      ->orWhere('mobile', 'like', '%'.$q.'%')
+                )->orWhereHas('customerBond.customer', fn($c) =>
+                    $c->where('name', 'like', '%'.$q.'%')
+                      ->orWhere('mobile', 'like', '%'.$q.'%')
+                );
+            });
+        }
+
+        // Search by bond no
+        if ($bondQ !== '') {
+            $query->whereHas('customerBond', fn($b) =>
+                $b->where('bond_no', 'like', '%'.$bondQ.'%')
+            );
+        }
+
+        // Search by arazi legacy code
+        if ($araziCode !== '') {
+            $araziIds = \App\Models\Arazi::idsForCode($araziCode);
+            $query->whereIn('arazi_id', $araziIds);
+        }
+
+        // Search by plot title
+        if ($plotQ !== '') {
+            $query->whereHas('plot', fn($p) =>
+                $p->where('title', 'like', '%'.$plotQ.'%')
+                  ->orWhere('plot_number', 'like', '%'.$plotQ.'%')
+            );
+        }
+
+        $records   = $query->get();
         $routeName = $this->resourceRouteName();
 
         $rows = $records->map(function (Model $record) use ($routeName) {
             $entry = $record->entry_no;
-
             return array_merge($this->resourceRow($record), [
-                'edit_url' => route($routeName . '.edit', $record),
+                'edit_url'   => route($routeName . '.edit', $record),
                 'delete_url' => route($routeName . '.destroy', $record),
-                'print_url' => $entry ? route('customer-bond-payments.receipt', ['entry_no' => $entry, 'print' => 1]) : null,
-                'pdf_url' => $entry ? route('customer-bond-payments.receipt-pdf', ['entry_no' => $entry]) : null,
+                'print_url'  => $entry ? route('customer-bond-payments.receipt', ['entry_no' => $entry, 'print' => 1]) : null,
+                'pdf_url'    => $entry ? route('customer-bond-payments.receipt-pdf', ['entry_no' => $entry]) : null,
             ]);
         })->all();
 
         return view('crud.index', [
-            'title' => $this->resourceTitle(),
-            'columns' => $this->resourceColumns(),
-            'rows' => $rows,
-            'createUrl' => route($routeName . '.create'),
-            'exportCsvUrl' => $this->allowsCsvExport() ? route($routeName.'.export.csv') : null,
+            'title'                  => $this->resourceTitle(),
+            'columns'                => $this->resourceColumns(),
+            'rows'                   => $rows,
+            'createUrl'              => route($routeName . '.create'),
+            'exportCsvUrl'           => $this->allowsCsvExport() ? route($routeName.'.export.csv') : null,
+            'isCustomerPaymentIndex' => true,
+            'cp_q'                   => $q,
+            'cp_bond'                => $bondQ,
+            'cp_arazi'               => $araziCode,
+            'cp_plot'                => $plotQ,
         ]);
     }
 

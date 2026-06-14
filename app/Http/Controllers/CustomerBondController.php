@@ -312,11 +312,8 @@ class CustomerBondController extends Controller
             $query->whereIn('arazi_id', Arazi::idsForCode((string) $araziId));
         }
         if ($plotQuery !== '') {
-            // allow numeric id match or title partial match
+            // search by title only
             $query->whereHas('plots', function ($q) use ($plotQuery) {
-                if (is_numeric($plotQuery)) {
-                    $q->where('plots.id', (int) $plotQuery);
-                }
                 $q->where('plots.title', 'like', '%'.$plotQuery.'%');
             });
         }
@@ -389,18 +386,28 @@ class CustomerBondController extends Controller
     protected function resourceRow(Model $item): array
     {
         /** @var CustomerBond $item */
+        $araziCode = $item->arazi
+            ? ($item->arazi->legacy_arazi_code ?: ($item->arazi->plot_number ?? ('Arazi-'.$item->arazi->id)))
+            : '-';
+
+        $plotRows = $item->plots->map(fn($p) => [
+            'title' => $p->title ?? ('Plot-'.$p->id),
+            'area'  => $p->area ? $p->area.' gaz' : '-',
+        ])->all();
+
         return [
             'cells' => [
                 $item->bond_no,
                 $item->customer?->name ?? '-',
-                $item->arazi?->plot_number ?? $item->arazi?->legacy_arazi_code ?? '-',
-                // plots summary: titles / area
-                ($item->plots->isNotEmpty() ? $item->plots->map(function($p){ return ($p->title ?? ('Plot-'.$p->id)).' / '.($p->area ?? '-').' gaz'; })->implode('; ') : '-'),
+                '',  // arazi — rendered as HTML in view via bond_arazi / bond_plots
+                '',  // plots
                 optional($item->bond_date)->format('d-m-Y') ?? '-',
                 number_format((float) $item->bond_amount, 2),
                 number_format((float) ($item->paid_amount ?? 0), 2),
                 number_format(max(0, ((float) ($item->bond_amount ?? 0) - (float) ($item->paid_amount ?? 0))), 2),
             ],
+            'bond_arazi' => $araziCode,
+            'bond_plots' => $plotRows,
             'print_url' => route('customer-bonds.print', $item->id),
             'pdf_url' => route('customer-bonds.pdf', $item->id),
             'action_buttons' => [

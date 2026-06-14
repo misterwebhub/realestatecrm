@@ -35,24 +35,19 @@
     </div>
 </div>
 
-{{-- Summary cards --}}
-<div class="row g-3 mb-4">
-    @foreach(['pending' => 'Pending', 'cleared' => 'Cleared', 'bounced' => 'Bounced', 'cancelled' => 'Cancelled'] as $key => $label)
-    @php $s = $summary[$key]; $c = $statusColors[$key]; @endphp
-    <div class="col-6 col-md-3">
-        <div class="cheque-stat" style="background:{{ $c['bg'] }}; border-color:{{ $c['border'] }}; color:{{ $c['text'] }};">
-            <div class="cs-label">{{ $label }}</div>
-            <div class="cs-count">{{ $s ? number_format($s->count) : 0 }} cheque(s)</div>
-            <div class="cs-amount">₹{{ $s ? number_format((float)$s->total, 2) : '0.00' }}</div>
-        </div>
-    </div>
-    @endforeach
-</div>
-
 {{-- Filter bar --}}
 <div class="no-print" style="background:#fff; border:1px solid #e2e8f0; border-radius:10px; padding:14px 18px; margin-bottom:20px;">
     <form method="GET" class="row g-2 align-items-end">
         <div class="col-md-3">
+            <label class="form-label fw-semibold mb-1" style="font-size:12px;">ACCOUNT</label>
+            <select name="account_id" id="filter_account" class="form-select form-select-sm">
+                <option value="">All Accounts</option>
+                @foreach($accounts as $acc)
+                    <option value="{{ $acc->id }}" @selected($filterAccount == $acc->id)>{{ $acc->name }}</option>
+                @endforeach
+            </select>
+        </div>
+        <div class="col-md-2">
             <label class="form-label fw-semibold mb-1" style="font-size:12px;">STATUS</label>
             <select name="status" id="filter_status" class="form-select form-select-sm">
                 <option value="">All Statuses</option>
@@ -73,12 +68,26 @@
     </form>
 </div>
 
+{{-- Summary cards --}}
+<div class="row g-3 mb-4">
+    @foreach(['pending' => 'Pending', 'cleared' => 'Cleared', 'bounced' => 'Bounced', 'cancelled' => 'Cancelled'] as $key => $label)
+    @php $s = $summary[$key]; $c = $statusColors[$key]; @endphp
+    <div class="col-6 col-md-3">
+        <div class="cheque-stat" style="background:{{ $c['bg'] }}; border-color:{{ $c['border'] }}; color:{{ $c['text'] }};">
+            <div class="cs-label">{{ $label }}</div>
+            <div class="cs-count">{{ $s ? number_format($s->count) : 0 }} cheque(s)</div>
+            <div class="cs-amount">₹{{ $s ? number_format((float)$s->total, 2) : '0.00' }}</div>
+        </div>
+    </div>
+    @endforeach
+</div>
+
 {{-- Cheques table --}}
 <div class="card border-0 shadow-sm">
     <div class="card-header bg-white border-bottom py-3 d-flex justify-content-between align-items-center">
         <span class="fw-bold" style="font-size:15px;">
             Cheques
-            @if($filterStatus || $filterBond)
+            @if($filterStatus || $filterBond || $filterAccount)
                 <span class="text-muted fw-normal" style="font-size:13px;">— filtered</span>
             @endif
         </span>
@@ -156,7 +165,7 @@
                         <td colspan="12" class="text-center py-5 text-muted">
                             <div style="font-size:32px;">🗒️</div>
                             <div class="mt-2" style="font-size:15px;">No cheques found.</div>
-                            @if($filterStatus || $filterBond)
+                            @if($filterStatus || $filterBond || $filterAccount)
                                 <a href="{{ route('customer-bond-cheques.index') }}" class="btn btn-sm btn-outline-secondary mt-2">Clear filters</a>
                             @endif
                         </td>
@@ -183,6 +192,12 @@ $(function(){
     $('#filter_status').select2({
         theme: 'bootstrap-5',
         minimumResultsForSearch: Infinity,
+        width: '100%',
+    });
+    $('#filter_account').select2({
+        theme: 'bootstrap-5',
+        placeholder: 'All Accounts',
+        allowClear: true,
         width: '100%',
     });
 });
