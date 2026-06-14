@@ -78,9 +78,35 @@
 
 {{-- ── FILTER BAR ── --}}
 <div class="filter-card no-print">
-    <form method="GET" class="row g-2 align-items-end">
-        <div class="col-md-5">
-            <label class="form-label fw-semibold mb-1" style="font-size:12px;">FILTER BY BOND</label>
+    <form method="GET" id="ledger-filter-form" class="row g-2 align-items-end">
+
+        {{-- Kisan filter --}}
+        @if(!empty($allKisans))
+        <div class="col-md-3">
+            <label class="form-label fw-semibold mb-1" style="font-size:12px;">KISAN</label>
+            <select name="{{ $partyFilterName }}" id="kisan_filter_select" class="form-select form-select-sm">
+                <option value="">All Kisans</option>
+                @foreach($allKisans as $kisan)
+                    <option value="{{ $kisan->id }}"
+                        @selected((string)($selectedPartyId ?? '') === (string)$kisan->id)>
+                        {{ $kisan->name }}{{ $kisan->mobile ? ' · '.$kisan->mobile : '' }}
+                    </option>
+                @endforeach
+            </select>
+        </div>
+        @endif
+
+        {{-- Arazi filter --}}
+        <div class="col-md-2">
+            <label class="form-label fw-semibold mb-1" style="font-size:12px;">ARAZI NO</label>
+            <input type="text" name="arazi_code" id="arazi_filter_input"
+                   value="{{ $selectedAraziCode ?? '' }}"
+                   class="form-control form-control-sm" placeholder="e.g. 419…">
+        </div>
+
+        {{-- Bond filter — auto-populated based on above --}}
+        <div class="col-md-4">
+            <label class="form-label fw-semibold mb-1" style="font-size:12px;">BOND</label>
             <select name="{{ $filterName }}" id="bond_filter_select" class="form-select form-select-sm">
                 <option value="">All Bonds</option>
                 @foreach($bonds as $bond)
@@ -90,15 +116,11 @@
                 @endforeach
             </select>
         </div>
-        <div class="col-md-auto">
-            <button class="btn btn-primary btn-sm px-4">Apply Filter</button>
-        </div>
-        <div class="col-md-auto">
+
+        <div class="col-md-auto d-flex gap-2">
+            <button type="submit" class="btn btn-primary btn-sm px-4">Apply</button>
             <a href="{{ url()->current() }}" class="btn btn-outline-secondary btn-sm px-3">Clear</a>
         </div>
-        @if(!empty($selectedPartyId))
-            <input type="hidden" name="{{ $partyFilterName }}" value="{{ $selectedPartyId }}">
-        @endif
     </form>
 </div>
 
@@ -148,6 +170,7 @@
                     <tr style="background:#f8fafc;">
                         <th class="ps-3 py-2" style="font-size:11px;font-weight:600;text-transform:uppercase;color:#64748b;letter-spacing:.4px;">Bond No</th>
                         <th style="font-size:11px;font-weight:600;text-transform:uppercase;color:#64748b;letter-spacing:.4px;">Customer</th>
+                        <th style="font-size:11px;font-weight:600;text-transform:uppercase;color:#64748b;letter-spacing:.4px;">Arazi No</th>
                         <th class="text-end" style="font-size:11px;font-weight:600;text-transform:uppercase;color:#64748b;letter-spacing:.4px;">Total</th>
                         <th class="text-end" style="font-size:11px;font-weight:600;text-transform:uppercase;color:#64748b;letter-spacing:.4px;">Paid</th>
                         <th class="text-end" style="font-size:11px;font-weight:600;text-transform:uppercase;color:#64748b;letter-spacing:.4px;">Balance</th>
@@ -161,6 +184,11 @@
                     <tr class="bond-row" style="border-bottom:1px solid #f1f5f9;">
                         <td class="ps-3 fw-semibold">{{ $bond['bond_no'] }}</td>
                         <td>{{ $bond['party'] }}</td>
+                        <td>
+                            @foreach(explode(', ', $bond['arazi']) as $code)
+                                <span style="background:#1a3a6b;color:#fff;border-radius:3px;padding:1px 6px;font-size:11px;font-weight:700;display:inline-block;margin:1px 1px;">{{ trim($code) }}</span>
+                            @endforeach
+                        </td>
                         <td class="text-end">₹{{ number_format($bond['total'], 2) }}</td>
                         <td class="text-end text-success fw-semibold">₹{{ number_format($bond['paid'], 2) }}</td>
                         <td class="text-end {{ $bond['balance'] > 0 ? 'text-danger fw-semibold' : 'text-success' }}">
@@ -181,7 +209,7 @@
                         </td>
                     </tr>
                     @empty
-                    <tr><td colspan="7" class="text-center py-4 text-muted">No bonds found.</td></tr>
+                    <tr><td colspan="8" class="text-center py-4 text-muted">No bonds found.</td></tr>
                     @endforelse
                 </tbody>
             </table>
@@ -294,11 +322,35 @@
 @push('scripts')
 <script>
 $(function(){
-    $('#bond_filter_select').select2({
+    $('#kisan_filter_select').select2({
         theme: 'bootstrap-5',
-        placeholder: 'Search bond or customer...',
+        placeholder: 'Search kisan...',
         allowClear: true,
         width: '100%',
+    });
+
+    $('#bond_filter_select').select2({
+        theme: 'bootstrap-5',
+        placeholder: 'Search bond...',
+        allowClear: true,
+        width: '100%',
+    });
+
+    // Auto-submit when kisan changes → bond list refreshes
+    $('#kisan_filter_select').on('change', function(){
+        // clear bond selection so page shows filtered bonds
+        $('#bond_filter_select').val('').trigger('change');
+        $('#ledger-filter-form').submit();
+    });
+
+    // Auto-submit when arazi code loses focus or Enter pressed
+    var araziTimer;
+    $('#arazi_filter_input').on('input', function(){
+        clearTimeout(araziTimer);
+        araziTimer = setTimeout(function(){
+            $('#bond_filter_select').val('').trigger('change');
+            $('#ledger-filter-form').submit();
+        }, 700);
     });
 });
 </script>

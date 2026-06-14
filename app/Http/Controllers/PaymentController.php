@@ -89,58 +89,84 @@ class PaymentController extends Controller
 
     public function ledger(Request $request)
     {
-        $selectedBondId = $request->query('bond_id');
+        $selectedBondId  = $request->query('bond_id');
         $selectedKisanId = $request->query('kisan_id');
-        $bonds = KisanBond::with('kisan')
+        $araziCode       = trim((string) $request->query('arazi_code', ''));
+
+        // Resolve arazi IDs from code
+        $araziIds = $araziCode !== '' ? Arazi::idsForCode($araziCode) : [];
+
+        // All kisans for the kisan filter dropdown
+        $allKisans = Kisan::orderBy('name')->get(['id', 'name', 'mobile']);
+
+        // Bonds filtered by kisan and/or arazi
+        $bonds = KisanBond::with(['kisan', 'arazis'])
             ->withSum('payments as paid_amount', 'amount')
-            ->when($selectedKisanId, fn ($query) => $query->where('kisan_id', $selectedKisanId))
+            ->when($selectedKisanId, fn ($q) => $q->where('kisan_id', $selectedKisanId))
+            ->when($araziIds, fn ($q) => $q->where(fn ($q2) =>
+                $q2->whereIn('arazi_id', $araziIds)
+                   ->orWhereHas('arazis', fn ($a) => $a->whereIn('arazis.id', $araziIds))
+            ))
             ->latest()
             ->get();
 
         $entries = Payment::with(['kisanBond.kisan'])
             ->whereNotNull('kisan_bond_id')
-            ->when($selectedKisanId, fn ($query) => $query->whereHas('kisanBond', fn ($bondQuery) => $bondQuery->where('kisan_id', $selectedKisanId)))
-            ->when($selectedBondId, fn ($query) => $query->where('kisan_bond_id', $selectedBondId))
+            ->when($selectedKisanId, fn ($q) => $q->whereHas('kisanBond', fn ($b) => $b->where('kisan_id', $selectedKisanId)))
+            ->when($araziIds, fn ($q) => $q->whereHas('kisanBond', fn ($b) =>
+                $b->whereIn('arazi_id', $araziIds)
+                  ->orWhereHas('arazis', fn ($a) => $a->whereIn('arazis.id', $araziIds))
+            ))
+            ->when($selectedBondId, fn ($q) => $q->where('kisan_bond_id', $selectedBondId))
             ->latest('payment_date')
             ->latest('id')
             ->get();
 
         return view('ledgers.bond_payments', [
-            'title' => 'Kisan Payment Ledger',
-            'bondLabel' => 'Kisan Bond',
-            'partyLabel' => 'Kisan',
-            'filterName' => 'bond_id',
-            'selectedBondId' => $selectedBondId,
-            'partyFilterName' => 'kisan_id',
-            'selectedPartyId' => $selectedKisanId,
-            'bonds' => $bonds->map(function (KisanBond $bond) {
+            'title'            => 'Kisan Payment Ledger',
+            'bondLabel'        => 'Kisan Bond',
+            'partyLabel'       => 'Kisan',
+            'filterName'       => 'bond_id',
+            'selectedBondId'   => $selectedBondId,
+            'partyFilterName'  => 'kisan_id',
+            'selectedPartyId'  => $selectedKisanId,
+            'selectedAraziCode'=> $araziCode,
+            'allKisans'        => $allKisans,
+            'bonds'            => $bonds->map(function (KisanBond $bond) {
                 $total = (float) ($bond->total_amount ?? $bond->bond_amount ?? 0);
-                $paid = (float) ($bond->paid_amount ?? 0);
+                $paid  = (float) ($bond->paid_amount ?? 0);
+
+                // Collect arazi codes
+                $arazis = $bond->arazis->isNotEmpty()
+                    ? $bond->arazis->map(fn($a) => $a->legacy_arazi_code ?: ($a->plot_number ?? ('Arazi-'.$a->id)))->unique()->implode(', ')
+                    : ($bond->arazi ? ($bond->arazi->legacy_arazi_code ?: ($bond->arazi->plot_number ?? '-')) : '-');
 
                 return [
-                    'id' => $bond->id,
-                    'bond_no' => $bond->bond_no,
-                    'party' => $bond->kisan?->name ?? '-',
-                    'total' => $total,
-                    'paid' => $paid,
-                    'balance' => max($total - $paid, 0),
+                    'id'        => $bond->id,
+                    'bond_no'   => $bond->bond_no,
+                    'party'     => $bond->kisan?->name ?? '-',
+                    'arazi'     => $arazis,
+                    'total'     => $total,
+                    'paid'      => $paid,
+                    'balance'   => max($total - $paid, 0),
                 ];
             }),
-            'entries' => $entries->map(function (Payment $payment) {
+            'entries'          => $entries->map(function (Payment $payment) {
                 return [
                     'entry_no' => $payment->receipt_no ?? $payment->reference_no ?? '-',
-                    'bond_no' => $payment->kisanBond?->bond_no ?? '-',
-                    'party' => $payment->kisanBond?->kisan?->name ?? $payment->kisan?->name ?? '-',
-                    'date' => optional($payment->payment_date)->format('d-m-Y') ?? '-',
-                    'type' => ucfirst($payment->payment_type),
-                    'amount' => (float) $payment->amount,
-                    'method' => $payment->payment_method ?? '-',
-                    'remarks' => $payment->notes ?? '-',
+                    'bond_no'  => $payment->kisanBond?->bond_no ?? '-',
+                    'party'    => $payment->kisanBond?->kisan?->name ?? $payment->kisan?->name ?? '-',
+                    'date'     => optional($payment->payment_date)->format('d-m-Y') ?? '-',
+                    'type'     => ucfirst($payment->payment_type),
+                    'amount'   => (float) $payment->amount,
+                    'method'   => $payment->payment_method ?? '-',
+                    'remarks'  => $payment->notes ?? '-',
                 ];
             }),
             'exportLedgerCsvUrl' => route('kisan-payment.ledger.export.csv', array_filter([
-                'bond_id' => $selectedBondId,
-                'kisan_id' => $selectedKisanId,
+                'bond_id'    => $selectedBondId,
+                'kisan_id'   => $selectedKisanId,
+                'arazi_code' => $araziCode ?: null,
             ], fn ($v) => $v !== null && $v !== '')),
         ]);
     }
