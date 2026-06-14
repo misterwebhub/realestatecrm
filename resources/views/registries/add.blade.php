@@ -98,10 +98,15 @@
             {{-- ── Section: Auto-filled Info (read-only display) ── --}}
             <h6 class="fw-bold text-muted mb-3 border-bottom pb-1">Bond Information</h6>
             <div class="row g-3 mb-4">
-                <div class="col-md-3">
+                <div class="col-md-2">
                     <label class="form-label small fw-semibold">Receipt No</label>
                     <input type="text" class="form-control form-control-sm bg-light" id="d_receipt_no"
                         value="{{ old('receipt_no', $item->receipt_no ?? '') }}" readonly>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label small fw-semibold">Registry Code</label>
+                    <input type="text" class="form-control form-control-sm bg-light"
+                        value="{{ $isEdit ? ($item->registry_code ?? 'Auto') : 'Auto-generated' }}" readonly>
                 </div>
                 <div class="col-md-4">
                     <label class="form-label small fw-semibold">Customer Name</label>
@@ -177,8 +182,14 @@
                         @php
                             $witnessRows = old('witnesses', []);
                             if (empty($witnessRows) && !empty($item->witness_name)) {
-                                foreach (explode(',', $item->witness_name) as $wn) {
-                                    $witnessRows[] = ['name' => trim($wn), 'mobile' => ''];
+                                // Try JSON first, fall back to comma-separated plain text
+                                $decoded = json_decode($item->witness_name, true);
+                                if (is_array($decoded)) {
+                                    $witnessRows = $decoded;
+                                } else {
+                                    foreach (explode(',', $item->witness_name) as $wn) {
+                                        $witnessRows[] = ['name' => trim($wn), 'mobile' => ''];
+                                    }
                                 }
                             }
                             if (empty($witnessRows)) $witnessRows = [['name'=>'','mobile'=>'']];

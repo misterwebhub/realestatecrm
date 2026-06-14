@@ -55,7 +55,7 @@ class RegistryController extends Controller
 
     protected function resourceColumns(): array
     {
-        return ['Reg Code', 'Legacy Reg No', 'Customer', 'Arazi', 'Plot', 'Booking Mode', 'Registry Date', 'Amount', 'Lock', 'Status'];
+        return ['Reg Code', 'Customer', 'Arazi', 'Plot', 'Booking Mode', 'Registry Date', 'Amount', 'Lock', 'Status'];
     }
 
     protected function resourceFields(?Model $item = null): array
@@ -131,33 +131,36 @@ class RegistryController extends Controller
             'witnesses'        => ['nullable', 'array'],
             'witnesses.*.name'   => ['required', 'string', 'max:150'],
             'witnesses.*.mobile' => ['nullable', 'string', 'max:30'],
-            // non-fillable extras
+            // non-fillable / computed extras
+            'mobile'           => ['nullable', 'string', 'max:30'],
             'secondary_mobile' => ['nullable', 'string', 'max:30'],
             'pending_amount'   => ['nullable', 'numeric', 'min:0'],
             'customer_bond_id' => ['nullable', 'integer'],
             'receipt_no'       => ['nullable', 'string', 'max:40'],
+            'registry_code'    => ['nullable', 'string', 'max:40'],
             'document'         => [$item ? 'nullable' : 'required', 'file', 'mimes:pdf,jpeg,png,jpg', 'max:5120'],
         ];
     }
 
     protected function resourcePrepareData(array $validated, Request $request, ?Model $item = null): array
     {
-        // Map witnesses array → witness_name (comma-joined names)
-        $witnesses = $validated['witnesses'] ?? [];
-        $witnessName = '';
-        if (!empty($witnesses)) {
-            $names = array_filter(array_column($witnesses, 'name'));
-            $witnessName = implode(', ', array_values($names));
-        }
+        // Store witnesses as JSON array [{name, mobile}, ...]
+        $witnesses = array_values(array_filter($validated['witnesses'] ?? [], fn($w) => !empty($w['name'])));
+        $witnessJson = !empty($witnesses) ? json_encode($witnesses, JSON_UNESCAPED_UNICODE) : null;
 
-        // Strip keys that are not in Registry $fillable
-        $strip = ['witnesses', 'secondary_mobile', 'pending_amount', 'customer_bond_id'];
+        // Strip keys not in Registry $fillable
+        $strip = ['witnesses', 'secondary_mobile', 'pending_amount', 'customer_bond_id', 'document', 'mobile'];
         $payload = array_diff_key($validated, array_flip($strip));
 
-        // Defaults for hidden required-ish fields
-        $payload['booking_mode']   = $payload['booking_mode'] ?? 'other';
-        $payload['land_size']      = $payload['land_size'] ?? 0;
-        $payload['witness_name']   = $witnessName ?: null;
+        // Defaults for hidden fields
+        $payload['booking_mode'] = $payload['booking_mode'] ?? 'other';
+        $payload['land_size']    = $payload['land_size'] ?? 0;
+        $payload['witness_name'] = $witnessJson;
+
+        // Auto-generate registry_code on create
+        if (!$item && empty($payload['registry_code'])) {
+            $payload['registry_code'] = $this->nextRegistryCode();
+        }
 
         // On update, don't overwrite receipt_no
         if ($item) {
@@ -165,6 +168,21 @@ class RegistryController extends Controller
         }
 
         return $payload;
+    }
+
+    private function nextRegistryCode(): string
+    {
+        $prefix = 'RGC';
+        $max = Registry::where('registry_code', 'like', $prefix . '%')
+            ->pluck('registry_code')
+            ->map(fn ($v) => preg_match('/^' . preg_quote($prefix, '/') . '(\d+)$/', (string) $v, $m) ? (int) $m[1] : 0)
+            ->max() ?? 0;
+        $next = $max + 1;
+        do {
+            $code = $prefix . str_pad((string) $next, 5, '0', STR_PAD_LEFT);
+            $next++;
+        } while (Registry::where('registry_code', $code)->exists());
+        return $code;
     }
 
     protected function resourceQuery()
@@ -202,10 +220,10 @@ class RegistryController extends Controller
 
         $rows = $records->map(function (Model $record) {
             return array_merge($this->resourceRow($record), [
-                'edit_url'   => route($this->resourceRouteName() . '.edit', $record),
-                'delete_url' => route($this->resourceRouteName() . '.destroy', $record),
-                'print_url'  => route($this->resourceRouteName() . '.print', $record),
-                'pdf_url'    => route($this->resourceRouteName() . '.pdf', $record),
+                'edit_url'     => route($this->resourceRouteName() . '.edit', $record),
+                'delete_url'   => route($this->resourceRouteName() . '.destroy', $record),
+                'print_url'    => route($this->resourceRouteName() . '.print', $record),
+                'doc_url'      => $record->document_path ? asset('storage/' . $record->document_path) : null,
             ]);
         })->all();
 
@@ -319,7 +337,6 @@ class RegistryController extends Controller
         return [
             'cells' => [
                 $item->registry_code ?? '-',
-                $item->customer_reg_no ?? '-',
                 $item->customer?->name ?? '-',
                 $item->arazi?->legacy_arazi_code ?? '-',
                 $item->plot?->title ?? $item->plot?->plot_number ?? '-',

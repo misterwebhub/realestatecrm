@@ -60,8 +60,12 @@
                             @if(!empty($row['print_url']))
                                 <a href="{{ $row['print_url'] }}?print=1" target="_blank" class="btn btn-outline-success btn-sm">Print</a>
                             @endif
-                            @if(!empty($row['pdf_url']))
-                                <a href="{{ $row['pdf_url'] }}" target="_blank" class="btn btn-outline-secondary btn-sm ms-1">PDF</a>
+                            @if(!empty($row['doc_url']))
+                                <a href="{{ $row['doc_url'] }}" target="_blank" download class="btn btn-outline-primary btn-sm ms-1">
+                                    <i class="bi bi-download"></i> Download
+                                </a>
+                            @else
+                                <span class="btn btn-outline-secondary btn-sm ms-1 disabled" style="opacity:.4;">No Doc</span>
                             @endif
                             <a href="{{ $row['edit_url'] }}" class="btn btn-outline-secondary btn-sm ms-1">Edit</a>
                             <form action="{{ $row['delete_url'] }}" method="POST" class="d-inline-block ms-1" onsubmit="return confirm('Delete this registry?');">
