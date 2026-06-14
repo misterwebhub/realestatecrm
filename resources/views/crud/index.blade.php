@@ -2,10 +2,10 @@
 
 @section('content')
     <div class="card card-outline card-primary">
-        <div class="card-header d-flex align-items-center justify-content-between flex-wrap gap-2">
+        <div class="card-header d-flex align-items-center flex-wrap gap-2">
             @if(!empty($searchInHeader))
                 <div class="d-flex align-items-center gap-3 flex-grow-1">
-                  
+
                     <form method="get" class="d-flex ms-3" action="{{ url()->current() }}">
                         <input name="q" value="{{ $searchQuery ?? '' }}" placeholder="Search by Arazi code, plot no or title" class="form-control form-control-sm" style="min-width:320px;" />
                         <button class="btn btn-sm btn-outline-secondary ms-2" type="submit">Search</button>
@@ -19,7 +19,7 @@
             @endif
 
             @if(auth()->check() && in_array(auth()->user()->role, ['admin','manager']))
-                <div class="d-flex flex-wrap gap-2 align-items-center">
+                <div class="d-flex flex-wrap gap-2 align-items-center ms-auto">
                     @if(isset($exportCsvUrl) && $exportCsvUrl)
                         <a href="{{ $exportCsvUrl }}" class="btn btn-outline-success btn-sm">
                             <i class="bi bi-filetype-csv"></i> Export CSV

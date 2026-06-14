@@ -2,9 +2,9 @@
 
 @section('content')
     <div class="card card-outline card-primary mb-3">
-        <div class="card-header d-flex align-items-center justify-content-between">
+        <div class="card-header d-flex align-items-center gap-2">
             <h5 class="card-title mb-0 fw-bold">Expenses</h5>
-            <a href="{{ route('expenses.create') }}" class="btn btn-primary btn-sm"><i class="bi bi-plus-lg"></i> New Expense</a>
+            <a href="{{ route('expenses.create') }}" class="btn btn-primary btn-sm ms-auto"><i class="bi bi-plus-lg"></i> New Expense</a>
         </div>
         <div class="card-body border-bottom py-2 px-3">
             <input id="expenses-search" type="search" class="form-control form-control-sm" placeholder="Search expenses (label, arazi, type)..." style="max-width:320px;">

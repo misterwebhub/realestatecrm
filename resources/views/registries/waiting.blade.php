@@ -2,9 +2,9 @@
 
 @section('content')
     <div class="card card-outline card-warning">
-        <div class="card-header d-flex align-items-center justify-content-between">
+        <div class="card-header d-flex align-items-center gap-2">
             <h5 class="card-title mb-0 fw-bold">Pending Customer Payments</h5>
-            <a href="{{ route('registries.index') }}" class="btn btn-outline-secondary btn-sm">Back to Registries</a>
+            <a href="{{ route('registries.index') }}" class="btn btn-outline-secondary btn-sm ms-auto">Back to Registries</a>
         </div>
 
         <div class="card-body table-responsive p-0">

@@ -2,6 +2,8 @@
 
 @section('content')
 @php
+    $isCustomerLedger = $isCustomerLedger ?? false;
+
     $overallTotal   = $bonds->sum('total');
     $overallPaid    = $bonds->sum('paid');
     $overallBalance = $bonds->sum('balance');
@@ -17,8 +19,9 @@
         return array_merge($e, ['running_balance' => $runningBalance]);
     });
 
-    $totalCredit = collect($entries)->where('is_debit', false)->sum('amount');
-    $totalDebit  = collect($entries)->where('is_debit', true)->sum('amount');
+    $totalCredit = $isCustomerLedger ? $overallPaid : collect($entries)->where('is_debit', false)->sum('amount');
+    $totalDebit  = $isCustomerLedger ? 0            : collect($entries)->where('is_debit', true)->sum('amount');
+    $netCollected = $totalCredit - $totalDebit;
 @endphp
 
 <style>
@@ -51,18 +54,97 @@
 .progress-thin { height: 5px; border-radius: 3px; }
 
 @media print {
-    .no-print { display: none !important; }
-    .entries-table td, .entries-table th { font-size: 11px; padding: 5px 7px !important; }
+    @page { margin: 10mm 8mm; size: A4 landscape; }
+
+    /* ── Hide everything except our print blocks ── */
+    .app-sidebar,
+    .app-header,
+    .app-footer,
+    .no-print,
+    .filter-card,
+    .row.g-3.mb-4,
+    .card:not(.print-bond-summary) { display: none !important; }
+
+    /* ── Reset layout wrappers ── */
+    body, .app-wrapper, .app-main, .app-content, .container-fluid {
+        display: block !important;
+        width: 100% !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        background: #fff !important;
+    }
+
+    /* ── Show print-only blocks ── */
+    .print-title, .print-stats { display: flex !important; }
+
+    /* ── Print title bar ── */
+    .print-title {
+        display: flex !important;
+        justify-content: space-between !important;
+        align-items: flex-end !important;
+        border-bottom: 2px solid #000 !important;
+        padding-bottom: 6px !important;
+        margin-bottom: 8px !important;
+    }
+    .print-title h4 { font-size: 15px !important; font-weight: 800 !important; margin: 0 !important; color: #000 !important; }
+    .print-title .print-date { font-size: 10px !important; color: #555 !important; }
+
+    /* ── Summary stats strip ── */
+    .print-stats {
+        display: flex !important;
+        gap: 20px !important;
+        margin-bottom: 8px !important;
+        padding: 6px 10px !important;
+        background: #f4f4f4 !important;
+        border: 1px solid #ddd !important;
+        border-radius: 4px !important;
+    }
+    .print-stats .ps-item { font-size: 10px !important; color: #000 !important; }
+    .print-stats .ps-item strong { font-size: 12px !important; display: block !important; }
+
+    /* ── Bond summary card ── */
+    .print-bond-summary { display: block !important; border: none !important; box-shadow: none !important; margin: 0 !important; }
+    .print-bond-summary .card-header {
+        background: #fff !important;
+        border-bottom: 2px solid #333 !important;
+        padding: 4px 0 6px !important;
+    }
+    .print-bond-summary .card-header span { font-size: 12px !important; font-weight: 700 !important; color: #000 !important; }
+    .print-bond-summary .card-body { padding: 0 !important; }
+
+    /* ── Table ── */
+    .print-bond-summary table { width: 100% !important; border-collapse: collapse !important; font-size: 9.5px !important; }
+    .print-bond-summary thead tr { background: #ddd !important; }
+    .print-bond-summary th {
+        background: #ddd !important; -webkit-print-color-adjust: exact; print-color-adjust: exact;
+        color: #000 !important; font-size: 8.5px !important; font-weight: 700 !important;
+        text-transform: uppercase !important; border: 1px solid #aaa !important;
+        padding: 4px 5px !important; white-space: nowrap !important;
+    }
+    .print-bond-summary td {
+        border: 1px solid #ccc !important; padding: 3px 5px !important;
+        color: #000 !important; vertical-align: middle !important;
+    }
+    .print-bond-summary tr:nth-child(even) td { background: #f9f9f9 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+
+    /* Arazi badge */
+    .print-bond-summary td span[style*="background:#1a3a6b"] {
+        background: #222 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact;
+        color: #fff !important; padding: 1px 4px !important; font-size: 8px !important; border-radius: 2px !important;
+    }
+
+    /* Hide progress bar div, show % number */
+    .print-bond-summary .no-print-progress-bar { display: none !important; }
 }
 </style>
 
 {{-- ── PAGE HEADER ── --}}
-<div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3 no-print">
+<div class="d-flex align-items-center flex-wrap gap-2 mb-3 no-print">
     <div>
         <h4 class="mb-0 fw-bold">{{ $title }}</h4>
         <span class="text-muted small">Track all bond payments, credits &amp; debits</span>
     </div>
-    <div class="d-flex gap-2">
+    <div class="d-flex gap-2 ms-auto">
         @if(auth()->check() && in_array(auth()->user()->role, ['admin','manager']))
             @if(!empty($exportLedgerCsvUrl))
                 <a href="{{ $exportLedgerCsvUrl }}" class="btn btn-sm btn-outline-success">
@@ -77,6 +159,43 @@
 </div>
 
 {{-- ── FILTER BAR ── --}}
+@if($isCustomerLedger)
+<div class="filter-card no-print">
+    <form method="GET" id="ledger-filter-form" class="row g-2 align-items-end">
+        <div class="col-md-3">
+            <label class="form-label fw-semibold mb-1" style="font-size:12px;">CUSTOMER NAME / MOBILE</label>
+            <input type="text" name="q" value="{{ $cl_q ?? '' }}" class="form-control form-control-sm" placeholder="Name or mobile…">
+        </div>
+        <div class="col-md-2">
+            <label class="form-label fw-semibold mb-1" style="font-size:12px;">ARAZI NO</label>
+            <input type="text" name="arazi_code" value="{{ $cl_arazi ?? '' }}" class="form-control form-control-sm" placeholder="e.g. 419…">
+        </div>
+        <div class="col-md-2">
+            <label class="form-label fw-semibold mb-1" style="font-size:12px;">PLOT</label>
+            <input type="text" name="plot" value="{{ $cl_plot ?? '' }}" class="form-control form-control-sm" placeholder="Plot title…">
+        </div>
+        <div class="col-md-2">
+            <label class="form-label fw-semibold mb-1" style="font-size:12px;">DATE FROM</label>
+            <input type="date" name="date_from" value="{{ $cl_date_from ?? '' }}" class="form-control form-control-sm">
+        </div>
+        <div class="col-md-2">
+            <label class="form-label fw-semibold mb-1" style="font-size:12px;">DATE TO</label>
+            <input type="date" name="date_to" value="{{ $cl_date_to ?? '' }}" class="form-control form-control-sm">
+        </div>
+        <div class="col-md-12 d-flex align-items-center gap-3 pt-1">
+            <div class="form-check mb-0">
+                <input class="form-check-input" type="checkbox" name="low_progress" value="1" id="low_progress_chk"
+                    {{ !empty($cl_low_progress) ? 'checked' : '' }}>
+                <label class="form-check-label fw-semibold" for="low_progress_chk" style="font-size:12px;">
+                    Show only &lt; 50% paid bonds
+                </label>
+            </div>
+            <button type="submit" class="btn btn-primary btn-sm px-4">Apply</button>
+            <a href="{{ url()->current() }}" class="btn btn-outline-secondary btn-sm px-3">Clear</a>
+        </div>
+    </form>
+</div>
+@else
 <div class="filter-card no-print">
     <form method="GET" id="ledger-filter-form" class="row g-2 align-items-end">
 
@@ -123,6 +242,7 @@
         </div>
     </form>
 </div>
+@endif
 
 {{-- ── SUMMARY STATS ── --}}
 <div class="row g-3 mb-4">
@@ -134,7 +254,6 @@
         </div>
     </div>
     <div class="col-sm-4">
-        @php $netCollected = $totalCredit - $totalDebit; @endphp
         <div class="ledger-stat bg-success bg-opacity-10 border border-success border-opacity-25">
             <div class="stat-label text-success">Net Collected</div>
             <div class="stat-value text-success">₹{{ number_format($netCollected, 2) }}</div>
@@ -156,12 +275,40 @@
     </div>
 </div>
 
-{{-- ── BOND SUMMARY (show when no specific bond selected) ── --}}
+{{-- ── PRINT-ONLY: title + stats (hidden on screen) ── --}}
 @if(!$selectedBondId)
-<div class="card border-0 shadow-sm mb-4">
-    <div class="card-header bg-white border-bottom py-3 d-flex justify-content-between align-items-center">
+<div class="print-title" style="display:none;">
+    <h4>{{ $title }}</h4>
+    <span class="print-date">Printed: {{ now()->format('d M Y, h:i A') }}</span>
+</div>
+<div class="print-stats" style="display:none;">
+    <div class="ps-item">
+        <span>Total Bond Value</span>
+        <strong>₹{{ number_format($overallTotal, 2) }}</strong>
+        <span>{{ $bonds->count() }} bond(s)</span>
+    </div>
+    <div class="ps-item">
+        <span>Net Collected</span>
+        <strong style="color:#15803d;">₹{{ number_format($overallPaid, 2) }}</strong>
+        @if($overallTotal > 0)<span>{{ number_format(($overallPaid / $overallTotal) * 100, 1) }}% of total</span>@endif
+    </div>
+    <div class="ps-item">
+        <span>Total Outstanding</span>
+        <strong style="color:#b91c1c;">₹{{ number_format($overallBalance, 2) }}</strong>
+        @if($overallTotal > 0)<span>{{ number_format(($overallBalance / $overallTotal) * 100, 1) }}% remaining</span>@endif
+    </div>
+</div>
+@endif
+
+{{-- ── BOND SUMMARY ── --}}
+@if(!$selectedBondId)
+<div class="card border-0 shadow-sm mb-4 print-bond-summary">
+    <div class="card-header bg-white border-bottom py-3 d-flex align-items-center gap-2">
         <span class="fw-bold">Bond-wise Summary</span>
-        <span class="text-muted small">{{ $bonds->count() }} bond(s)</span>
+        @if($isCustomerLedger && !empty($cl_low_progress))
+            <span class="badge bg-danger ms-2" style="font-size:11px;">Below 50% only</span>
+        @endif
+        <span class="text-muted small ms-auto">{{ $bonds->count() }} bond(s)</span>
     </div>
     <div class="card-body p-0">
         <div class="table-responsive">
@@ -169,26 +316,44 @@
                 <thead>
                     <tr style="background:#f8fafc;">
                         <th class="ps-3 py-2" style="font-size:11px;font-weight:600;text-transform:uppercase;color:#64748b;letter-spacing:.4px;">Bond No</th>
-                        <th style="font-size:11px;font-weight:600;text-transform:uppercase;color:#64748b;letter-spacing:.4px;">Customer</th>
+                        <th style="font-size:11px;font-weight:600;text-transform:uppercase;color:#64748b;letter-spacing:.4px;">{{ $partyLabel }}</th>
+                        @if($isCustomerLedger)
+                            <th style="font-size:11px;font-weight:600;text-transform:uppercase;color:#64748b;letter-spacing:.4px;">Mobile</th>
+                        @endif
                         <th style="font-size:11px;font-weight:600;text-transform:uppercase;color:#64748b;letter-spacing:.4px;">Arazi No</th>
+                        @if($isCustomerLedger)
+                            <th style="font-size:11px;font-weight:600;text-transform:uppercase;color:#64748b;letter-spacing:.4px;">Plot(s)</th>
+                        @endif
                         <th class="text-end" style="font-size:11px;font-weight:600;text-transform:uppercase;color:#64748b;letter-spacing:.4px;">Total</th>
                         <th class="text-end" style="font-size:11px;font-weight:600;text-transform:uppercase;color:#64748b;letter-spacing:.4px;">Paid</th>
                         <th class="text-end" style="font-size:11px;font-weight:600;text-transform:uppercase;color:#64748b;letter-spacing:.4px;">Balance</th>
                         <th style="width:140px;font-size:11px;font-weight:600;text-transform:uppercase;color:#64748b;letter-spacing:.4px;">Progress</th>
+                        @if(!$isCustomerLedger)
                         <th class="no-print" style="font-size:11px;font-weight:600;text-transform:uppercase;color:#64748b;letter-spacing:.4px;"></th>
+                        @endif
                     </tr>
                 </thead>
                 <tbody>
                     @forelse($bonds as $bond)
-                    @php $pct = $bond['total'] > 0 ? min(round(($bond['paid'] / $bond['total']) * 100), 100) : 0; @endphp
+                    @php
+                        $pct     = $bond['pct'] ?? ($bond['total'] > 0 ? min(round(($bond['paid'] / $bond['total']) * 100), 100) : 0);
+                        $barColor = $pct < 50 ? 'bg-danger' : 'bg-success';
+                        $colspan  = $isCustomerLedger ? 10 : 8;
+                    @endphp
                     <tr class="bond-row" style="border-bottom:1px solid #f1f5f9;">
                         <td class="ps-3 fw-semibold">{{ $bond['bond_no'] }}</td>
                         <td>{{ $bond['party'] }}</td>
+                        @if($isCustomerLedger)
+                            <td class="text-muted" style="font-size:12px;">{{ $bond['mobile'] ?? '' }}</td>
+                        @endif
                         <td>
-                            @foreach(explode(', ', $bond['arazi']) as $code)
+                            @foreach(explode(', ', $bond['arazi'] ?? '-') as $code)
                                 <span style="background:#1a3a6b;color:#fff;border-radius:3px;padding:1px 6px;font-size:11px;font-weight:700;display:inline-block;margin:1px 1px;">{{ trim($code) }}</span>
                             @endforeach
                         </td>
+                        @if($isCustomerLedger)
+                            <td class="text-muted" style="font-size:12px;">{{ $bond['plots'] ?? '-' }}</td>
+                        @endif
                         <td class="text-end">₹{{ number_format($bond['total'], 2) }}</td>
                         <td class="text-end text-success fw-semibold">₹{{ number_format($bond['paid'], 2) }}</td>
                         <td class="text-end {{ $bond['balance'] > 0 ? 'text-danger fw-semibold' : 'text-success' }}">
@@ -197,19 +362,21 @@
                             @endif
                         </td>
                         <td>
-                            <div class="d-flex align-items-center gap-1">
+                            <div class="d-flex align-items-center gap-1 no-print-progress-bar">
                                 <div class="progress flex-grow-1 progress-thin">
-                                    <div class="progress-bar bg-success" style="width:{{ $pct }}%"></div>
+                                    <div class="progress-bar {{ $barColor }}" style="width:{{ $pct }}%"></div>
                                 </div>
-                                <span style="font-size:10px;color:#64748b;width:30px;text-align:right;">{{ $pct }}%</span>
                             </div>
+                            <span style="font-size:10px;color:{{ $pct < 50 ? '#b91c1c' : '#64748b' }};font-weight:{{ $pct < 50 ? '700' : '400' }};">{{ $pct }}%</span>
                         </td>
+                        @if(!$isCustomerLedger)
                         <td class="no-print">
                             <a href="{{ url()->current() }}?bond_id={{ $bond['id'] }}" class="btn btn-xs btn-outline-primary" style="font-size:11px;padding:2px 8px;">View</a>
                         </td>
+                        @endif
                     </tr>
                     @empty
-                    <tr><td colspan="8" class="text-center py-4 text-muted">No bonds found.</td></tr>
+                    <tr><td colspan="{{ $colspan }}" class="text-center py-4 text-muted">No bonds found.</td></tr>
                     @endforelse
                 </tbody>
             </table>
@@ -218,9 +385,10 @@
 </div>
 @endif
 
-{{-- ── ENTRIES TABLE ── --}}
+{{-- ── ENTRIES TABLE (kisan ledger only) ── --}}
+@if(!$isCustomerLedger)
 <div class="card border-0 shadow-sm">
-    <div class="card-header bg-white border-bottom py-3 d-flex justify-content-between align-items-center flex-wrap gap-2">
+    <div class="card-header bg-white border-bottom py-3 d-flex align-items-center flex-wrap gap-2">
         <div>
             <span class="fw-bold">
                 @if($selectedBondId)
@@ -234,7 +402,7 @@
             <span class="text-muted small ms-2">{{ count($entries) }} entr{{ count($entries) === 1 ? 'y' : 'ies' }}</span>
         </div>
         {{-- mini totals for visible entries --}}
-        <div class="d-flex gap-3" style="font-size:12px;">
+        <div class="d-flex gap-3 ms-auto" style="font-size:12px;">
             <span>Credit: <strong class="text-success">₹{{ number_format($totalCredit, 2) }}</strong></span>
             <span>Debit: <strong class="text-danger">₹{{ number_format($totalDebit, 2) }}</strong></span>
             <span>Net: <strong class="{{ ($totalCredit - $totalDebit) >= 0 ? 'text-primary' : 'text-danger' }}">₹{{ number_format($totalCredit - $totalDebit, 2) }}</strong></span>
@@ -318,6 +486,7 @@
         </div>
     </div>
 </div>
+@endif {{-- !$isCustomerLedger --}}
 
 @push('scripts')
 <script>

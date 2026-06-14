@@ -2,9 +2,9 @@
 
 @section('content')
 <div class="container py-3">
-    <div class="d-flex justify-content-between align-items-center mb-3">
+    <div class="d-flex align-items-center gap-2 mb-3">
         <h4>Upload Categories</h4>
-        <a href="{{ route('uploads.index') }}" class="btn btn-sm btn-secondary">Back to Uploads</a>
+        <a href="{{ route('uploads.index') }}" class="btn btn-sm btn-secondary ms-auto">Back to Uploads</a>
     </div>
 
     <div class="row">

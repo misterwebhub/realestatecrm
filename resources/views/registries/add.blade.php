@@ -11,12 +11,12 @@
 
 @section('content')
     <div class="card card-outline card-primary receipt-like" style="max-width:720px;margin:12px auto;border:4px solid #000;background:#fff;color:#000;">
-        <div class="card-header p-2 d-flex align-items-center justify-content-between" style="border-bottom:2px solid #000;">
+        <div class="card-header p-2 d-flex align-items-center gap-2" style="border-bottom:2px solid #000;">
             <div>
                 <div style="font-size:18px;font-weight:800;">HEED REAL ESTATE</div>
                 <div style="font-size:12px;">Registry / Receipt</div>
             </div>
-            <div style="text-align:right;font-size:12px">{{ $isEdit ? 'Edit' : 'New' }}</div>
+            <div style="text-align:right;font-size:12px" class="ms-auto">{{ $isEdit ? 'Edit' : 'New' }}</div>
         </div>
         <div class="card-body p-2">
             <form action="{{ $action }}" method="POST" id="registryForm" enctype="multipart/form-data">

@@ -2,9 +2,9 @@
 
 @section('content')
     <div class="card card-outline card-primary">
-        <div class="card-header d-flex justify-content-between align-items-center">
+        <div class="card-header d-flex align-items-center gap-2">
             <h5 class="card-title mb-0 fw-bold">{{ $title }}</h5>
-            <a href="{{ route('customer-bonds.index') }}" class="btn btn-secondary btn-sm">Back to Bonds</a>
+            <a href="{{ route('customer-bonds.index') }}" class="btn btn-secondary btn-sm ms-auto">Back to Bonds</a>
         </div>
 
         <div class="card-body">

@@ -2,9 +2,9 @@
 
 @section('content')
 <div class="container py-3">
-    <div class="d-flex justify-content-between align-items-center mb-3">
+    <div class="d-flex align-items-center gap-2 mb-3">
         <h4 class="mb-0">New Expense</h4>
-        <a href="{{ route('expenses.index') }}" class="btn btn-sm btn-outline-secondary">Back</a>
+        <a href="{{ route('expenses.index') }}" class="btn btn-sm btn-outline-secondary ms-auto">Back</a>
     </div>
 
     <div class="card">

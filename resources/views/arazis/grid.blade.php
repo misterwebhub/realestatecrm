@@ -2,9 +2,9 @@
 
 @section('content')
 <div class="container-fluid p-3">
-    <div class="d-flex justify-content-between align-items-center mb-3">
+    <div class="d-flex align-items-center gap-2 mb-3">
         <h3 class="mb-0">Plots for Arazi {{ $arazi->legacy_arazi_code ?? $arazi->id }}</h3>
-        <div>
+        <div class="ms-auto">
             <a href="{{ route('arazis.index') }}" class="btn btn-sm btn-outline-secondary">Back to Arazis</a>
         </div>
     </div>
@@ -17,7 +17,7 @@
         </div>
     </div>
 
-    <div class="d-flex justify-content-between align-items-center mb-2">
+    <div class="d-flex align-items-center gap-2 mb-2">
         @php
             $totalPlots = count($plots ?? []);
             $statusCounts = collect($plots ?? [])->map(function($p){

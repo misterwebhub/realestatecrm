@@ -1,9 +1,9 @@
 @extends('layouts.app')
 
 @section('content')
-    <div class="d-flex align-items-center justify-content-between mb-3">
+    <div class="d-flex align-items-center gap-2 mb-3">
         <h4 class="mb-0">Plot Registry</h4>
-        <div>
+        <div class="ms-auto">
             <a href="{{ $createUrl }}" class="btn btn-primary btn-sm"><i class="bi bi-plus-lg"></i> Add New Registry</a>
         </div>
     </div>

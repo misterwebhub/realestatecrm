@@ -110,69 +110,88 @@ class CustomerBondPaymentController extends Controller
 
     public function ledger(\Illuminate\Http\Request $request)
     {
-        $selectedBondId = $request->query('bond_id');
-        $selectedCustomerId = $request->query('customer_id');
-        $bonds = CustomerBond::with('customer')
-            ->withSum('payments as paid_amount', 'amount')
-            ->when($selectedCustomerId, fn ($query) => $query->where('customer_id', $selectedCustomerId))
-            ->latest()
-            ->get();
+        $q               = trim((string) $request->query('q', ''));
+        $araziCode       = trim((string) $request->query('arazi_code', ''));
+        $plotQ           = trim((string) $request->query('plot', ''));
+        $dateFrom        = $request->query('date_from', '');
+        $dateTo          = $request->query('date_to', '');
+        $lowProgress     = (bool) $request->query('low_progress', false);
 
-        $entries = CustomerBondPayment::with(['customerBond.customer', 'customer'])
-            ->whereNotNull('customer_bond_id')
-            ->when($selectedCustomerId, fn ($query) => $query->whereHas('customerBond', fn ($bondQuery) => $bondQuery->where('customer_id', $selectedCustomerId)))
-            ->when($selectedBondId, fn ($query) => $query->where('customer_bond_id', $selectedBondId))
-            ->orderBy('entry_date')
-            ->orderBy('id')
-            ->get();
+        // Resolve arazi IDs
+        $araziIds = $araziCode !== '' ? \App\Models\Arazi::idsForCode($araziCode) : [];
+
+        $bondsQuery = CustomerBond::with(['customer', 'arazi', 'plots'])
+            ->withSum(['payments as paid_amount' => function ($query) use ($dateFrom, $dateTo) {
+                if ($dateFrom) $query->whereDate('entry_date', '>=', $dateFrom);
+                if ($dateTo)   $query->whereDate('entry_date', '<=', $dateTo);
+            }], 'amount')
+            ->when($q, fn ($query) => $query->whereHas('customer', fn ($c) =>
+                $c->where('name', 'like', '%'.$q.'%')
+                  ->orWhere('mobile', 'like', '%'.$q.'%')
+            ))
+            ->when($araziIds, fn ($query) => $query->whereIn('arazi_id', $araziIds))
+            ->when($plotQ, fn ($query) => $query->whereHas('plots', fn ($p) =>
+                $p->where('title', 'like', '%'.$plotQ.'%')
+                  ->orWhere('plot_number', 'like', '%'.$plotQ.'%')
+            ))
+            ->latest();
+
+        $bonds = $bondsQuery->get()->map(function (CustomerBond $bond) {
+            $total = (float) ($bond->total_amount ?? $bond->bond_amount ?? 0);
+            $paid  = (float) ($bond->paid_amount ?? 0);
+            $pct   = $total > 0 ? min(round(($paid / $total) * 100), 100) : 0;
+
+            $araziCode = $bond->arazi
+                ? ($bond->arazi->legacy_arazi_code ?: ($bond->arazi->plot_number ?? '-'))
+                : '-';
+
+            $plotTitles = $bond->plots->pluck('title')->filter()->implode(', ') ?: '-';
+
+            return [
+                'id'      => $bond->id,
+                'bond_no' => $bond->bond_no,
+                'party'   => $bond->customer?->name ?? '-',
+                'mobile'  => $bond->customer?->mobile ?? '',
+                'arazi'   => $araziCode,
+                'plots'   => $plotTitles,
+                'total'   => $total,
+                'paid'    => $paid,
+                'balance' => max($total - $paid, 0),
+                'pct'     => $pct,
+            ];
+        });
+
+        // Apply low-progress filter (< 50%) after mapping
+        if ($lowProgress) {
+            $bonds = $bonds->filter(fn ($b) => $b['pct'] < 50)->values();
+        }
 
         return view('ledgers.bond_payments', [
-            'title' => 'Customer Payment Ledger',
-            'bondLabel' => 'Customer Bond',
-            'partyLabel' => 'Customer',
-            'filterName' => 'bond_id',
-            'selectedBondId' => $selectedBondId,
-            'partyFilterName' => 'customer_id',
-            'selectedPartyId' => $selectedCustomerId,
-            'bonds' => $bonds->map(function (CustomerBond $bond) {
-                $total = (float) ($bond->total_amount ?? $bond->bond_amount ?? 0);
-                $paid = (float) ($bond->paid_amount ?? 0);
-
-                return [
-                    'id' => $bond->id,
-                    'bond_no' => $bond->bond_no,
-                    'party' => $bond->customer?->name ?? '-',
-                    'total' => $total,
-                    'paid' => $paid,
-                    'balance' => max($total - $paid, 0),
-                ];
-            }),
-            'entries' => $entries->map(function (CustomerBondPayment $payment) {
-                $chequeNumber = null;
-                if (strtolower((string) $payment->payment_method) === 'cheque' && $payment->customer_bond_cheque_id) {
-                    $c = \App\Models\CustomerBondCheque::find($payment->customer_bond_cheque_id);
-                    $chequeNumber = $c?->cheque_number ?? null;
-                }
-
-                $isDebit = in_array($payment->entry_type, ['return', 'discount']);
-
-                return [
-                    'entry_no' => $payment->entry_no,
-                    'bond_no' => $payment->customerBond?->bond_no ?? '-',
-                    'party' => $payment->customerBond?->customer?->name ?? $payment->customer?->name ?? '-',
-                    'date' => optional($payment->entry_date)->format('d-m-Y') ?? '-',
-                    'type' => ucfirst($payment->entry_type),
-                    'amount' => (float) $payment->amount,
-                    'is_debit' => $isDebit,
-                    'method' => $payment->payment_method ?? '-',
-                    'cheque_number' => $chequeNumber,
-                    'remarks' => $payment->remarks ?? '-',
-                ];
-            }),
+            'title'            => 'Customer Payment Ledger',
+            'bondLabel'        => 'Customer Bond',
+            'partyLabel'       => 'Customer',
+            'filterName'       => 'bond_id',
+            'selectedBondId'   => null,
+            'partyFilterName'  => 'customer_id',
+            'selectedPartyId'  => null,
+            'isCustomerLedger' => true,
+            'bonds'            => $bonds,
+            'entries'          => collect([]),
+            // filter state for repopulating form
+            'cl_q'             => $q,
+            'cl_arazi'         => $araziCode,
+            'cl_plot'          => $plotQ,
+            'cl_date_from'     => $dateFrom,
+            'cl_date_to'       => $dateTo,
+            'cl_low_progress'  => $lowProgress,
             'exportLedgerCsvUrl' => route('customer-bond-payments.ledger.export.csv', array_filter([
-                'bond_id' => $selectedBondId,
-                'customer_id' => $selectedCustomerId,
-            ], fn ($v) => $v !== null && $v !== '')),
+                'q'            => $q,
+                'arazi_code'   => $araziCode,
+                'plot'         => $plotQ,
+                'date_from'    => $dateFrom,
+                'date_to'      => $dateTo,
+                'low_progress' => $lowProgress ? 1 : null,
+            ], fn ($v) => $v !== null && $v !== '' && $v !== false)),
         ]);
     }
 
@@ -186,38 +205,65 @@ class CustomerBondPaymentController extends Controller
 
     public function ledgerExportCsv(\Illuminate\Http\Request $request)
     {
-        $selectedBondId = $request->query('bond_id');
-        $selectedCustomerId = $request->query('customer_id');
+        $q           = trim((string) $request->query('q', ''));
+        $araziCode   = trim((string) $request->query('arazi_code', ''));
+        $plotQ       = trim((string) $request->query('plot', ''));
+        $dateFrom    = $request->query('date_from', '');
+        $dateTo      = $request->query('date_to', '');
+        $lowProgress = (bool) $request->query('low_progress', false);
 
-        $entries = CustomerBondPayment::with(['customerBond.customer', 'customer'])
-            ->whereNotNull('customer_bond_id')
-            ->when($selectedCustomerId, fn ($query) => $query->whereHas('customerBond', fn ($bondQuery) => $bondQuery->where('customer_id', $selectedCustomerId)))
-            ->when($selectedBondId, fn ($query) => $query->where('customer_bond_id', $selectedBondId))
-            ->orderByDesc('entry_date')
-            ->orderByDesc('id')
-            ->get();
+        $araziIds = $araziCode !== '' ? \App\Models\Arazi::idsForCode($araziCode) : [];
 
-        $columns = ['Entry No', 'Customer Bond', 'Customer', 'Date', 'Type', 'Amount', 'Method', 'Cheque No', 'Remarks'];
+        $bonds = CustomerBond::with(['customer', 'arazi', 'plots'])
+            ->withSum(['payments as paid_amount' => function ($query) use ($dateFrom, $dateTo) {
+                if ($dateFrom) $query->whereDate('entry_date', '>=', $dateFrom);
+                if ($dateTo)   $query->whereDate('entry_date', '<=', $dateTo);
+            }], 'amount')
+            ->when($q, fn ($query) => $query->whereHas('customer', fn ($c) =>
+                $c->where('name', 'like', '%'.$q.'%')
+                  ->orWhere('mobile', 'like', '%'.$q.'%')
+            ))
+            ->when($araziIds, fn ($query) => $query->whereIn('arazi_id', $araziIds))
+            ->when($plotQ, fn ($query) => $query->whereHas('plots', fn ($p) =>
+                $p->where('title', 'like', '%'.$plotQ.'%')
+                  ->orWhere('plot_number', 'like', '%'.$plotQ.'%')
+            ))
+            ->latest()
+            ->get()
+            ->map(function (CustomerBond $bond) {
+                $total = (float) ($bond->total_amount ?? $bond->bond_amount ?? 0);
+                $paid  = (float) ($bond->paid_amount ?? 0);
+                $pct   = $total > 0 ? min(round(($paid / $total) * 100), 100) : 0;
+                return [
+                    'bond_no' => $bond->bond_no,
+                    'party'   => $bond->customer?->name ?? '-',
+                    'mobile'  => $bond->customer?->mobile ?? '',
+                    'arazi'   => $bond->arazi ? ($bond->arazi->legacy_arazi_code ?: ($bond->arazi->plot_number ?? '-')) : '-',
+                    'plots'   => $bond->plots->pluck('title')->filter()->implode(', ') ?: '-',
+                    'total'   => $total,
+                    'paid'    => $paid,
+                    'balance' => max($total - $paid, 0),
+                    'pct'     => $pct,
+                ];
+            });
 
-        $rows = $entries->map(function (CustomerBondPayment $payment) {
-            $chequeNumber = null;
-            if (strtolower((string) $payment->payment_method) === 'cheque' && $payment->customer_bond_cheque_id) {
-                $c = \App\Models\CustomerBondCheque::find($payment->customer_bond_cheque_id);
-                $chequeNumber = $c?->cheque_number ?? null;
-            }
+        if ($lowProgress) {
+            $bonds = $bonds->filter(fn ($b) => $b['pct'] < 50)->values();
+        }
 
-            return [
-                $payment->entry_no,
-                $payment->customerBond?->bond_no ?? '-',
-                $payment->customerBond?->customer?->name ?? $payment->customer?->name ?? '-',
-                optional($payment->entry_date)->format('d-m-Y') ?? '-',
-                ucfirst($payment->entry_type),
-                number_format((float) $payment->amount, 2, '.', ''),
-                $payment->payment_method ?? '-',
-                $chequeNumber ?? '-',
-                $payment->remarks ?? '-',
-            ];
-        })->all();
+        $columns = ['Bond No', 'Customer', 'Mobile', 'Arazi No', 'Plot(s)', 'Total (₹)', 'Paid (₹)', 'Balance (₹)', 'Progress (%)'];
+
+        $rows = $bonds->map(fn ($b) => [
+            $b['bond_no'],
+            $b['party'],
+            $b['mobile'],
+            $b['arazi'],
+            $b['plots'],
+            number_format($b['total'], 2, '.', ''),
+            number_format($b['paid'],  2, '.', ''),
+            number_format($b['balance'], 2, '.', ''),
+            $b['pct'].'%',
+        ])->all();
 
         return $this->csvDownload('customer-payment-ledger', $columns, $rows);
     }

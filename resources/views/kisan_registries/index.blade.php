@@ -2,10 +2,10 @@
 
 @section('content')
 <div class="card card-outline card-primary">
-    <div class="card-header d-flex align-items-center justify-content-between flex-wrap gap-2">
+    <div class="card-header d-flex align-items-center flex-wrap gap-2">
         <h5 class="card-title mb-0 fw-bold">{{ $title }}</h5>
         @if(auth()->check() && in_array(auth()->user()->role, ['admin','manager']))
-            <a href="{{ $createUrl }}" class="btn btn-primary btn-sm">
+            <a href="{{ $createUrl }}" class="btn btn-primary btn-sm ms-auto">
                 <i class="bi bi-plus-lg"></i> Add New Registry
             </a>
         @endif

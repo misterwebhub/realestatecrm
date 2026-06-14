@@ -2,9 +2,9 @@
 
 @section('content')
 <div class="container-fluid">
-    <div class="d-flex align-items-center justify-content-between mb-3">
+    <div class="d-flex align-items-center gap-3 mb-3">
         <h4 class="mb-0">Arazi Maps</h4>
-        <div class="w-50">
+        <div class="w-50 ms-auto">
             <input id="map-search" class="form-control form-control-sm" placeholder="Search maps by name...">
         </div>
     </div>

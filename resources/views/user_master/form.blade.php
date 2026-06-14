@@ -2,9 +2,9 @@
 
 @section('content')
 <div class="card card-outline card-primary" style="max-width:680px;">
-    <div class="card-header d-flex align-items-center justify-content-between">
+    <div class="card-header d-flex align-items-center gap-2">
         <h5 class="card-title mb-0 fw-bold">{{ $title }}</h5>
-        <a href="{{ route('user-master.index') }}" class="btn btn-secondary btn-sm">Back</a>
+        <a href="{{ route('user-master.index') }}" class="btn btn-secondary btn-sm ms-auto">Back</a>
     </div>
     <div class="card-body">
         @if($errors->any())

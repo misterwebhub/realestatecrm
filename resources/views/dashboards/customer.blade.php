@@ -2,9 +2,9 @@
 
 @section('content')
     <div class="card card-outline card-primary">
-        <div class="card-header d-flex justify-content-between align-items-center">
+        <div class="card-header d-flex align-items-center gap-2">
             <h5 class="card-title mb-0 fw-bold">Customer Dashboard — {{ $customer->name }}</h5>
-            <div>
+            <div class="ms-auto">
                 <a href="{{ $shareUrl }}" class="btn btn-outline-secondary btn-sm" target="_blank">Shareable Link</a>
             </div>
         </div>

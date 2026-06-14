@@ -2,7 +2,7 @@
 
 @section('content')
 <div class="card card-outline card-primary">
-    <div class="card-header d-flex align-items-center justify-content-between flex-wrap gap-2">
+    <div class="card-header d-flex align-items-center flex-wrap gap-2">
         <div class="d-flex align-items-center gap-3 flex-grow-1">
             <h5 class="card-title mb-0 fw-bold">{{ $title }}</h5>
             <form method="get" class="d-flex ms-3" action="{{ route('arazis.index') }}">
@@ -14,7 +14,7 @@
             </form>
         </div>
         @if(auth()->check() && in_array(auth()->user()->role, ['admin','manager']))
-            <a href="{{ $createUrl }}" class="btn btn-primary btn-sm">
+            <a href="{{ $createUrl }}" class="btn btn-primary btn-sm ms-auto">
                 <i class="bi bi-plus-lg"></i> Add New Arazi
             </a>
         @endif

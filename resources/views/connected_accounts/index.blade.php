@@ -9,9 +9,9 @@
 </style>
 
 <div class="card card-outline card-primary">
-    <div class="card-header d-flex align-items-center justify-content-between">
+    <div class="card-header d-flex align-items-center gap-2">
         <h5 class="card-title mb-0 fw-bold">Connected Accounts <span class="text-muted fw-normal" style="font-size:13px;">— {{ $accounts->count() }} account(s)</span></h5>
-        <a href="{{ route('connected-accounts.create') }}" class="btn btn-primary btn-sm">
+        <a href="{{ route('connected-accounts.create') }}" class="btn btn-primary btn-sm ms-auto">
             <i class="bi bi-plus-lg"></i> Add Account
         </a>
     </div>

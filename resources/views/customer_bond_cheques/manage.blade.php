@@ -9,11 +9,11 @@
 @endphp
 
 {{-- Bond Info Strip --}}
-<div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-3">
+<div class="d-flex align-items-start flex-wrap gap-2 mb-3">
     <div>
         <h5 class="fw-bold mb-0">Manage Cheques — {{ $b->bond_no }}</h5>
     </div>
-    <div class="d-flex gap-2">
+    <div class="d-flex gap-2 ms-auto">
         <button type="button" class="btn btn-outline-success btn-sm" data-bs-toggle="modal" data-bs-target="#addAccountModal">
             <i class="bi bi-plus"></i> Add Account
         </button>
@@ -85,10 +85,10 @@
 {{-- CHEQUES TABLE --}}
 {{-- ═══════════════════════════════════════════════════════ --}}
 <div class="card border-0 shadow-sm">
-    <div class="card-header py-2 px-3 d-flex justify-content-between align-items-center bg-white border-bottom">
+    <div class="card-header py-2 px-3 d-flex align-items-center gap-2 bg-white border-bottom">
         <span class="fw-bold" style="font-size:15px;"><i class="bi bi-credit-card-2-front me-1 text-primary"></i>Cheque Entries</span>
         @if($connectedAccounts->isEmpty())
-            <span class="text-warning" style="font-size:13px;"><i class="bi bi-exclamation-triangle me-1"></i>
+            <span class="text-warning ms-auto" style="font-size:13px;"><i class="bi bi-exclamation-triangle me-1"></i>
                 No accounts found. <a href="#" data-bs-toggle="modal" data-bs-target="#addAccountModal" class="fw-semibold">Add one</a> first.
             </span>
         @endif

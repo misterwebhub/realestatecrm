@@ -4,9 +4,9 @@
 <div class="card card-outline card-primary">
 
     {{-- Header --}}
-    <div class="card-header d-flex align-items-center justify-content-between flex-wrap gap-2">
+    <div class="card-header d-flex align-items-center flex-wrap gap-2">
         <h5 class="card-title mb-0 fw-bold">Kisans</h5>
-        <div class="d-flex gap-2">
+        <div class="d-flex gap-2 ms-auto">
             @if(!empty($exportCsvUrl))
                 <a href="{{ $exportCsvUrl }}" class="btn btn-outline-success btn-sm"><i class="bi bi-filetype-csv"></i> Export CSV</a>
             @endif

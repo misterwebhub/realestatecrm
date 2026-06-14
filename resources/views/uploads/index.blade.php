@@ -2,9 +2,9 @@
 
 @section('content')
     <div class="card card-outline card-primary mb-3">
-        <div class="card-header d-flex align-items-center justify-content-between">
+        <div class="card-header d-flex align-items-center gap-2">
             <h5 class="card-title mb-0 fw-bold">Uploads</h5>
-            <a href="{{ route('uploads.create') }}" class="btn btn-primary btn-sm"><i class="bi bi-plus-lg"></i> New Upload</a>
+            <a href="{{ route('uploads.create') }}" class="btn btn-primary btn-sm ms-auto"><i class="bi bi-plus-lg"></i> New Upload</a>
         </div>
         <div class="card-body border-bottom">
             <form method="get" class="row g-2">

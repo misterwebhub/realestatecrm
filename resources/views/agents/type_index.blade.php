@@ -2,10 +2,10 @@
 
 @section('content')
     <div class="card card-outline card-primary">
-        <div class="card-header d-flex align-items-center justify-content-between">
+        <div class="card-header d-flex align-items-center gap-2">
             <h5 class="card-title mb-0 fw-bold">{{ $title }}</h5>
             @if(auth()->check() && in_array(auth()->user()->role, ['admin','manager']))
-                <button type="button" class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#addBrokerModal">
+                <button type="button" class="btn btn-primary btn-sm ms-auto" data-bs-toggle="modal" data-bs-target="#addBrokerModal">
                     <i class="bi bi-plus-lg"></i> Add {{ $typeLabel }} Broker
                 </button>
             @endif

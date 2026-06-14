@@ -23,7 +23,7 @@
 </style>
 
 {{-- Page header --}}
-<div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3 no-print">
+<div class="d-flex align-items-center flex-wrap gap-2 mb-3 no-print">
     <div>
         <h4 class="mb-0 fw-bold">{{ $title }}</h4>
         <span class="text-muted" style="font-size:14px;">All bond cheques across all customers</span>
