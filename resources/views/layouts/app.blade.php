@@ -68,12 +68,12 @@
                             </a>
                         </li>
 
-                        <li class="nav-item">
+                        {{-- <li class="nav-item">
                             <a href="{{ route('arazi-documents.index') }}" class="nav-link {{ request()->routeIs('arazi-documents.*') ? 'active' : '' }}">
                                 <i class="nav-icon bi bi-file-earmark-arrow-up"></i>
                                 <p>Arazi Registry Upload</p>
                             </a>
-                        </li>
+                        </li> --}}
 
                         
 

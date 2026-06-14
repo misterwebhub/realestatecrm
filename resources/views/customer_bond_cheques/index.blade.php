@@ -28,11 +28,6 @@
         <h4 class="mb-0 fw-bold">{{ $title }}</h4>
         <span class="text-muted" style="font-size:14px;">All bond cheques across all customers</span>
     </div>
-    <div class="d-flex gap-2">
-        <button class="btn btn-sm btn-outline-secondary" onclick="window.print()">
-            <i class="bi bi-printer"></i> Print
-        </button>
-    </div>
 </div>
 
 {{-- Filter bar --}}
@@ -57,9 +52,17 @@
                 <option value="cancelled" @selected($filterStatus === 'cancelled')>Cancelled</option>
             </select>
         </div>
-        <div class="col-md-3">
+        <div class="col-md-2">
             <label class="form-label fw-semibold mb-1" style="font-size:12px;">BOND NO.</label>
             <input type="text" name="bond_no" value="{{ $filterBond }}" class="form-control form-control-sm" placeholder="Search bond no...">
+        </div>
+        <div class="col-md-2">
+            <label class="form-label fw-semibold mb-1" style="font-size:12px;">DATE FROM</label>
+            <input type="date" name="date_from" value="{{ $filterFrom }}" class="form-control form-control-sm">
+        </div>
+        <div class="col-md-2">
+            <label class="form-label fw-semibold mb-1" style="font-size:12px;">DATE TO</label>
+            <input type="date" name="date_to" value="{{ $filterTo }}" class="form-control form-control-sm">
         </div>
         <div class="col-md-auto">
             <button class="btn btn-primary btn-sm px-4">Filter</button>
@@ -84,14 +87,24 @@
 
 {{-- Cheques table --}}
 <div class="card border-0 shadow-sm">
-    <div class="card-header bg-white border-bottom py-3 d-flex justify-content-between align-items-center">
-        <span class="fw-bold" style="font-size:15px;">
-            Cheques
-            @if($filterStatus || $filterBond || $filterAccount)
-                <span class="text-muted fw-normal" style="font-size:13px;">— filtered</span>
+    <div class="card-header bg-white border-bottom py-3 d-flex align-items-center">
+        {{-- Left: heading --}}
+        <div>
+            <span class="fw-bold" style="font-size:15px;">Cheques</span>
+            @if($filterStatus || $filterBond || $filterAccount || $filterFrom || $filterTo)
+                <span class="text-muted fw-normal ms-1" style="font-size:13px;">— filtered</span>
             @endif
-        </span>
-        <span class="text-muted" style="font-size:13px;">{{ $cheques->count() }} record(s)</span>
+            <span class="text-muted ms-2" style="font-size:12px;">{{ $cheques->count() }} record(s)</span>
+        </div>
+        {{-- Right: actions --}}
+        <div class="d-flex align-items-center gap-2 no-print ms-auto">
+            <button class="btn btn-sm btn-outline-secondary" onclick="window.print()" title="Print">
+                <i class="bi bi-printer"></i> Print
+            </button>
+            <button class="btn btn-sm btn-outline-success" onclick="exportCsv()" title="Export CSV">
+                <i class="bi bi-file-earmark-spreadsheet"></i> Export
+            </button>
+        </div>
     </div>
     <div class="card-body p-0">
         <div class="table-responsive">
@@ -165,7 +178,7 @@
                         <td colspan="12" class="text-center py-5 text-muted">
                             <div style="font-size:32px;">🗒️</div>
                             <div class="mt-2" style="font-size:15px;">No cheques found.</div>
-                            @if($filterStatus || $filterBond || $filterAccount)
+                            @if($filterStatus || $filterBond || $filterAccount || $filterFrom || $filterTo)
                                 <a href="{{ route('customer-bond-cheques.index') }}" class="btn btn-sm btn-outline-secondary mt-2">Clear filters</a>
                             @endif
                         </td>
@@ -188,6 +201,34 @@
 
 @push('scripts')
 <script>
+function exportCsv() {
+    const rows = [['#','Account','Customer','Bond No','Cheque No','Date','Bank','Branch','Amount','Status','Type','Notes']];
+    document.querySelectorAll('.ch-table tbody tr').forEach((tr, i) => {
+        const cells = tr.querySelectorAll('td');
+        if (!cells.length || cells.length === 1) return; // skip empty row
+        rows.push([
+            i + 1,
+            cells[1]?.innerText?.trim().replace(/\n/g,' ') ?? '',
+            cells[2]?.innerText?.trim() ?? '',
+            cells[3]?.innerText?.trim() ?? '',
+            cells[4]?.innerText?.trim() ?? '',
+            cells[5]?.innerText?.trim() ?? '',
+            cells[6]?.innerText?.trim().replace(/\n/g,' ') ?? '',
+            '',
+            cells[7]?.innerText?.trim() ?? '',
+            cells[8]?.innerText?.trim() ?? '',
+            cells[9]?.innerText?.trim() ?? '',
+            cells[10]?.innerText?.trim() ?? '',
+        ]);
+    });
+    const csv = rows.map(r => r.map(c => '"' + String(c).replace(/"/g,'""') + '"').join(',')).join('\n');
+    const blob = new Blob([csv], {type:'text/csv'});
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'cheques_' + new Date().toISOString().slice(0,10) + '.csv';
+    a.click();
+}
+
 $(function(){
     $('#filter_status').select2({
         theme: 'bootstrap-5',

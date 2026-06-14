@@ -15,18 +15,28 @@ class CustomerBondChequeController extends Controller
         $filterStatus  = $request->query('status', '');
         $filterBond    = $request->query('bond_no', '');
         $filterAccount = $request->query('account_id', '');
+        $filterFrom    = $request->query('date_from', '');
+        $filterTo      = $request->query('date_to', '');
 
         $query = CustomerBondCheque::with(['customerBond.customer', 'connectedAccount'])
             ->when($filterStatus,  fn ($q) => $q->where('status', $filterStatus))
             ->when($filterBond,    fn ($q) => $q->whereHas('customerBond', fn ($bq) => $bq->where('bond_no', 'like', '%' . $filterBond . '%')))
             ->when($filterAccount, fn ($q) => $q->where('connected_account_id', $filterAccount))
+            ->when($filterFrom,    fn ($q) => $q->whereDate('cheque_date', '>=', $filterFrom))
+            ->when($filterTo,      fn ($q) => $q->whereDate('cheque_date', '<=', $filterTo))
             ->latest('cheque_date')
             ->latest('id');
 
         $cheques = $query->get();
 
-        // summary totals
-        $all     = CustomerBondCheque::selectRaw('status, SUM(amount) as total, COUNT(*) as count')->groupBy('status')->get()->keyBy('status');
+        // summary totals — respect active filters
+        $summaryQuery = CustomerBondCheque::query()
+            ->when($filterBond,    fn ($q) => $q->whereHas('customerBond', fn ($bq) => $bq->where('bond_no', 'like', '%' . $filterBond . '%')))
+            ->when($filterAccount, fn ($q) => $q->where('connected_account_id', $filterAccount))
+            ->when($filterFrom,    fn ($q) => $q->whereDate('cheque_date', '>=', $filterFrom))
+            ->when($filterTo,      fn ($q) => $q->whereDate('cheque_date', '<=', $filterTo));
+
+        $all     = (clone $summaryQuery)->selectRaw('status, SUM(amount) as total, COUNT(*) as count')->groupBy('status')->get()->keyBy('status');
         $summary = [
             'pending'   => $all->get('pending'),
             'cleared'   => $all->get('cleared'),
@@ -43,6 +53,8 @@ class CustomerBondChequeController extends Controller
             'filterStatus'   => $filterStatus,
             'filterBond'     => $filterBond,
             'filterAccount'  => $filterAccount,
+            'filterFrom'     => $filterFrom,
+            'filterTo'       => $filterTo,
             'accounts'       => $accounts,
         ]);
     }
