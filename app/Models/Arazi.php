@@ -33,6 +33,65 @@ class Arazi extends Model
         return $this->hasMany(Plot::class);
     }
 
+    /**
+     * The "Arazi No" code used to identify this record in selects/lookups: legacy_arazi_code,
+     * falling back to plot_number. If neither is set, returns a visible error placeholder
+     * instead of inventing a synthetic code.
+     */
+    public function araziNoCode(): string
+    {
+        if ($this->legacy_arazi_code) {
+            return $this->legacy_arazi_code;
+        }
+
+        if ($this->plot_number) {
+            return $this->plot_number;
+        }
+
+        return '⚠ Missing Arazi No (#' . $this->id . ')';
+    }
+
+    /**
+     * All Arazi records matching the given "Arazi No" code (legacy_arazi_code, falling back to
+     * plot_number).
+     */
+    public static function arazisForCode(string $code): \Illuminate\Support\Collection
+    {
+        $code = trim($code);
+        if ($code === '') {
+            return collect();
+        }
+
+        $byLegacy = static::where('legacy_arazi_code', $code)->get();
+        if ($byLegacy->isNotEmpty()) {
+            return $byLegacy;
+        }
+
+        return static::where('plot_number', $code)->get();
+    }
+
+    /**
+     * IDs of all Arazi records matching the given "Arazi No" code.
+     */
+    public static function idsForCode(string $code): array
+    {
+        return static::arazisForCode($code)->pluck('id')->all();
+    }
+
+    /**
+     * All Plot records belonging to any Arazi record matching the given "Arazi No" code
+     * (legacy_arazi_code, falling back to plot_number).
+     */
+    public static function plotsForCode(string $code): \Illuminate\Support\Collection
+    {
+        $araziIds = static::idsForCode($code);
+        if (empty($araziIds)) {
+            return collect();
+        }
+
+        return Plot::whereIn('arazi_id', $araziIds)->get();
+    }
+
     public function registry()
     {
         return $this->hasOne(Registry::class);

@@ -36,7 +36,7 @@
         .plot-detail{margin-top:8px;padding:8px;border-left:4px solid #0d6efd;background:#eef5ff}
         .selected-plots th,.selected-plots td{padding:6px}
         .clean-section{border:1px solid #bdbdbd;border-radius:8px;padding:12px;margin-top:12px;text-align:left;background:#fff}
-        .clean-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+        .clean-grid{display:grid;grid-template-columns:2fr 3fr;gap:12px}
         .hidden-summary{display:none}
     </style>
 </head>
@@ -88,7 +88,7 @@
                         <option value="cheque" {{ old('bayana_mode', $item->bayana_mode ?? '') == 'cheque' ? 'selected' : '' }}>CHEQUE</option>
                     </select>
                 </td>
-                <td><input type="number" step="0.01" name="total_amount" class="total-amount-input" value="{{ old('total_amount', $item->total_amount ?? $item->bond_amount ?? 0) }}" readonly /></td>
+                <td><input type="number" step="0.01" name="total_amount" id="consideration-amount" class="total-amount-input" value="{{ old('total_amount', $item->total_amount ?? $item->bond_amount ?? 0) }}" placeholder="Enter amount" /></td>
                 <td>
                     @php
                         $__instRaw = old('installment_amount', $item->installment_amount ?? $item->no_of_months ?? null);
@@ -159,25 +159,25 @@
                             </select>
                             <button type="button" id="add-plot" class="btn btn-primary btn-sm">Add Plot</button>
                         </div>
-                        <div class="hidden-summary" style="display:block">
-                            <label class="form-label">Total Gaz (editable)</label>
-                            <input type="number" step="0.01" name="land_size" id="land-size" value="{{ old('land_size', $item->land_size ?? '') }}" class="form-control form-control-sm" />
+                        <div class="hidden-summary" style="display:none">
+                            <input type="hidden" name="land_size" id="land-size" value="{{ old('land_size', $item->land_size ?? '') }}" />
                             <input type="hidden" name="sale_land" id="sale-land" value="{{ old('sale_land', $item->sale_land ?? $item->land_size ?? '') }}">
-                            <input type="number" step="0.01" name="total_amount" class="total-amount-input" value="{{ old('total_amount', $item->total_amount ?? $item->bond_amount ?? 0) }}" readonly />
                         </div>
+                        <div id="consideration-warning" class="alert alert-warning py-1 px-2 mt-2 small d-none"></div>
 
                         <table class="table table-sm selected-plots mt-3 mb-0">
                             <thead>
                                 <tr>
                                     <th>Plot</th>
                                     <th class="text-end">Gaz / Area</th>
-                                    <th class="text-end">Plot Price<br><span class="small">(per gaz)</span></th>
+                                    <th class="text-end">Amount</th>
+                                    <th class="text-center" style="width:70px">Manual</th>
                                     <th></th>
                                 </tr>
                             </thead>
                             <tbody id="selected-plots-body">
                                 <tr data-empty-row>
-                                    <td colspan="4" class="text-center small">No plot selected.</td>
+                                    <td colspan="5" class="text-center small">No plot selected.</td>
                                 </tr>
                             </tbody>
                         </table>
@@ -260,7 +260,7 @@
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script>
     (function(){
-        const araziPlotsUrl = @json(route('arazis.plots', ['arazi' => '__ARAZI_ID__']));
+        const araziPlotsUrl = @json(route('arazis.plots-by-code', ['code' => '__ARAZI_CODE__']));
         const brokerStoreUrl = @json(route('agents.type.store', 'customer'));
         const csrfToken = @json(csrf_token());
         const customerDetails = @json($customerDetails);
@@ -290,6 +290,8 @@
         const selectedPlots = new Map();
         let availablePlots = [];
         const bondForm = document.querySelector('#main > form');
+        const considerationInput = document.getElementById('consideration-amount');
+        const considerationWarning = document.getElementById('consideration-warning');
 
         function escapeHtml(value){
             return String(value || '').replace(/[&<>"']/g, function(char){
@@ -302,9 +304,6 @@
             selectedPlots.clear();
             availablePlots = [];
             renderSelectedPlots();
-            landSize.value = '';
-            saleLand.value = '';
-            updateTotals();
         }
 
         function formatAmount(value){
@@ -337,12 +336,40 @@
             return parseFloat(Array.from(bookingAmountInputs)[0]?.value || 0);
         }
 
-        /** Line amount = (Gaz/Area) × (plot price per gaz). plot.amount is rate per gaz. */
-        function linePayable(plot){
-            const area = parseFloat(plot.area || 0);
-            const rate = parseFloat(plot.amount || 0);
-            if (Number.isNaN(area) || Number.isNaN(rate)) return 0;
-            return area * rate;
+        function considerationAmount(){
+            return parseFloat(considerationInput ? considerationInput.value : 0) || 0;
+        }
+
+        function validateConsideration(){
+            if (!considerationWarning) return;
+            const total = considerationAmount();
+            let plotSum = 0;
+            selectedPlots.forEach(function(plot){ plotSum += parseFloat(plot.saleAmount || 0); });
+            if (total > 0 && plotSum > total + 0.01) {
+                considerationWarning.textContent = 'Warning: Sum of plot amounts (' + plotSum.toFixed(2) + ') exceeds consideration amount (' + total.toFixed(2) + ')';
+                considerationWarning.classList.remove('d-none');
+            } else {
+                considerationWarning.classList.add('d-none');
+            }
+        }
+
+        function distributeConsideration(){
+            const total = considerationAmount();
+            const nonManual = [];
+            let manualSum = 0;
+            selectedPlots.forEach(function(plot){
+                if (plot.manual) manualSum += parseFloat(plot.saleAmount || 0);
+                else nonManual.push(plot);
+            });
+            if (!nonManual.length) return;
+            const remaining = total - manualSum;
+            const perPlot = nonManual.length > 0 ? remaining / nonManual.length : 0;
+            nonManual.forEach(function(plot){
+                plot.saleAmount = perPlot > 0 ? perPlot.toFixed(2) : '';
+                const inp = document.querySelector('[data-plot-amount="' + plot.id + '"]');
+                if (inp) inp.value = plot.saleAmount;
+            });
+            updateTotals();
         }
 
         function updateTotals(){
@@ -351,16 +378,14 @@
 
             selectedPlots.forEach(function(plot){
                 totalArea += parseFloat(plot.area || 0);
-                totalPayable += linePayable(plot);
+                totalPayable += parseFloat(plot.saleAmount || 0);
             });
 
             landSize.value = totalArea ? totalArea.toFixed(2) : '';
             saleLand.value = landSize.value;
-            totalAmountInputs.forEach(input => {
-                input.value = totalPayable ? totalPayable.toFixed(2) : '';
-            });
             totalPayableLabel.value = formatAmount(totalPayable);
             expectedSum.value = formatAmount(Math.max(totalPayable - bookingAmount(), 0));
+            validateConsideration();
         }
 
         function syncBookingInputs(source){
@@ -374,13 +399,14 @@
             selectedPlotsBody.innerHTML = '';
 
             if(!selectedPlots.size){
-                selectedPlotsBody.innerHTML = '<tr data-empty-row><td colspan="4" class="text-center small">No plot selected.</td></tr>';
+                selectedPlotsBody.innerHTML = '<tr data-empty-row><td colspan="5" class="text-center small">No plot selected.</td></tr>';
                 updateTotals();
                 renderAvailablePlots();
                 return;
             }
 
             selectedPlots.forEach(function(plot){
+                const isManual = !!plot.manual;
                 const tr = document.createElement('tr');
                 tr.innerHTML = `
                     <td>
@@ -389,10 +415,13 @@
                         <div class="small">${escapeHtml(plot.description || '')}</div>
                     </td>
                     <td class="text-end">
-                        <input type="number" step="0.01" min="0" name="plot_areas[${plot.id}]" value="${plot.area || ''}" class="form-control form-control-sm text-end" data-plot-area="${plot.id}" placeholder="Gaz / area">
+                        <input type="number" step="0.01" min="0" name="plot_areas[${plot.id}]" value="${plot.area || ''}" class="form-control form-control-sm text-end" data-plot-area="${plot.id}" placeholder="Gaz">
                     </td>
                     <td class="text-end">
-                        <input type="number" step="0.01" min="0" name="plot_amounts[${plot.id}]" value="${plot.amount || ''}" class="form-control form-control-sm text-end" data-plot-amount="${plot.id}" placeholder="Rate / gaz">
+                        <input type="number" step="0.01" min="0" name="plot_amounts[${plot.id}]" value="${plot.saleAmount || ''}" class="form-control form-control-sm text-end" data-plot-amount="${plot.id}" placeholder="Amount" ${isManual ? '' : 'readonly style="background:#f0f4fa"'}>
+                    </td>
+                    <td class="text-center">
+                        <input class="form-check-input" type="checkbox" data-plot-manual="${plot.id}" ${isManual ? 'checked' : ''} title="Manual amount">
                     </td>
                     <td class="text-end"><button type="button" class="btn btn-outline-danger btn-sm" data-remove-plot="${plot.id}">Delete</button></td>
                 `;
@@ -410,22 +439,24 @@
 
             const savedTotal = selectedPlotAmounts[String(plot.id)];
             if (savedTotal !== undefined && savedTotal !== null && savedTotal !== '') {
-                const ar = parseFloat(plot.area || 0);
-                plot.amount = ar > 0 ? (parseFloat(savedTotal) / ar).toFixed(2) : String(savedTotal);
+                plot.saleAmount = String(savedTotal);
+                plot.manual = true;
             } else {
-                plot.amount = plot.amount ?? '';
+                plot.saleAmount = '';
+                plot.manual = false;
             }
             selectedPlots.set(String(plot.id), plot);
             renderSelectedPlots();
+            distributeConsideration();
         }
 
-        function loadPlots(araziId, selectPlotIds){
+        function loadPlots(araziCode, selectPlotIds){
             clearPlots();
-            if(!araziId) return;
-            fetch(araziPlotsUrl.replace('__ARAZI_ID__', encodeURIComponent(araziId)))
+            if(!araziCode) return;
+            fetch(araziPlotsUrl.replace('__ARAZI_CODE__', encodeURIComponent(araziCode)))
                 .then(r => r.json())
                 .then(data => {
-                    availablePlots = data;
+                    availablePlots = (data && data.plots) || [];
                     renderAvailablePlots();
                     selectPlotIds.map(String).forEach(function(plotId){
                         addPlot(plotId);
@@ -449,7 +480,7 @@
             if(amountInput){
                 const plot = selectedPlots.get(String(amountInput.dataset.plotAmount));
                 if(!plot) return;
-                plot.amount = amountInput.value;
+                plot.saleAmount = amountInput.value;
                 updateTotals();
                 return;
             }
@@ -462,12 +493,34 @@
             }
         });
 
+        selectedPlotsBody && selectedPlotsBody.addEventListener('change', function(event){
+            const manualCb = event.target.closest('[data-plot-manual]');
+            if(manualCb){
+                const plot = selectedPlots.get(String(manualCb.dataset.plotManual));
+                if(!plot) return;
+                plot.manual = manualCb.checked;
+                // toggle readonly on the amount input
+                const amtInp = document.querySelector('[data-plot-amount="' + plot.id + '"]');
+                if(amtInp){
+                    amtInp.readOnly = !plot.manual;
+                    amtInp.style.background = plot.manual ? '' : '#f0f4fa';
+                }
+                if(!plot.manual) distributeConsideration();
+                else updateTotals();
+            }
+        });
+
+        considerationInput && considerationInput.addEventListener('input', function(){
+            distributeConsideration();
+        });
+
         selectedPlotsBody && selectedPlotsBody.addEventListener('click', function(event){
             const removeButton = event.target.closest('[data-remove-plot]');
             if(!removeButton) return;
 
             selectedPlots.delete(String(removeButton.dataset.removePlot));
             renderSelectedPlots();
+            distributeConsideration();
         });
 
         bookingAmountInputs.forEach(function(input){
@@ -476,33 +529,24 @@
             });
         });
 
-        // If total land_size edited and only one plot selected, update that plot's area
-        landSize && landSize.addEventListener('input', function(){
-            const v = parseFloat(this.value || 0);
-            if (Number.isNaN(v)) return;
-            if (selectedPlots.size === 1) {
-                const key = Array.from(selectedPlots.keys())[0];
-                const plot = selectedPlots.get(String(key));
-                if (plot) {
-                    plot.area = v;
-                    // update corresponding input in DOM if present
-                    const areaInput = document.querySelector('[data-plot-area="' + plot.id + '"]');
-                    if (areaInput) areaInput.value = (v || '');
-                    updateTotals();
-                }
-            } else {
-                // when multiple plots selected, just update sale_land hidden input
-                saleLand.value = this.value || '';
-            }
-        });
+        // land_size is now a hidden input updated by updateTotals() automatically
 
-        bondForm && bondForm.addEventListener('submit', function(){
+        bondForm && bondForm.addEventListener('submit', function(e){
+            // Validate sum of plot amounts ≤ consideration amount
+            const consideration = considerationAmount();
+            let plotSum = 0;
+            selectedPlots.forEach(function(plot){ plotSum += parseFloat(plot.saleAmount || 0); });
+            if (consideration > 0 && plotSum > consideration + 0.01) {
+                e.preventDefault();
+                validateConsideration();
+                considerationWarning && considerationWarning.scrollIntoView({behavior:'smooth', block:'center'});
+                return;
+            }
+            // ensure plot_amounts inputs have the direct sale amount values
             selectedPlots.forEach(function(plot){
                 const input = bondForm.querySelector('[name="plot_amounts[' + plot.id + ']"]');
                 if (!input) return;
-                const area = parseFloat(plot.area || 0);
-                const rate = parseFloat(plot.amount || 0);
-                input.value = (area * rate).toFixed(2);
+                input.value = parseFloat(plot.saleAmount || 0).toFixed(2);
             });
         });
 

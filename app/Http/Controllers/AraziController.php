@@ -116,7 +116,7 @@ class AraziController extends Controller
 
         // Group by legacy_arazi_code (same arazi can have multiple kisan purchases)
         $grouped = $records->groupBy(function (Arazi $a) {
-            return $a->legacy_arazi_code ?: ('Arazi-' . $a->id);
+            return $a->araziNoCode();
         });
 
         $routeName = $this->resourceRouteName();
@@ -231,7 +231,38 @@ class AraziController extends Controller
 
     public function plots(Arazi $arazi)
     {
-        $plots = $arazi->plots()->get(['id', 'plot_number', 'title', 'block', 'area', 'description', 'status'])->map(function ($p) {
+        $plots = $this->decoratePlots(Arazi::plotsForCode($arazi->araziNoCode()));
+
+        return response()->json($plots);
+    }
+
+    /**
+     * All plots for every Arazi record sharing the given "Arazi No" code
+     * (legacy_arazi_code, falling back to plot_number).
+     * GET /arazi-no/{code}/plots
+     */
+    public function plotsByAraziNo(string $code)
+    {
+        $arazis = Arazi::arazisForCode($code);
+        if ($arazis->isEmpty()) {
+            return response()->json(['found' => false, 'plots' => []]);
+        }
+
+        $plots = $this->decoratePlots(Arazi::plotsForCode($code));
+
+        return response()->json([
+            'found' => true,
+            'arazi_id' => $arazis->min('id'),
+            'plots' => $plots,
+        ]);
+    }
+
+    /**
+     * Derive a display status for each plot and shape the payload for plot pickers.
+     */
+    private function decoratePlots(\Illuminate\Support\Collection $plots): \Illuminate\Support\Collection
+    {
+        return $plots->map(function ($p) {
             $status = null;
 
             // derive status similarly to grid() logic
@@ -277,8 +308,6 @@ class AraziController extends Controller
                 'status' => $status,
             ];
         })->values();
-
-        return response()->json($plots);
     }
 
     /**
@@ -303,7 +332,7 @@ class AraziController extends Controller
             $matches = $arazis->map(function (Arazi $a) {
                 return [
                     'id' => $a->id,
-                    'label' => $a->legacy_arazi_code ?: ($a->plot_number ?? ('Arazi-' . $a->id)),
+                    'label' => $a->araziNoCode(),
                     'kisan' => $a->kisan?->name ?? null,
                     'location' => $a->location,
                     'size' => $a->size,
@@ -318,54 +347,13 @@ class AraziController extends Controller
 
         $arazi = $arazis->first();
 
-        // reuse plots() logic to prepare plot payload
-        $plots = $arazi->plots()->get(['id', 'plot_number', 'title', 'block', 'area', 'description', 'status'])->map(function ($p) {
-            $status = null;
-            $dbStatus = strtolower((string) ($p->status ?? ''));
-            $dbStatus = str_replace(['-',' '], '_', $dbStatus);
-            $dbStatus = str_replace('adwance', 'advance', $dbStatus);
-            $explicitStatuses = ['available','booked_advance','booked','hold','registry','blacklist','not_for_sale','issue'];
-            if ($dbStatus !== '' && in_array($dbStatus, $explicitStatuses, true)) {
-                $status = $dbStatus;
-            }
-
-            if ($status === null || $status === 'available') {
-                $hasRegistry = \App\Models\Registry::where('plot_id', $p->id)
-                    ->where(function($q){ $q->where('status', 'completed')->orWhere('payment_status', 'completed')->orWhereNull('status'); })
-                    ->exists();
-
-                if ($hasRegistry) {
-                    $status = 'registry';
-                } else {
-                    $booking = \App\Models\Booking::where('plot_id', $p->id)
-                        ->where(function($q){ $q->where('status', '!=', 'expired')->orWhereNull('status'); })
-                        ->latest()->first();
-                    if ($booking) {
-                        $status = 'booked';
-                    }
-                }
-            }
-
-            $desc = strtolower((string) ($p->description ?? ''));
-            if (str_contains($desc, 'issue') || empty($p->area) || (float) ($p->area ?? 0) <= 0) {
-                $status = 'issue';
-            }
-
-            if ($status === null) $status = 'available';
-
-            return [
-                'id' => $p->id,
-                'plot_number' => $p->plot_number ?? ($p->title ?? $p->id),
-                'label' => $p->title ?? ($p->plot_number ?: ('Plot-' . $p->id)),
-                'area' => $p->area,
-                'status' => $status,
-            ];
-        })->values();
+        // gather plots across every Arazi record sharing this Arazi No code
+        $plots = $this->decoratePlots(Arazi::plotsForCode($arazi->araziNoCode()));
 
         return response()->json([
             'found' => true,
             'arazi_id' => $arazi->id,
-            'arazi_label' => $arazi->legacy_arazi_code ?: ($arazi->plot_number ?? ('Arazi-' . $arazi->id)),
+            'arazi_label' => $arazi->araziNoCode(),
             'plots' => $plots,
         ]);
     }
@@ -523,7 +511,7 @@ class AraziController extends Controller
         $item = $modelClass::create($payload);
         $this->resourceAfterSave($item, $request, $validated);
 
-        $label = $item->legacy_arazi_code ?: ($item->plot_number ?? ('Arazi-' . $item->id));
+        $label = $item->araziNoCode();
 
         return response()->json(['success' => true, 'arazi' => ['id' => $item->id, 'label' => $label]]);
     }
@@ -601,10 +589,8 @@ class AraziController extends Controller
      */
     public function gridByIdentifier($identifier)
     {
-        // Prefer lookup by legacy_arazi_code or plot_number (so numeric codes like "319" match code)
-        $arazis = Arazi::where('legacy_arazi_code', $identifier)
-            ->orWhere('plot_number', $identifier)
-            ->get();
+        // Prefer lookup by legacy_arazi_code, falling back to plot_number (so numeric codes like "319" match code)
+        $arazis = Arazi::arazisForCode((string) $identifier);
 
         // If no matches by code/plot_number, fall back to numeric id lookup
         if ($arazis->isEmpty() && is_numeric($identifier)) {
@@ -615,49 +601,12 @@ class AraziController extends Controller
             abort(404);
         }
 
-        // collect plots across all matched arazis
-        $araziIds = $arazis->pluck('id')->all();
-        $plots = \App\Models\Plot::whereIn('arazi_id', $araziIds)->get(['id','plot_number','title','block','area','description','status'])->map(function ($p) {
-            $status = null;
-            $dbStatus = strtolower((string) ($p->status ?? ''));
-            $explicitStatuses = ['available','booked_advance','booked','hold','registry','blacklist','not_for_sale','issue'];
-            if ($dbStatus !== '' && in_array($dbStatus, $explicitStatuses, true)) {
-                $status = $dbStatus;
-            }
+        if ($arazis->isEmpty()) {
+            abort(404);
+        }
 
-            if ($status === null || $status === 'available') {
-                $hasRegistry = \App\Models\Registry::where('plot_id', $p->id)
-                    ->where(function($q){ $q->where('status', 'completed')->orWhere('payment_status', 'completed')->orWhereNull('status'); })
-                    ->exists();
-
-                if ($hasRegistry) {
-                    $status = 'registry';
-                } else {
-                    $booking = \App\Models\Booking::where('plot_id', $p->id)
-                        ->where(function($q){ $q->where('status', '!=', 'expired')->orWhereNull('status'); })
-                        ->latest()->first();
-                    if ($booking) {
-                        $status = 'booked';
-                    }
-                }
-            }
-
-            $desc = strtolower((string) ($p->description ?? ''));
-            if (str_contains($desc, 'issue') || empty($p->area) || (float) ($p->area ?? 0) <= 0) {
-                $status = 'issue';
-            }
-
-            if ($status === null) $status = 'available';
-
-            return [
-                'id' => $p->id,
-                'plot_number' => $p->plot_number ?? ($p->title ?? $p->id),
-                'title' => $p->title,
-                'block' => $p->block,
-                'area' => $p->area,
-                'status' => $status,
-            ];
-        })->all();
+        // collect plots across every Arazi record sharing this Arazi No code
+        $plots = $this->decoratePlots(Arazi::plotsForCode((string) $identifier))->all();
 
         // Pass a representative arazi object (first) but adjust label to identifier
         $representative = $arazis->first();

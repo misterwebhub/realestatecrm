@@ -257,6 +257,7 @@
                             <td class="fw-bold" style="font-size:16px;">₹${c.amount}</td>
                             <td><span class="badge bg-${color}-subtle text-${color} border border-${color}-subtle" style="font-size:13px;padding:5px 11px;">${c.status}</span></td>
                             <td style="font-size:16px;" class="text-muted">${c.type || '-'}</td>
+                            <td style="font-size:16px;">${c.account_name || '-'}</td>
                             <td style="font-size:16px;color:#64748b;">${c.notes || ''}</td>
                         </tr>`;
                     });
@@ -271,6 +272,7 @@
                                         <th style="font-size:12px;font-weight:700;text-transform:uppercase;color:#64748b;letter-spacing:.5px;">Amount</th>
                                         <th style="font-size:12px;font-weight:700;text-transform:uppercase;color:#64748b;letter-spacing:.5px;">Status</th>
                                         <th style="font-size:12px;font-weight:700;text-transform:uppercase;color:#64748b;letter-spacing:.5px;">Type</th>
+                                        <th style="font-size:12px;font-weight:700;text-transform:uppercase;color:#64748b;letter-spacing:.5px;">Account</th>
                                         <th style="font-size:12px;font-weight:700;text-transform:uppercase;color:#64748b;letter-spacing:.5px;">Notes</th>
                                     </tr>
                                 </thead>

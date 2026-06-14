@@ -58,7 +58,7 @@ class KisanBondController extends Controller
 
                     return $q->orderBy('legacy_arazi_code')
                         ->get()
-                        ->mapWithKeys(function ($a) { return [$a->id => ($a->legacy_arazi_code ?: ($a->plot_number ?? ('Arazi-' . $a->id)))]; })
+                        ->mapWithKeys(function ($a) { return [$a->id => $a->araziNoCode()]; })
                         ->all();
                 })(),
                 'value' => $item?->exists
@@ -233,7 +233,7 @@ class KisanBondController extends Controller
                 $item->bond_no,
                 $item->kisan?->name ?? '-',
                 $item->arazis->isNotEmpty()
-                    ? $item->arazis->map(fn (Arazi $arazi) => $arazi->legacy_arazi_code ?: ($arazi->plot_number ?? ('Arazi-' . $arazi->id)))->join(', ')
+                    ? $item->arazis->map(fn (Arazi $arazi) => $arazi->araziNoCode())->join(', ')
                     : ($item->arazi?->legacy_arazi_code ?: ($item->arazi?->plot_number ?? '-')),
                 optional($item->bond_date)->format('d-m-Y') ?? '-',
                 number_format((float) $item->bond_amount, 2),
@@ -279,7 +279,7 @@ class KisanBondController extends Controller
                 ? $item->arazis->map(function (Arazi $arazi) {
                     return [
                         'id' => $arazi->id,
-                        'label' => $arazi->legacy_arazi_code ?: ($arazi->plot_number ?? ('Arazi-' . $arazi->id)),
+                        'label' => $arazi->araziNoCode(),
                         'location' => $arazi->location,
                         'land_size' => (float) ($arazi->pivot->land_size ?? $arazi->size ?? 0),
                         'sale_land' => (float) ($arazi->pivot->sale_land ?? $arazi->saleable_area ?? 0),

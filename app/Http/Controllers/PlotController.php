@@ -41,7 +41,7 @@ class PlotController extends Controller
                 'options' => Arazi::orderBy('legacy_arazi_code')
                     ->get()
                     ->groupBy(function (Arazi $a) {
-                        return $a->legacy_arazi_code ?: ($a->plot_number ?? ('Arazi-' . $a->id));
+                        return $a->araziNoCode();
                     })
                     ->mapWithKeys(function ($group, $label) {
                         $first = $group->sortBy('id')->first();

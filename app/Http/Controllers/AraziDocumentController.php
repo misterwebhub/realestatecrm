@@ -44,7 +44,7 @@ class AraziDocumentController extends Controller
                 'options' => Arazi::orderBy('legacy_arazi_code')
                     ->get()
                     ->mapWithKeys(function (Arazi $arazi) {
-                        return [$arazi->id => $arazi->legacy_arazi_code ?: ($arazi->plot_number ?? ('Arazi-' . $arazi->id))];
+                        return [$arazi->id => $arazi->araziNoCode()];
                     })
                     ->all(),
                 'value' => $item?->arazi_id,

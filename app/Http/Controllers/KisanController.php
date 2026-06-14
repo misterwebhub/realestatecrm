@@ -145,7 +145,7 @@ class KisanController extends Controller
             ->map(function ($a) {
             return [
                 'id' => $a->id,
-                'label' => $a->legacy_arazi_code ?: ($a->plot_number ?: ('Arazi-' . $a->id)),
+                'label' => $a->araziNoCode(),
                 'location' => $a->location,
                 'land_size' => (float) ($a->size ?? 0),
                 'sale_land' => (float) ($a->saleable_area ?? $a->size ?? 0),

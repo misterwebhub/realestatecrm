@@ -94,7 +94,7 @@ class UploadController extends Controller
                 ->orWhere('plot_number','like','%'.$q.'%');
         }
         $results = $query->limit(20)->get()->map(function($a){
-            return ['id'=>$a->id,'text'=>($a->legacy_arazi_code ?: ('Arazi '.$a->id))];
+            return ['id'=>$a->id,'text'=>$a->araziNoCode()];
         });
         return response()->json(['results'=>$results]);
     }

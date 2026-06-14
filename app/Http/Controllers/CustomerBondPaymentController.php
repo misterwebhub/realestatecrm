@@ -347,7 +347,7 @@ class CustomerBondPaymentController extends Controller
 
         $araziLabel = '-';
         if ($bond->arazi) {
-            $araziLabel = $bond->arazi->legacy_arazi_code ?: ($bond->arazi->plot_number ?? ('Arazi-' . $bond->arazi_id));
+            $araziLabel = $bond->arazi->araziNoCode();
         }
 
         $plotSummary = '-';
@@ -433,7 +433,7 @@ class CustomerBondPaymentController extends Controller
     public function compact()
     {
         $arazis = \App\Models\Arazi::orderBy('id')->get()->mapWithKeys(function ($a) {
-            return [$a->id => ($a->legacy_arazi_code ?: ($a->plot_number ?? ('Arazi-' . $a->id)))];
+            return [$a->id => $a->araziNoCode()];
         })->all();
 
         $paymentMethods = [

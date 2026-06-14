@@ -29,7 +29,7 @@ class KisanRegistryController extends Controller
         $unique = [];
         $araziMap = [];
         foreach ($araziList as $a) {
-            $label = $a->legacy_arazi_code ?: ($a->plot_number ?? ('Arazi-' . $a->id));
+            $label = $a->araziNoCode();
             if (! isset($unique[$label])) {
                 $unique[$label] = $label; // use label as value
             }

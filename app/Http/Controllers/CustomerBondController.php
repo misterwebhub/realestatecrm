@@ -67,12 +67,16 @@ class CustomerBondController extends Controller
         return [
             'bond_no' => ['nullable', 'string', 'max:50', Rule::unique('customer_bonds', 'bond_no')->ignore($item?->id)],
             'customer_id' => ['required', 'exists:customers,id'],
-            'arazi_id' => ['required', 'exists:arazis,id'],
+            'arazi_id' => ['required', function ($attribute, $value, $fail) {
+                if (Arazi::arazisForCode((string) $value)->isEmpty()) {
+                    $fail('Selected Arazi No is invalid.');
+                }
+            }],
             'plot_ids' => ['nullable', 'array'],
             'plot_ids.*' => ['required', 'distinct', 'exists:plots,id', function ($attribute, $value, $fail) {
-                $araziId = request()->input('arazi_id');
+                $plots = Arazi::plotsForCode((string) request()->input('arazi_id'));
 
-                if ($araziId && ! Plot::where('id', $value)->where('arazi_id', $araziId)->exists()) {
+                if ($plots->isNotEmpty() && ! $plots->contains('id', (int) $value)) {
                     $fail('Selected plot does not belong to the selected Arazi.');
                 }
             }],
@@ -111,6 +115,14 @@ class CustomerBondController extends Controller
     {
         $payload = $validated;
         $plotIds = array_values(array_filter($validated['plot_ids'] ?? []));
+
+        // arazi_id is submitted as the "Arazi No" code; resolve it to a real arazis.id for the FK column.
+        if (isset($payload['arazi_id'])) {
+            $arazis = Arazi::arazisForCode((string) $payload['arazi_id']);
+            if ($arazis->isNotEmpty()) {
+                $payload['arazi_id'] = $arazis->min('id');
+            }
+        }
 
         $payload['bond_no'] = ($payload['bond_no'] ?? null) ?: $this->nextBondNumber();
 
@@ -190,7 +202,8 @@ class CustomerBondController extends Controller
             if (! empty($plotIds)) {
                 Plot::whereIn('id', $plotIds)->update(['status' => 'booked']);
             } elseif (! empty($validated['arazi_id'])) {
-                Plot::where('arazi_id', $validated['arazi_id'])->update(['status' => 'booked']);
+                Plot::whereIn('id', Arazi::plotsForCode((string) $validated['arazi_id'])->pluck('id'))
+                    ->update(['status' => 'booked']);
             }
         } catch (\Throwable $e) {
             // Ignore to avoid breaking bond save flow
@@ -274,7 +287,7 @@ class CustomerBondController extends Controller
                 'address' => $customer->address,
             ],
         ])->all();
-        $arazis = \App\Models\Arazi::orderBy('id')->get()->mapWithKeys(function ($a) { return [$a->id => ($a->legacy_arazi_code ?: ($a->plot_number ?? ('Arazi-' . $a->id)))]; })->all();
+        $arazis = $this->uniqueArazisList();
         $agents = Agent::where('broker_type', 'customer')->orderBy('name')->pluck('name', 'id')->all();
 
         return view('customer_bonds.form_certificate', [
@@ -296,7 +309,7 @@ class CustomerBondController extends Controller
 
         $query = $this->resourceQuery();
         if ($araziId) {
-            $query->where('arazi_id', $araziId);
+            $query->whereIn('arazi_id', Arazi::idsForCode((string) $araziId));
         }
         if ($plotQuery !== '') {
             // allow numeric id match or title partial match
@@ -318,18 +331,7 @@ class CustomerBondController extends Controller
             ]);
         })->all();
 
-        $araziList = \App\Models\Arazi::orderBy('id')->get();
-        $unique = [];
-        foreach ($araziList as $a) {
-            $label = $a->legacy_arazi_code ?: ($a->plot_number ?? ('Arazi-' . $a->id));
-            if (! isset($unique[$label])) {
-                $unique[$label] = $a->id;
-            }
-        }
-        $arazis = [];
-        foreach ($unique as $label => $id) {
-            $arazis[$id] = $label;
-        }
+        $arazis = $this->uniqueArazisList();
 
         return view('crud.index', [
             'title' => $this->resourceTitle(),
@@ -360,7 +362,16 @@ class CustomerBondController extends Controller
                 'address' => $customer->address,
             ],
         ])->all();
-        $arazis = \App\Models\Arazi::orderBy('id')->get()->mapWithKeys(function ($a) { return [$a->id => ($a->legacy_arazi_code ?: ($a->plot_number ?? ('Arazi-' . $a->id)))]; })->all();
+        $arazis = $this->uniqueArazisList();
+
+        // The select uses Arazi No codes as values; map the bond's stored arazis.id to its code for display.
+        if ($item->arazi_id) {
+            $current = \App\Models\Arazi::find($item->arazi_id);
+            if ($current) {
+                $item->arazi_id = $current->araziNoCode();
+            }
+        }
+
         $agents = Agent::where('broker_type', 'customer')->orderBy('name')->pluck('name', 'id')->all();
 
         return view('customer_bonds.form_certificate', [
@@ -412,7 +423,7 @@ class CustomerBondController extends Controller
      */
     public function chequesModal(CustomerBond $customer_bond)
     {
-        $customer_bond->loadMissing(['customer', 'cheques', 'arazi', 'plots', 'payments']);
+        $customer_bond->loadMissing(['customer', 'cheques.connectedAccount', 'arazi', 'plots', 'payments']);
 
         // balance
         $totalAmount = (float) ($customer_bond->total_amount ?? $customer_bond->bond_amount ?? 0);
@@ -431,8 +442,7 @@ class CustomerBondController extends Controller
         // arazi label
         $araziLabel = '-';
         if ($customer_bond->arazi) {
-            $araziLabel = $customer_bond->arazi->legacy_arazi_code
-                ?: ($customer_bond->arazi->plot_number ?? ('Arazi-' . $customer_bond->arazi_id));
+            $araziLabel = $customer_bond->arazi->araziNoCode();
         }
 
         // plots
@@ -461,6 +471,7 @@ class CustomerBondController extends Controller
                 'status'       => $c->status,
                 'type'         => $c->type ?? 'mentioned',
                 'notes'        => $c->notes,
+                'account_name' => $c->connectedAccount?->name ?? '-',
             ])->all(),
             'manage_url' => route('customer-bond-cheques.manage', $customer_bond->id),
         ]);
@@ -502,7 +513,7 @@ class CustomerBondController extends Controller
 
         $araziLabel = '-';
         if ($bond->arazi) {
-            $araziLabel = $bond->arazi->legacy_arazi_code ?: ($bond->arazi->plot_number ?? ('Arazi-' . $bond->arazi_id));
+            $araziLabel = $bond->arazi->araziNoCode();
         }
 
         $plots = $bond->plots->map(fn ($p) => [
@@ -595,6 +606,20 @@ class CustomerBondController extends Controller
         }
 
         return response($html)->header('Content-Type', 'text/html');
+    }
+
+    /**
+     * Unique "Arazi No" codes (legacy_arazi_code, falling back to plot_number).
+     */
+    private function uniqueArazisList(): array
+    {
+        $codes = \App\Models\Arazi::orderBy('id')->get()
+            ->map(fn ($a) => $a->araziNoCode())
+            ->unique()
+            ->values()
+            ->all();
+
+        return array_combine($codes, $codes);
     }
 
     private function nextBondNumber(): string
