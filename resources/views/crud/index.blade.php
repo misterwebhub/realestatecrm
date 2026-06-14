@@ -33,6 +33,69 @@
             @endif
         </div>
 
+        @if(!empty($isKisanPaymentIndex))
+            <div class="card-body border-top py-2 px-3">
+                <form method="GET" class="row g-2 align-items-end">
+                    <div class="col-md-5">
+                        <label class="form-label small fw-semibold mb-1">Kisan Name / Mobile</label>
+                        <input type="text" name="q" value="{{ $kp_q ?? '' }}"
+                               class="form-control form-control-sm" placeholder="Search kisan name or mobile…">
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label small fw-semibold mb-1">Arazi No</label>
+                        <input type="text" name="arazi_code" value="{{ $kp_arazi ?? '' }}"
+                               class="form-control form-control-sm" placeholder="e.g. 419, 375KA…">
+                    </div>
+                    <div class="col-auto d-flex gap-2">
+                        <button type="submit" class="btn btn-primary btn-sm">Search</button>
+                        <a href="{{ route('kisan-payment.index') }}" class="btn btn-outline-secondary btn-sm">Clear</a>
+                    </div>
+                </form>
+            </div>
+        @endif
+
+        @if(!empty($isKisanBondIndex))
+            <div class="card-body border-top py-2 px-3">
+                <form method="GET" class="row g-2 align-items-end">
+                    <div class="col-md-5">
+                        <label class="form-label small fw-semibold mb-1">Kisan Name / Mobile</label>
+                        <input type="text" name="q" value="{{ $kb_q ?? '' }}"
+                               class="form-control form-control-sm" placeholder="Search kisan name or mobile…">
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label small fw-semibold mb-1">Arazi No</label>
+                        <input type="text" name="arazi_code" value="{{ $kb_arazi ?? '' }}"
+                               class="form-control form-control-sm" placeholder="e.g. 419, 375KA…">
+                    </div>
+                    <div class="col-auto d-flex gap-2">
+                        <button type="submit" class="btn btn-primary btn-sm">Search</button>
+                        <a href="{{ route('kisan-bonds.index') }}" class="btn btn-outline-secondary btn-sm">Clear</a>
+                    </div>
+                </form>
+            </div>
+        @endif
+
+        @if(!empty($isKisanIndex))
+            <div class="card-body border-top py-2 px-3">
+                <form method="GET" class="row g-2 align-items-end">
+                    <div class="col-md-5">
+                        <label class="form-label small fw-semibold mb-1">Name / Mobile / Reg. No</label>
+                        <input type="text" name="q" value="{{ $kisan_q ?? '' }}"
+                               class="form-control form-control-sm" placeholder="Search name, mobile, reg no…">
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label small fw-semibold mb-1">Arazi No</label>
+                        <input type="text" name="arazi_code" value="{{ $kisan_arazi ?? '' }}"
+                               class="form-control form-control-sm" placeholder="e.g. 419, 375KA…">
+                    </div>
+                    <div class="col-auto d-flex gap-2">
+                        <button type="submit" class="btn btn-primary btn-sm">Search</button>
+                        <a href="{{ route('kisans.index') }}" class="btn btn-outline-secondary btn-sm">Clear</a>
+                    </div>
+                </form>
+            </div>
+        @endif
+
         @if(!empty($isCustomerBondIndex))
             <div class="card-body border-top">
                 <form class="row g-2 align-items-end" method="GET">

@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Http\Controllers\Concerns\ExportsCsv;
 use App\Http\Controllers\Concerns\ManagesCrud;
+use App\Models\Arazi;
 use App\Models\Kisan;
 use App\Models\KisanBond;
 use App\Models\Payment;
@@ -334,31 +335,61 @@ class PaymentController extends Controller
     // Kisan-scoped index
     public function index(Request $request, ?Kisan $kisan = null)
     {
-        $records = $this->resourceQuery()
-            ->when($kisan, fn($q) => $q->where('kisan_id', $kisan->id))
-            ->get();
+        $q         = trim((string) $request->input('q', ''));
+        $araziCode = trim((string) $request->input('arazi_code', ''));
 
+        $query = $this->resourceQuery()
+            ->when($kisan, fn($qb) => $qb->where('kisan_id', $kisan->id));
+
+        // Search by kisan name or mobile
+        if ($q !== '') {
+            $query->where(function ($qb) use ($q) {
+                $qb->whereHas('kisan', fn($k) =>
+                    $k->where('name', 'like', '%'.$q.'%')
+                      ->orWhere('mobile', 'like', '%'.$q.'%')
+                )->orWhereHas('kisanBond.kisan', fn($k) =>
+                    $k->where('name', 'like', '%'.$q.'%')
+                      ->orWhere('mobile', 'like', '%'.$q.'%')
+                );
+            });
+        }
+
+        // Search by arazi legacy code
+        if ($araziCode !== '') {
+            $araziIds = Arazi::idsForCode($araziCode);
+            $query->where(function ($qb) use ($araziIds) {
+                $qb->whereHas('kisanBond', fn($b) =>
+                    $b->whereIn('arazi_id', $araziIds)
+                      ->orWhereHas('arazis', fn($a) => $a->whereIn('arazis.id', $araziIds))
+                )->orWhereHas('registry.arazi', fn($a) => $a->whereIn('arazis.id', $araziIds));
+            });
+        }
+
+        $records   = $query->get();
         $routeName = $this->resourceRouteName();
 
         $rows = $records->map(function (Model $record) use ($routeName) {
             $ref = $record->receipt_no ?: $record->reference_no;
 
             return array_merge($this->resourceRow($record), [
-                'edit_url' => route($routeName . '.edit', $record),
+                'edit_url'   => route($routeName . '.edit', $record),
                 'delete_url' => route($routeName . '.destroy', $record),
-                'print_url' => $ref ? route('kisan-payment.print', ['receipt_no' => $ref, 'print' => 1]) : null,
-                'pdf_url' => $ref ? route('kisan-payment.receipt-pdf', ['receipt_no' => $ref]) : null,
+                'print_url'  => $ref ? route('kisan-payment.print', ['receipt_no' => $ref, 'print' => 1]) : null,
+                'pdf_url'    => $ref ? route('kisan-payment.receipt-pdf', ['receipt_no' => $ref]) : null,
             ]);
         })->all();
 
         return view('crud.index', [
-            'title' => $this->resourceTitle(),
-            'columns' => $this->resourceColumns(),
-            'rows' => $rows,
-            'createUrl' => $kisan ? route('kisans.kisan-payment.create', $kisan) : route($routeName . '.create'),
-            'exportCsvUrl' => $this->allowsCsvExport()
+            'title'               => $this->resourceTitle(),
+            'columns'             => $this->resourceColumns(),
+            'rows'                => $rows,
+            'createUrl'           => $kisan ? route('kisans.kisan-payment.create', $kisan) : route($routeName . '.create'),
+            'exportCsvUrl'        => $this->allowsCsvExport()
                 ? route($routeName.'.export.csv', array_filter(['kisan_id' => $kisan?->id]))
                 : null,
+            'isKisanPaymentIndex' => !$kisan,
+            'kp_q'                => $q,
+            'kp_arazi'            => $araziCode,
         ]);
     }
 

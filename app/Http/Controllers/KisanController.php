@@ -30,7 +30,7 @@ class KisanController extends Controller
 
     protected function resourceColumns(): array
     {
-        return ['Reg. No.', 'Kishan Name', 'Location', 'Mobile'];
+        return ['Reg. No.', 'Kishan Name', 'Location', 'Mobile', 'Arazi No(s)'];
     }
 
     protected function resourceFields(?Model $item = null): array
@@ -111,15 +111,67 @@ class KisanController extends Controller
         return Kisan::withCount('arazis')->latest();
     }
 
+    public function index(Request $request)
+    {
+        $q         = trim((string) $request->input('q', ''));
+        $araziCode = trim((string) $request->input('arazi_code', ''));
+
+        $query = Kisan::with('arazis')->withCount('arazis')->latest();
+
+        // Search by name, mobile or reg_no
+        if ($q !== '') {
+            $query->where(function ($qb) use ($q) {
+                $qb->where('name', 'like', '%' . $q . '%')
+                   ->orWhere('mobile', 'like', '%' . $q . '%')
+                   ->orWhere('reg_no', 'like', '%' . $q . '%');
+            });
+        }
+
+        // Search by arazi legacy code
+        if ($araziCode !== '') {
+            $araziIds = Arazi::idsForCode($araziCode);
+            $kisanIds = Arazi::whereIn('id', $araziIds)->whereNotNull('kisan_id')->pluck('kisan_id')->unique()->all();
+            $query->whereIn('id', $kisanIds);
+        }
+
+        $records   = $query->get();
+        $routeName = $this->resourceRouteName();
+
+        $rows = $records->map(function (Kisan $item) use ($routeName) {
+            return array_merge($this->resourceRow($item), [
+                'edit_url'   => route($routeName . '.edit', $item),
+                'delete_url' => route($routeName . '.destroy', $item),
+            ]);
+        })->all();
+
+        return view('crud.index', [
+            'title'        => $this->resourceTitle(),
+            'columns'      => $this->resourceColumns(),
+            'rows'         => $rows,
+            'createUrl'    => route($routeName . '.create'),
+            'exportCsvUrl' => $this->allowsCsvExport() ? route($routeName . '.export.csv') : null,
+            'isKisanIndex' => true,
+            'kisan_q'      => $q,
+            'kisan_arazi'  => $araziCode,
+        ]);
+    }
+
     protected function resourceRow(Model $item): array
     {
         /** @var Kisan $item */
+        $araziCodes = ($item->relationLoaded('arazis') ? $item->arazis : collect())
+            ->map(fn($a) => $a->legacy_arazi_code ?: ($a->plot_number ?? ('Arazi-'.$a->id)))
+            ->filter()
+            ->unique()
+            ->implode(', ');
+
         return [
             'cells' => [
                 $item->reg_no ?? '-',
                 $item->name,
                 $item->location ?? '-',
                 $item->mobile,
+                $araziCodes ?: '-',
             ],
             'add_url' => route('kisan-bonds.create') . '?kisan_id=' . $item->id,
             'action_buttons' => [

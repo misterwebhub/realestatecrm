@@ -7,6 +7,7 @@ use App\Models\Arazi;
 use App\Models\Kisan;
 use App\Models\KisanBond;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 
 class KisanBondController extends Controller
@@ -223,6 +224,54 @@ class KisanBondController extends Controller
     protected function resourceQuery()
     {
         return KisanBond::with(['kisan', 'arazi', 'arazis'])->latest();
+    }
+
+    public function index(Request $request)
+    {
+        $q         = trim((string) $request->input('q', ''));
+        $araziCode = trim((string) $request->input('arazi_code', ''));
+
+        $query = KisanBond::with(['kisan', 'arazi', 'arazis'])->latest();
+
+        // Search by kisan name or mobile
+        if ($q !== '') {
+            $query->where(function ($qb) use ($q) {
+                $qb->whereHas('kisan', fn($k) =>
+                    $k->where('name', 'like', '%'.$q.'%')
+                      ->orWhere('mobile', 'like', '%'.$q.'%')
+                );
+            });
+        }
+
+        // Search by arazi legacy code
+        if ($araziCode !== '') {
+            $araziIds = Arazi::idsForCode($araziCode);
+            $query->where(function ($qb) use ($araziIds) {
+                $qb->whereIn('arazi_id', $araziIds)
+                   ->orWhereHas('arazis', fn($a) => $a->whereIn('arazis.id', $araziIds));
+            });
+        }
+
+        $records   = $query->get();
+        $routeName = $this->resourceRouteName();
+
+        $rows = $records->map(function (KisanBond $item) use ($routeName) {
+            return array_merge($this->resourceRow($item), [
+                'edit_url'   => route($routeName . '.edit', $item),
+                'delete_url' => route($routeName . '.destroy', $item),
+            ]);
+        })->all();
+
+        return view('crud.index', [
+            'title'           => $this->resourceTitle(),
+            'columns'         => $this->resourceColumns(),
+            'rows'            => $rows,
+            'createUrl'       => route($routeName . '.create'),
+            'exportCsvUrl'    => $this->allowsCsvExport() ? route($routeName . '.export.csv') : null,
+            'isKisanBondIndex'=> true,
+            'kb_q'            => $q,
+            'kb_arazi'        => $araziCode,
+        ]);
     }
 
     protected function resourceRow(Model $item): array
