@@ -200,8 +200,7 @@ class RegistryController extends Controller
         $filterRegNo     = trim((string) $request->input('reg_no', ''));
 
         if ($filterAraziCode !== '') {
-            $araziIds = Arazi::where('legacy_arazi_code', $filterAraziCode)->pluck('id');
-            $q->whereIn('arazi_id', $araziIds);
+            $q->where('arazi_code', $filterAraziCode);
         }
 
         if ($filterPlotId) {
@@ -230,8 +229,7 @@ class RegistryController extends Controller
         // Plots for selected arazi code (all arazis with that code)
         $filterPlots = collect();
         if ($filterAraziCode !== '') {
-            $araziIds    = Arazi::where('legacy_arazi_code', $filterAraziCode)->pluck('id');
-            $filterPlots = \App\Models\Plot::whereIn('arazi_id', $araziIds)->orderBy('plot_number')->get(['id','plot_number','title']);
+            $filterPlots = \App\Models\Plot::where('arazi_code', $filterAraziCode)->orderBy('plot_number')->get(['id','plot_number','title']);
         }
 
         // Unique arazi codes for dropdown

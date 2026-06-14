@@ -2,12 +2,14 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\HasAraziCode;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 class CustomerBondPayment extends Model
 {
     use HasFactory;
+    use HasAraziCode;
 
     protected $fillable = [
         'customer_bond_id',
@@ -15,6 +17,7 @@ class CustomerBondPayment extends Model
         'registry_id',
         'customer_id',
         'arazi_id',
+        'arazi_code',
         'plot_id',
         'entry_no',
         'entry_date',

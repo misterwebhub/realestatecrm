@@ -2,12 +2,14 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\HasAraziCode;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 class Registry extends Model
 {
     use HasFactory;
+    use HasAraziCode;
 
     protected $fillable = [
         'registry_code',
@@ -16,6 +18,7 @@ class Registry extends Model
         'plot_id',
         'customer_id',
         'arazi_id',
+        'arazi_code',
         'agent_id',
         'check_by_agent_id',
         'registry_date',

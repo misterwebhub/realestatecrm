@@ -69,8 +69,7 @@ class CustomerBondPaymentController extends Controller
 
         // Search by arazi legacy code
         if ($araziCode !== '') {
-            $araziIds = \App\Models\Arazi::idsForCode($araziCode);
-            $query->whereIn('arazi_id', $araziIds);
+            $query->where('arazi_code', $araziCode);
         }
 
         // Search by plot title
@@ -117,9 +116,6 @@ class CustomerBondPaymentController extends Controller
         $dateTo          = $request->query('date_to', '');
         $lowProgress     = (bool) $request->query('low_progress', false);
 
-        // Resolve arazi IDs
-        $araziIds = $araziCode !== '' ? \App\Models\Arazi::idsForCode($araziCode) : [];
-
         $bondsQuery = CustomerBond::with(['customer', 'arazi', 'plots'])
             ->withSum(['payments as paid_amount' => function ($query) use ($dateFrom, $dateTo) {
                 if ($dateFrom) $query->whereDate('entry_date', '>=', $dateFrom);
@@ -129,7 +125,7 @@ class CustomerBondPaymentController extends Controller
                 $c->where('name', 'like', '%'.$q.'%')
                   ->orWhere('mobile', 'like', '%'.$q.'%')
             ))
-            ->when($araziIds, fn ($query) => $query->whereIn('arazi_id', $araziIds))
+            ->when($araziCode !== '', fn ($query) => $query->where('arazi_code', $araziCode))
             ->when($plotQ, fn ($query) => $query->whereHas('plots', fn ($p) =>
                 $p->where('title', 'like', '%'.$plotQ.'%')
                   ->orWhere('plot_number', 'like', '%'.$plotQ.'%')
@@ -212,8 +208,6 @@ class CustomerBondPaymentController extends Controller
         $dateTo      = $request->query('date_to', '');
         $lowProgress = (bool) $request->query('low_progress', false);
 
-        $araziIds = $araziCode !== '' ? \App\Models\Arazi::idsForCode($araziCode) : [];
-
         $bonds = CustomerBond::with(['customer', 'arazi', 'plots'])
             ->withSum(['payments as paid_amount' => function ($query) use ($dateFrom, $dateTo) {
                 if ($dateFrom) $query->whereDate('entry_date', '>=', $dateFrom);
@@ -223,7 +217,7 @@ class CustomerBondPaymentController extends Controller
                 $c->where('name', 'like', '%'.$q.'%')
                   ->orWhere('mobile', 'like', '%'.$q.'%')
             ))
-            ->when($araziIds, fn ($query) => $query->whereIn('arazi_id', $araziIds))
+            ->when($araziCode !== '', fn ($query) => $query->where('arazi_code', $araziCode))
             ->when($plotQ, fn ($query) => $query->whereHas('plots', fn ($p) =>
                 $p->where('title', 'like', '%'.$plotQ.'%')
                   ->orWhere('plot_number', 'like', '%'.$plotQ.'%')

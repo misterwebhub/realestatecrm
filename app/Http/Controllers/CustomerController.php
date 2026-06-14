@@ -82,8 +82,7 @@ class CustomerController extends Controller
 
         // Filter by arazi code → bonds → customers
         if ($araziCode !== '') {
-            $araziIds = Arazi::idsForCode($araziCode);
-            $customerIds = CustomerBond::whereIn('arazi_id', $araziIds)->pluck('customer_id')->unique()->all();
+            $customerIds = CustomerBond::where('arazi_code', $araziCode)->pluck('customer_id')->unique()->all();
             $query->whereIn('id', $customerIds);
         }
 

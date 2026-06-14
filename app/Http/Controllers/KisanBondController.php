@@ -211,6 +211,7 @@ class KisanBondController extends Controller
         $syncData = [];
         foreach ($this->normaliseAraziItems($validated['arazi_items'] ?? []) as $araziItem) {
             $syncData[$araziItem['arazi_id']] = [
+                'arazi_code' => \App\Models\Arazi::whereKey($araziItem['arazi_id'])->value('legacy_arazi_code'),
                 'land_size' => $araziItem['land_size'],
                 'sale_land' => $araziItem['sale_land'],
                 'sale_rate' => $araziItem['sale_rate'],
@@ -243,12 +244,11 @@ class KisanBondController extends Controller
             });
         }
 
-        // Search by arazi legacy code
+        // Search by arazi legacy code (direct column or pivot)
         if ($araziCode !== '') {
-            $araziIds = Arazi::idsForCode($araziCode);
-            $query->where(function ($qb) use ($araziIds) {
-                $qb->whereIn('arazi_id', $araziIds)
-                   ->orWhereHas('arazis', fn($a) => $a->whereIn('arazis.id', $araziIds));
+            $query->where(function ($qb) use ($araziCode) {
+                $qb->where('arazi_code', $araziCode)
+                   ->orWhereHas('arazis', fn($a) => $a->where('kisan_bond_arazi.arazi_code', $araziCode));
             });
         }
 

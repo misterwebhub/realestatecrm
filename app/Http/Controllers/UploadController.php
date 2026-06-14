@@ -26,8 +26,7 @@ class UploadController extends Controller
         }
 
         if ($araziCode !== '') {
-            $araziIds = Arazi::where('legacy_arazi_code', $araziCode)->pluck('id');
-            $query->whereIn('arazi_id', $araziIds);
+            $query->where('arazi_code', $araziCode);
         }
 
         if ($unassigned) {
@@ -95,6 +94,7 @@ class UploadController extends Controller
         $upload = Upload::create([
             'upload_category_id' => $validated['upload_category_id'],
             'arazi_id'           => $araziId,
+            'arazi_code'         => $validated['arazi_code'] ?? null,
             'label' => $validated['label'] ?? null,
             'file_path' => $path,
             'mime' => $file->getClientMimeType(),

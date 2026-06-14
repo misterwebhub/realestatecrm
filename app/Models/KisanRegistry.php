@@ -2,15 +2,18 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\HasAraziCode;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 class KisanRegistry extends Model
 {
     use HasFactory;
+    use HasAraziCode;
 
     protected $fillable = [
         'arazi_id',
+        'arazi_code',
         'arazi_deed_no',
         'name_deed_no',
         'sale_by',

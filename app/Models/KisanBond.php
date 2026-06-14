@@ -2,16 +2,19 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\HasAraziCode;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 class KisanBond extends Model
 {
     use HasFactory;
+    use HasAraziCode;
 
     protected $fillable = [
         'kisan_id',
         'arazi_id',
+        'arazi_code',
         'bond_no',
         'bond_date',
         'bond_amount',
@@ -52,7 +55,7 @@ class KisanBond extends Model
     public function arazis()
     {
         return $this->belongsToMany(Arazi::class, 'kisan_bond_arazi')
-            ->withPivot(['land_size', 'sale_land', 'sale_rate', 'sale_amount'])
+            ->withPivot(['arazi_code', 'land_size', 'sale_land', 'sale_rate', 'sale_amount'])
             ->withTimestamps();
     }
 
