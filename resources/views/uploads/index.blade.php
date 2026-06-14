@@ -19,12 +19,12 @@
                 </div>
 
                 <div class="col-md-3">
-                    <label class="form-label small">Arazi</label>
-                    <select id="filter-arazi" name="arazi_id" class="form-select form-select-sm">
+                    <label class="form-label small">Arazi No.</label>
+                    <select name="arazi_code" id="filter-arazi" class="form-select form-select-sm">
                         <option value="">Any</option>
-                        @if(request('arazi_id') && $a = \App\Models\Arazi::find(request('arazi_id')))
-                            <option value="{{ $a->id }}" selected>{{ $a->legacy_arazi_code ?? ('Arazi '.$a->id) }}</option>
-                        @endif
+                        @foreach($araziOptions as $code)
+                            <option value="{{ $code }}" {{ $code === ($araziCode ?? '') ? 'selected' : '' }}>{{ $code }}</option>
+                        @endforeach
                     </select>
                 </div>
 
@@ -114,14 +114,7 @@
 $(function(){
     $('#filter-arazi').select2({
         theme: 'bootstrap-5',
-        placeholder: 'Search Arazi',
-        ajax: {
-            url: '{{ route('ajax.arazi.search') }}',
-            dataType: 'json',
-            delay: 250,
-            data: function(params){ return { q: params.term }; },
-            processResults: function(data){ return { results: data.results }; }
-        },
+        placeholder: 'Any Arazi',
         allowClear: true,
         width: '100%'
     });

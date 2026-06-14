@@ -15,7 +15,7 @@ class UploadController extends Controller
         $query = Upload::with('category','arazi')->latest();
 
         $category = request()->input('category');
-        $araziId = request()->input('arazi_id');
+        $araziCode  = trim((string) request()->input('arazi_code', ''));
         $unassigned = request()->boolean('unassigned');
         $q = request()->input('q');
         $dateFrom = request()->input('date_from');
@@ -25,8 +25,9 @@ class UploadController extends Controller
             $query->where('upload_category_id', $category);
         }
 
-        if ($araziId) {
-            $query->where('arazi_id', $araziId);
+        if ($araziCode !== '') {
+            $araziIds = Arazi::where('legacy_arazi_code', $araziCode)->pluck('id');
+            $query->whereIn('arazi_id', $araziIds);
         }
 
         if ($unassigned) {
@@ -50,32 +51,50 @@ class UploadController extends Controller
 
         $uploads = $query->paginate(40)->withQueryString();
 
-        $categories = UploadCategory::orderBy('name')->get();
+        $categories  = UploadCategory::orderBy('name')->get();
+        $araziOptions = Arazi::whereNotNull('legacy_arazi_code')
+            ->where('legacy_arazi_code', '!=', '')
+            ->orderBy('legacy_arazi_code')
+            ->pluck('legacy_arazi_code')
+            ->unique()
+            ->values();
 
-        return view('uploads.index', compact('uploads','categories'));
+        return view('uploads.index', compact('uploads', 'categories', 'araziOptions', 'araziCode'));
     }
 
     public function create()
     {
-        $categories = UploadCategory::orderBy('name')->pluck('name','id')->all();
-        return view('uploads.create', compact('categories'));
+        $categories   = UploadCategory::orderBy('name')->pluck('name', 'id')->all();
+        $araziOptions = Arazi::whereNotNull('legacy_arazi_code')
+            ->where('legacy_arazi_code', '!=', '')
+            ->orderBy('legacy_arazi_code')
+            ->pluck('legacy_arazi_code')
+            ->unique()
+            ->values();
+        return view('uploads.create', compact('categories', 'araziOptions'));
     }
 
     public function store(Request $request)
     {
         $validated = $request->validate([
             'upload_category_id' => 'required|exists:upload_categories,id',
-            'arazi_id' => 'nullable|exists:arazis,id',
-            'label' => 'nullable|string|max:191',
-            'file' => 'required|file|max:10240',
+            'arazi_code'         => 'nullable|string|max:40',
+            'label'              => 'nullable|string|max:191',
+            'file'               => 'required|file|max:10240',
         ]);
+
+        // Resolve arazi_code → first matching arazi_id
+        $araziId = null;
+        if (!empty($validated['arazi_code'])) {
+            $araziId = Arazi::where('legacy_arazi_code', $validated['arazi_code'])->value('id');
+        }
 
         $file = $request->file('file');
         $path = $file->store('uploads', 'public');
 
         $upload = Upload::create([
             'upload_category_id' => $validated['upload_category_id'],
-            'arazi_id' => $validated['arazi_id'] ?? null,
+            'arazi_id'           => $araziId,
             'label' => $validated['label'] ?? null,
             'file_path' => $path,
             'mime' => $file->getClientMimeType(),

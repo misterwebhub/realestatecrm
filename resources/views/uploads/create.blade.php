@@ -1,55 +1,74 @@
 @extends('layouts.app')
 
 @section('content')
-<div class="container py-3">
-    <div class="card">
-        <div class="card-body">
-            <h4>Create Upload</h4>
-            <form action="{{ route('uploads.store') }}" method="post" enctype="multipart/form-data">
-                @csrf
-                <div class="mb-3">
-                    <label class="form-label">Category</label>
-                    <select name="upload_category_id" class="form-select">
-                        @foreach($categories as $id => $label)
-                            <option value="{{ $id }}">{{ $label }}</option>
-                        @endforeach
-                    </select>
-                    <small class="form-text text-muted">You can add categories in Upload Categories.</small>
-                </div>
-                <div class="mb-3">
-                    <label class="form-label">Arazi (optional)</label>
-                    <select id="arazi-select" name="arazi_id" class="form-select"></select>
-                </div>
-                <div class="mb-3">
-                    <label class="form-label">Label</label>
-                    <input type="text" name="label" class="form-control" />
-                </div>
-                <div class="mb-3">
-                    <label class="form-label">File</label>
-                    <input type="file" name="file" class="form-control" />
-                </div>
-                <button class="btn btn-primary">Upload</button>
-            </form>
-        </div>
+<div class="card card-outline card-primary" style="max-width:600px;">
+    <div class="card-header d-flex align-items-center gap-2">
+        <h5 class="card-title mb-0 fw-bold">New Upload</h5>
+        <a href="{{ route('uploads.index') }}" class="btn btn-outline-secondary btn-sm ms-auto">
+            <i class="bi bi-arrow-left"></i> Back
+        </a>
+    </div>
+    <div class="card-body">
+        @if($errors->any())
+            <div class="alert alert-danger">
+                <ul class="mb-0">@foreach($errors->all() as $e)<li>{{ $e }}</li>@endforeach</ul>
+            </div>
+        @endif
+
+        <form action="{{ route('uploads.store') }}" method="POST" enctype="multipart/form-data">
+            @csrf
+
+            <div class="mb-3">
+                <label class="form-label fw-semibold">Category <span class="text-danger">*</span></label>
+                <select name="upload_category_id" class="form-select @error('upload_category_id') is-invalid @enderror">
+                    <option value="">-- Select Category --</option>
+                    @foreach($categories as $id => $label)
+                        <option value="{{ $id }}" {{ old('upload_category_id') == $id ? 'selected' : '' }}>{{ $label }}</option>
+                    @endforeach
+                </select>
+                @error('upload_category_id')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                <div class="form-text">Manage categories in Upload Categories.</div>
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label fw-semibold">Arazi No. <span class="text-muted fw-normal">(optional)</span></label>
+                <select name="arazi_code" id="arazi-select" class="form-select">
+                    <option value="">-- None --</option>
+                    @foreach($araziOptions as $code)
+                        <option value="{{ $code }}" {{ old('arazi_code') === $code ? 'selected' : '' }}>{{ $code }}</option>
+                    @endforeach
+                </select>
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label fw-semibold">Label</label>
+                <input type="text" name="label" value="{{ old('label') }}" class="form-control" placeholder="Optional description">
+            </div>
+
+            <div class="mb-4">
+                <label class="form-label fw-semibold">File <span class="text-danger">*</span></label>
+                <input type="file" name="file" class="form-control @error('file') is-invalid @enderror">
+                @error('file')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                <div class="form-text">Max 10 MB.</div>
+            </div>
+
+            <div class="d-flex gap-2">
+                <button class="btn btn-primary px-4"><i class="bi bi-upload"></i> Upload</button>
+                <a href="{{ route('uploads.index') }}" class="btn btn-outline-secondary">Cancel</a>
+            </div>
+        </form>
     </div>
 </div>
 @endsection
 
 @push('scripts')
-<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
-<link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
 <script>
-document.addEventListener('DOMContentLoaded', function(){
+$(function(){
     $('#arazi-select').select2({
-        placeholder: 'Select Arazi (or leave empty)',
+        theme: 'bootstrap-5',
+        placeholder: '-- None --',
         allowClear: true,
-        ajax: {
-            url: '{{ route('ajax.arazi.search') }}',
-            dataType: 'json',
-            delay: 250,
-            data: function(params){ return { q: params.term }; },
-            processResults: function(data){ return { results: data.results }; }
-        }
+        width: '100%'
     });
 });
 </script>
