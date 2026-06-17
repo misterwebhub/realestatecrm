@@ -134,7 +134,7 @@ class KisanRegistryController extends Controller
         $fileRule = ($existing !== null) ? ['nullable', 'file', 'max:10240'] : ['required', 'file', 'max:10240'];
 
         return $request->validate([
-            'arazi_id'       => ['nullable', 'integer', 'exists:arazis,id'],
+            'arazi_code'     => ['nullable', 'string', 'exists:arazis,legacy_arazi_code'],
             'arazi_deed_no'  => ['required', 'string', 'max:100'],
             'name_deed_no'   => ['required', 'string', 'max:100'],
             'sale_by'        => ['nullable', 'string', 'max:200'],

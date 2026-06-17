@@ -223,9 +223,19 @@
             <div class="container-fluid pb-4">
                 @if(session('success'))
                     <div class="alert alert-success alert-dismissible fade show" role="alert">
-                        {{ session('success') }}
+                        <i class="bi bi-check-circle-fill me-2"></i>{{ session('success') }}
                         <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
                     </div>
+                @endif
+                @if(session('error'))
+                    <div class="alert alert-danger alert-dismissible fade show d-flex align-items-center gap-2" role="alert" id="sessionErrorAlert">
+                        <i class="bi bi-exclamation-octagon-fill fs-5 flex-shrink-0"></i>
+                        <div><strong>Error:</strong> {{ session('error') }}</div>
+                        <button type="button" class="btn-close ms-auto" data-bs-dismiss="alert" aria-label="Close"></button>
+                    </div>
+                    <script>
+                        setTimeout(function(){ var el=document.getElementById('sessionErrorAlert'); if(el){ var a=bootstrap.Alert.getOrCreateInstance(el); a.close(); } }, 7000);
+                    </script>
                 @endif
 
                 @yield('content')

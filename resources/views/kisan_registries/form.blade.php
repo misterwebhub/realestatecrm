@@ -26,14 +26,13 @@
                 <div class="col-md-3">
                     <label class="form-label">Select Arazi</label>
                     @php
-                        $selectedAraziId = old('arazi_id', $item->arazi_id ?? null);
+                        $selectedAraziCode = old('arazi_code', $item->arazi_code ?? null);
                         $groups = collect($arazis ?? [])->groupBy(function($a){ return $a->legacy_arazi_code ?: ('Arazi-' . $a->id); });
                     @endphp
-                    <select id="arazi_select" name="arazi_id" class="form-select">
+                    <select id="arazi_select" name="arazi_code" class="form-select">
                         <option value="">-- choose arazi --</option>
                         @foreach($groups as $code => $group)
-                            @php $first = $group->first(); @endphp
-                            <option value="{{ $first->id }}" data-code="{{ $code }}" {{ (string)$selectedAraziId === (string)$first->id ? 'selected' : '' }}>{{ $code }}</option>
+                            <option value="{{ $code }}" {{ (string)$selectedAraziCode === (string)$code ? 'selected' : '' }}>{{ $code }}</option>
                         @endforeach
                     </select>
                 </div>
@@ -200,7 +199,7 @@
             // If selection was made from modal, use that arazi id directly
             if(window.__selectedFromModal){
                 window.__selectedFromModal = false;
-                $.getJSON("{{ route('ajax.kisans.by-arazi') }}", { arazi_id: val })
+                $.getJSON("{{ route('ajax.kisans.by-arazi') }}", { arazi_code: val })
                     .done(function(data){ populateKisans(data || []); })
                     .fail(function(){ resetKisanSelects(); });
                 (async function(){
@@ -222,7 +221,7 @@
             // If user re-selects the same grouped option already resolved from modal — skip modal
             if(araziSelect.dataset.resolvedAraziId && araziSelect.dataset.resolvedForValue === val){
                 const rid = araziSelect.dataset.resolvedAraziId;
-                $.getJSON("{{ route('ajax.kisans.by-arazi') }}", { arazi_id: rid })
+                $.getJSON("{{ route('ajax.kisans.by-arazi') }}", { arazi_code: val })
                     .done(function(data){ populateKisans(data || []); })
                     .fail(function(){ resetKisanSelects(); });
                 (async function(){
@@ -243,9 +242,8 @@
             araziSelect.dataset.resolvedAraziId = '';
             araziSelect.dataset.resolvedForValue = '';
 
-            // Lookup by arazi code
-            const opt = araziSelect.options[araziSelect.selectedIndex];
-            const code = opt?.dataset?.code || '';
+            // Lookup by arazi code — val IS the legacy_arazi_code (option value = code)
+            const code = val || '';
             if(code){
                 (async function(){
                     try{
@@ -256,8 +254,8 @@
                             try{ showAraziMatches(json.matches); }catch(e){}
                             return;
                         }
-                        const araziId = (json.found && json.arazi_id) ? json.arazi_id : val;
-                        $.getJSON("{{ route('ajax.kisans.by-arazi') }}", { arazi_id: araziId })
+                        const araziId = (json.found && json.arazi_id) ? json.arazi_id : null;
+                        $.getJSON("{{ route('ajax.kisans.by-arazi') }}", { arazi_code: code })
                             .done(function(data){ populateKisans(data || []); })
                             .fail(function(){ resetKisanSelects(); });
                         const infoRes = await fetch(araziInfoUrl.replace('__ARAZI_ID__', encodeURIComponent(araziId)));
@@ -279,17 +277,17 @@
             try{ $('#sale_by_input').val($(this).val()); }catch(e){}
         });
 
-        // On page load (edit): fetch kisans directly by saved arazi_id — never open modal on load
-        @if(!empty($item->arazi_id))
+        // On page load (edit): fetch kisans directly by saved arazi_code — never open modal on load
+        @if(!empty($item->arazi_code))
         (function(){
-            const savedId = @json((string)($item->arazi_id));
+            const savedCode = @json((string)($item->arazi_code));
             const savedVal = araziSelect ? araziSelect.value : '';
             // Pre-mark as resolved so any subsequent re-selection also skips the modal
             if(araziSelect){
-                araziSelect.dataset.resolvedAraziId = savedId;
+                araziSelect.dataset.resolvedAraziId = savedCode;
                 araziSelect.dataset.resolvedForValue = savedVal;
             }
-            $.getJSON("{{ route('ajax.kisans.by-arazi') }}", { arazi_id: savedId })
+            $.getJSON("{{ route('ajax.kisans.by-arazi') }}", { arazi_code: savedCode })
                 .done(function(data){
                     populateKisans(data || []);
                     // Re-select saved name_deed_no after kisans are populated
@@ -332,9 +330,9 @@
                     if(!matched){ /* leave select as-is */ }
                 }catch(e){}
 
-                // directly fetch kisans and arazi info for the exact arazi id selected in modal
+                // directly fetch kisans and arazi info for the exact arazi selected in modal
                 try{
-                    $.getJSON("{{ route('ajax.kisans.by-arazi') }}", { arazi_id: a.id })
+                    $.getJSON("{{ route('ajax.kisans.by-arazi') }}", { arazi_code: a.arazi_code || a.label })
                         .done(function(data){ populateKisans(data || []); })
                         .fail(function(){ resetKisanSelects(); });
 

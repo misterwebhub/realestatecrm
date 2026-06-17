@@ -40,10 +40,41 @@ class CustomerBondPaymentController extends Controller
 
     public function index(\Illuminate\Http\Request $request)
     {
-        $q         = trim((string) $request->input('q', ''));
-        $bondQ     = trim((string) $request->input('bond', ''));
-        $araziCode = trim((string) $request->input('arazi_code', ''));
-        $plotQ     = trim((string) $request->input('plot', ''));
+        // ── Bond-level inline ledger ──────────────────────────────────────────
+        $bondId = $request->query('bond_id');
+        if ($bondId) {
+            $bond = CustomerBond::with(['customer', 'arazi', 'plots'])
+                ->withSum('payments as total_paid', 'amount')
+                ->findOrFail($bondId);
+
+            $entries = CustomerBondPayment::where('customer_bond_id', $bondId)
+                ->orderBy('entry_date')
+                ->orderBy('id')
+                ->get();
+
+            $totalPaid    = (float) ($bond->total_paid ?? 0);
+            $totalAmount  = (float) ($bond->total_amount ?? $bond->bond_amount ?? 0);
+            $balance      = max($totalAmount - $totalPaid, 0);
+            $routeName    = $this->resourceRouteName();
+
+            return view('customer_payments.bond_ledger', [
+                'title'      => 'Payment Ledger — '.$bond->bond_no,
+                'bond'       => $bond,
+                'entries'    => $entries,
+                'totalPaid'  => $totalPaid,
+                'totalAmount'=> $totalAmount,
+                'balance'    => $balance,
+                'routeName'  => $routeName,
+            ]);
+        }
+
+        // ── Standard payment index ────────────────────────────────────────────
+        $q           = trim((string) $request->input('q', ''));
+        $bondQ       = trim((string) $request->input('bond', ''));
+        $araziCode   = trim((string) $request->input('arazi_code', ''));
+        $plotQ       = trim((string) $request->input('plot', ''));
+        $entryType   = trim((string) $request->input('entry_type', ''));
+        $creditDebit = trim((string) $request->input('credit_debit', ''));
 
         $query = $this->resourceQuery();
 
@@ -80,6 +111,18 @@ class CustomerBondPaymentController extends Controller
             );
         }
 
+        // Filter by entry type (advance, installment, final, etc.)
+        if ($entryType !== '') {
+            $query->where('entry_type', $entryType);
+        }
+
+        // Filter by credit / debit
+        if ($creditDebit === 'credit') {
+            $query->whereNotIn('entry_type', ['return', 'discount']);
+        } elseif ($creditDebit === 'debit') {
+            $query->whereIn('entry_type', ['return', 'discount']);
+        }
+
         $records   = $query->get();
         $routeName = $this->resourceRouteName();
 
@@ -104,6 +147,8 @@ class CustomerBondPaymentController extends Controller
             'cp_bond'                => $bondQ,
             'cp_arazi'               => $araziCode,
             'cp_plot'                => $plotQ,
+            'cp_entry_type'          => $entryType,
+            'cp_credit_debit'        => $creditDebit,
         ]);
     }
 
@@ -329,7 +374,7 @@ class CustomerBondPaymentController extends Controller
 
     protected function resourceColumns(): array
     {
-        return ['Entry No', 'Bond', 'Customer', 'Arazi', 'Plot', 'Land Size', 'Entry Date', 'Type', 'Amount'];
+        return ['Entry No', 'Bond', 'Customer', 'Arazi', 'Plot', 'Land Size', 'Entry Date', 'Type', 'Credit', 'Debit', 'Taken By'];
     }
 
     protected function resourceFields(?Model $item = null): array
@@ -401,6 +446,13 @@ class CustomerBondPaymentController extends Controller
             // witness_name removed per request
             ['name' => 'amount', 'label' => 'Amount', 'type' => 'number', 'step' => '0.01', 'value' => $item?->amount, 'required' => true],
             ['name' => 'payment_method', 'label' => 'Payment Method', 'type' => 'text', 'value' => $item?->payment_method],
+            [
+                'name'    => 'taken_by_user_id',
+                'label'   => 'Taken By',
+                'type'    => 'select',
+                'options' => \App\Models\User::orderBy('name')->pluck('name', 'id')->all(),
+                'value'   => $item?->taken_by_user_id ?? auth()->id(),
+            ],
             ['name' => 'remarks', 'label' => 'Remarks', 'type' => 'textarea', 'value' => $item?->remarks],
         ];
     }
@@ -445,7 +497,7 @@ class CustomerBondPaymentController extends Controller
             'land_size' => ['nullable', 'numeric', 'min:0'],
             'amount' => ['required', 'numeric', 'min:0'],
             'payment_method' => ['nullable', 'string', 'max:40'],
-            'taken_by_user_id' => ['required', 'exists:users,id'],
+            'taken_by_user_id' => ['nullable', 'exists:users,id'],
             'remarks' => ['nullable', 'string'],
         ];
     }
@@ -534,7 +586,7 @@ class CustomerBondPaymentController extends Controller
 
     protected function resourceQuery()
     {
-        return CustomerBondPayment::with(['customerBond.customer', 'customer', 'arazi', 'plot'])
+        return CustomerBondPayment::with(['customerBond.customer', 'customer', 'arazi', 'plot', 'takenByUser'])
             ->whereNotNull('customer_bond_id')
             ->latest();
     }
@@ -552,7 +604,9 @@ class CustomerBondPaymentController extends Controller
                 (string) ($item->land_size ?? '-'),
                 optional($item->entry_date)->format('d-m-Y') ?? '-',
                 ucfirst($item->entry_type),
-                number_format((float) $item->amount, 2),
+                in_array($item->entry_type, ['return', 'discount']) ? '—' : number_format((float) $item->amount, 2),
+                in_array($item->entry_type, ['return', 'discount']) ? number_format((float) $item->amount, 2) : '—',
+                $item->takenByUser?->name ?? '—',
             ],
         ];
     }

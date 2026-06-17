@@ -66,7 +66,7 @@
             <input type="hidden" name="receipt_no"        id="h_receipt_no"   value="{{ old('receipt_no', $item->receipt_no ?? '') }}">
             <input type="hidden" name="customer_bond_id"  id="h_bond_id"      value="{{ old('customer_bond_id', '') }}">
             <input type="hidden" name="customer_id"       id="h_customer_id"  value="{{ old('customer_id', $item->customer_id ?? '') }}">
-            <input type="hidden" name="arazi_id"          id="h_arazi_id"     value="{{ old('arazi_id', $item->arazi_id ?? '') }}">
+            <input type="hidden" name="arazi_code"        id="h_arazi_code"   value="{{ old('arazi_code', $item->arazi_code ?? '') }}">
             <input type="hidden" name="plot_id"           id="h_plot_id"      value="{{ old('plot_id', $item->plot_id ?? '') }}">
             <input type="hidden" name="registry_amount"   id="h_bond_amount"  value="{{ old('registry_amount', $item->registry_amount ?? '') }}">
             <input type="hidden" name="pending_amount"    id="h_pending"      value="">
@@ -91,7 +91,7 @@
             @error('customer_id')
                 <div class="alert alert-danger py-2 small">Please search and select a bond first. ({{ $message }})</div>
             @enderror
-            @error('arazi_id')
+            @error('arazi_code')
                 <div class="alert alert-danger py-2 small">{{ $message }}</div>
             @enderror
 
@@ -157,6 +157,22 @@
                         value="{{ old('registry_date', optional($item->registry_date)->format('Y-m-d') ?? date('Y-m-d')) }}"
                         class="form-control form-control-sm @error('registry_date') is-invalid @enderror">
                     @error('registry_date')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label small fw-semibold">Deed No <span class="text-danger">*</span></label>
+                    <input type="text" name="deed_no"
+                        value="{{ old('deed_no', $item->deed_no ?? '') }}"
+                        class="form-control form-control-sm @error('deed_no') is-invalid @enderror"
+                        placeholder="e.g. DEED-2024-001" required>
+                    @error('deed_no')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label small fw-semibold">Circle Value</label>
+                    <input type="number" name="circle_value" step="0.01" min="0"
+                        value="{{ old('circle_value', $item->circle_value ?? '') }}"
+                        class="form-control form-control-sm @error('circle_value') is-invalid @enderror"
+                        placeholder="e.g. 50000.00">
+                    @error('circle_value')<div class="invalid-feedback">{{ $message }}</div>@enderror
                 </div>
             </div>
 
@@ -264,7 +280,7 @@
     function applyBond(b){
         $('h_bond_id').value      = b.bond_id    || '';
         $('h_customer_id').value  = b.customer_id || '';
-        $('h_arazi_id').value     = b.arazi_id   || '';
+        $('h_arazi_code').value   = b.arazi_code || '';
         $('h_bond_amount').value  = b.bond_amount || '';
         $('h_pending').value      = b.pending_amount || '';
 
@@ -404,7 +420,7 @@
 
     /* ── Clear applied bond ── */
     $('clearBondBtn')?.addEventListener('click', () => {
-        ['h_bond_id','h_customer_id','h_arazi_id','h_plot_id','h_bond_amount','h_pending'].forEach(id => {
+        ['h_bond_id','h_customer_id','h_arazi_code','h_plot_id','h_bond_amount','h_pending'].forEach(id => {
             const el=$(id); if(el) el.value='';
         });
         ['d_customer_name','d_mobile','d_alt_mobile','d_arazi_code','d_plot_title','d_bond_amount','d_pending'].forEach(id => {

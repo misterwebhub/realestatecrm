@@ -33,6 +33,10 @@
                     <input type="text" name="reg_no" value="{{ $filterRegNo ?? '' }}"
                         class="form-control form-control-sm" placeholder="Registry / Bond No.">
                 </div>
+                <div style="min-width:160px; flex:1 1 160px;">
+                    <input type="text" name="deed_no" value="{{ $filterDeedNo ?? '' }}"
+                        class="form-control form-control-sm" placeholder="Deed No.">
+                </div>
                 <button type="submit" class="btn btn-primary btn-sm"><i class="bi bi-search"></i> Search</button>
                 <a href="{{ route('registries.index') }}" class="btn btn-outline-secondary btn-sm">Reset</a>
             </form>

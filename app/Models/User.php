@@ -48,4 +48,9 @@ class User extends Authenticatable
         'email_verified_at' => 'datetime',
         'password' => 'hashed',
     ];
+
+    public function payments()
+    {
+        return $this->hasMany(\App\Models\CustomerBondPayment::class, 'taken_by_user_id');
+    }
 }

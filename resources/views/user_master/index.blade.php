@@ -20,6 +20,7 @@
                         <th style="font-size:12px;font-weight:700;text-transform:uppercase;color:#64748b;">Email</th>
                         <th style="font-size:12px;font-weight:700;text-transform:uppercase;color:#64748b;">Role</th>
                         <th style="font-size:12px;font-weight:700;text-transform:uppercase;color:#64748b;">Status</th>
+                        <th class="text-center" style="font-size:12px;font-weight:700;text-transform:uppercase;color:#64748b;">Receipts</th>
                         <th class="text-end pe-3" style="font-size:12px;font-weight:700;text-transform:uppercase;color:#64748b;">Actions</th>
                     </tr>
                 </thead>
@@ -53,7 +54,17 @@
                                 <span class="badge bg-secondary-subtle text-secondary border border-secondary-subtle">Inactive</span>
                             @endif
                         </td>
+                        <td class="text-center">
+                            <a href="{{ route('user-master.receipts', $user) }}" class="text-decoration-none">
+                                <span class="badge bg-info-subtle text-info border border-info-subtle" style="font-size:12px;">
+                                    {{ $user->receipt_count ?? 0 }}
+                                </span>
+                            </a>
+                        </td>
                         <td class="text-end pe-3" style="white-space:nowrap;">
+                            <a href="{{ route('user-master.receipts', $user) }}" class="btn btn-outline-info btn-sm me-1" title="Receipt Dashboard">
+                                <i class="bi bi-receipt"></i> View All Receipts
+                            </a>
                             <a href="{{ route('user-master.edit', $user) }}" class="btn btn-outline-secondary btn-sm">Edit</a>
                             @if($user->id !== auth()->id())
                             <form action="{{ route('user-master.destroy', $user) }}" method="POST" class="d-inline-block ms-1" onsubmit="return confirm('Delete this user?')">
@@ -65,7 +76,7 @@
                     </tr>
                     @empty
                     <tr>
-                        <td colspan="8" class="text-center py-5 text-muted">
+                        <td colspan="9" class="text-center py-5 text-muted">
                             <div style="font-size:32px;">👤</div>
                             <div class="mt-2">No users yet.</div>
                             <a href="{{ route('user-master.create') }}" class="btn btn-sm btn-primary mt-2">Add First User</a>

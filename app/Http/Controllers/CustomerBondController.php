@@ -402,7 +402,7 @@ class CustomerBondController extends Controller
             'pdf_url' => route('customer-bonds.pdf', $item->id),
             'action_buttons' => [
                 [
-                    'url'   => route('customer-bond-payments.ledger', ['bond_id' => $item->id]),
+                    'url'   => route('customer-bond-payments.index', ['bond_id' => $item->id]),
                     'label' => 'Ledger',
                     'class' => 'btn-outline-success',
                 ],

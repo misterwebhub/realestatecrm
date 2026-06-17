@@ -55,7 +55,7 @@ class RegistryController extends Controller
 
     protected function resourceColumns(): array
     {
-        return ['Reg Code', 'Customer', 'Arazi', 'Plot', 'Booking Mode', 'Registry Date', 'Amount', 'Lock', 'Status'];
+        return ['Reg Code', 'Customer', 'Arazi', 'Plot', 'Booking Mode', 'Registry Date', 'Deed No', 'Circle Value', 'Amount', 'Lock', 'Status'];
     }
 
     protected function resourceFields(?Model $item = null): array
@@ -70,11 +70,13 @@ class RegistryController extends Controller
                 'required' => true,
             ],
             [
-                'name' => 'arazi_id',
+                'name' => 'arazi_code',
                 'label' => 'Arazi',
                 'type' => 'select',
-                'options' => Arazi::orderBy('plot_number')->pluck('plot_number', 'id')->all(),
-                'value' => $item?->arazi_id,
+                'options' => Arazi::whereNotNull('legacy_arazi_code')->where('legacy_arazi_code', '<>', '')
+                    ->orderBy('legacy_arazi_code')->pluck('legacy_arazi_code')->unique()
+                    ->mapWithKeys(fn($c) => [$c => $c])->all(),
+                'value' => $item?->arazi_code,
                 'required' => true,
             ],
             [
@@ -94,7 +96,8 @@ class RegistryController extends Controller
             ],
             ['name' => 'registry_code', 'label' => 'Registry Code', 'type' => 'text', 'value' => $item?->registry_code],
             ['name' => 'customer_reg_no', 'label' => 'Legacy Customer Reg No', 'type' => 'text', 'value' => $item?->customer_reg_no],
-            ['name' => 'registry_date', 'label' => 'Registry Date', 'type' => 'date', 'value' => optional($item?->registry_date)->format('Y-m-d'), 'required' => true],
+            ['name' => 'registry_date',  'label' => 'Registry Date',  'type' => 'date',   'value' => optional($item?->registry_date)->format('Y-m-d'), 'required' => true],
+            ['name' => 'circle_value',   'label' => 'Circle Value',   'type' => 'number', 'step' => '0.01', 'value' => $item?->circle_value, 'placeholder' => 'Enter circle value'],
             ['name' => 'booking_mode', 'label' => 'Booking Mode', 'type' => 'select', 'options' => ['cash' => 'Cash', 'emi' => 'EMI', 'mixed' => 'Mixed', 'other' => 'Other'], 'value' => $item?->booking_mode ?? 'other', 'required' => true],
             ['name' => 'land_size', 'label' => 'Land Size', 'type' => 'number', 'step' => '0.01', 'value' => $item?->land_size, 'required' => true, 'placeholder' => 'Enter land size (required)'],
             ['name' => 'registry_amount', 'label' => 'Registry Amount', 'type' => 'number', 'step' => '0.01', 'value' => $item?->registry_amount],
@@ -118,9 +121,14 @@ class RegistryController extends Controller
     {
         return [
             'customer_id'      => ['required', 'exists:customers,id'],
-            'arazi_id'         => ['required', 'exists:arazis,id'],
+            'arazi_code'       => [
+                'required', 'string', 'exists:arazis,legacy_arazi_code',
+                Rule::unique('registries', 'arazi_code')->ignore($item?->id),
+            ],
             'plot_id'          => ['nullable', 'exists:plots,id'],
             'registry_date'    => ['required', 'date'],
+            'deed_no'          => ['required', 'string', 'max:100'],
+            'circle_value'     => ['nullable', 'numeric', 'min:0'],
             'booking_mode'     => ['nullable', 'in:cash,emi,mixed,other'],
             'land_size'        => ['nullable', 'numeric', 'min:0'],
             'registry_amount'  => ['nullable', 'numeric', 'min:0'],
@@ -190,6 +198,39 @@ class RegistryController extends Controller
         return Registry::with(['customer', 'arazi', 'agent'])->latest();
     }
 
+    public function store(Request $request)
+    {
+        $request->validate($this->resourceRules(), [
+            'arazi_code.unique' => 'A registry already exists for this Arazi. Each Arazi can only have one registry.',
+        ]);
+        try {
+            return parent::store($request);
+        } catch (\Illuminate\Database\QueryException $e) {
+            if ($e->errorInfo[1] === 1062) {
+                return redirect()->back()->withInput()
+                    ->with('error', 'A registry already exists for this Arazi. Each Arazi can only have one registry.');
+            }
+            throw $e;
+        }
+    }
+
+    public function update(Request $request, $id)
+    {
+        $item = Registry::findOrFail($id);
+        $request->validate($this->resourceRules($item), [
+            'arazi_code.unique' => 'A registry already exists for this Arazi. Each Arazi can only have one registry.',
+        ]);
+        try {
+            return parent::update($request, $id);
+        } catch (\Illuminate\Database\QueryException $e) {
+            if ($e->errorInfo[1] === 1062) {
+                return redirect()->back()->withInput()
+                    ->with('error', 'A registry already exists for this Arazi. Each Arazi can only have one registry.');
+            }
+            throw $e;
+        }
+    }
+
     // Override index to support search filters for plot registry listing
     public function index(Request $request)
     {
@@ -198,6 +239,7 @@ class RegistryController extends Controller
         $filterAraziCode = trim((string) $request->input('arazi_code', ''));
         $filterPlotId    = $request->input('plot_id');
         $filterRegNo     = trim((string) $request->input('reg_no', ''));
+        $filterDeedNo    = trim((string) $request->input('deed_no', ''));
 
         if ($filterAraziCode !== '') {
             $q->where('arazi_code', $filterAraziCode);
@@ -213,6 +255,10 @@ class RegistryController extends Controller
                    ->orWhere('receipt_no', 'like', "%{$filterRegNo}%")
                    ->orWhere('customer_reg_no', 'like', "%{$filterRegNo}%");
             });
+        }
+
+        if ($filterDeedNo !== '') {
+            $q->where('deed_no', 'like', "%{$filterDeedNo}%");
         }
 
         $records = $q->latest()->get();
@@ -250,6 +296,7 @@ class RegistryController extends Controller
             'filterAraziCode' => $filterAraziCode,
             'filterPlotId'    => $filterPlotId,
             'filterRegNo'     => $filterRegNo,
+            'filterDeedNo'    => $filterDeedNo,
         ]);
     }
 
@@ -340,6 +387,8 @@ class RegistryController extends Controller
                 $item->plot?->title ?? $item->plot?->plot_number ?? '-',
                 strtoupper((string) $item->booking_mode),
                 optional($item->registry_date)->format('d-m-Y') ?? '-',
+                $item->deed_no ?? '—',
+                $item->circle_value !== null ? number_format((float) $item->circle_value, 2) : '—',
                 number_format((float) ($item->registry_amount ?? $item->land_size), 2),
                 ucfirst((string) $item->lock_status),
                 ucfirst($item->status),
@@ -430,8 +479,7 @@ class RegistryController extends Controller
                 'customer_name'    => $bond->customer?->name ?? '',
                 'mobile'           => $bond->customer?->mobile ?? '',
                 'secondary_mobile' => $bond->customer?->secondary_mobile ?? '',
-                'arazi_id'         => $bond->arazi_id,
-                'arazi_code'       => $bond->arazi?->legacy_arazi_code ?: ($bond->arazi?->plot_number ?? ''),
+                'arazi_code'       => $bond->arazi_code ?: ($bond->arazi?->legacy_arazi_code ?? ''),
                 'plots'            => $bond->plots->map(fn ($p) => ['id' => $p->id, 'title' => $p->title ?? $p->plot_number])->values(),
                 'bond_amount'      => $total,
                 'paid_amount'      => $netPaid,

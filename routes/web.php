@@ -128,6 +128,7 @@ Route::middleware('auth')->group(function () {
     
     // User Master
     Route::get('user-master/list', [UserMasterController::class, 'list'])->name('user-master.list');
+    Route::get('user-master/{userMaster}/receipts', [UserMasterController::class, 'receipts'])->name('user-master.receipts');
     Route::resource('user-master', UserMasterController::class)->except(['show'])->parameters(['user-master' => 'userMaster']);
 
     // Expenses

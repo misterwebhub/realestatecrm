@@ -56,6 +56,23 @@
                         <input type="text" name="plot" value="{{ $cp_plot ?? '' }}"
                                class="form-control form-control-sm" placeholder="Plot title…">
                     </div>
+                    <div class="col-md-2">
+                        <label class="form-label small fw-semibold mb-1">Type</label>
+                        <select name="entry_type" class="form-select form-select-sm">
+                            <option value="">All Types</option>
+                            @foreach(['advance'=>'Advance','installment'=>'Installment','final'=>'Final','penalty'=>'Penalty','return'=>'Return','discount'=>'Discount','other'=>'Other'] as $val => $label)
+                                <option value="{{ $val }}" {{ ($cp_entry_type ?? '') === $val ? 'selected' : '' }}>{{ $label }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div class="col-md-1">
+                        <label class="form-label small fw-semibold mb-1">Credit/Debit</label>
+                        <select name="credit_debit" class="form-select form-select-sm">
+                            <option value="">All</option>
+                            <option value="credit" {{ ($cp_credit_debit ?? '') === 'credit' ? 'selected' : '' }}>Credit</option>
+                            <option value="debit"  {{ ($cp_credit_debit ?? '') === 'debit'  ? 'selected' : '' }}>Debit</option>
+                        </select>
+                    </div>
                     <div class="col-auto d-flex gap-2">
                         <button type="submit" class="btn btn-primary btn-sm">Search</button>
                         <a href="{{ route('customer-bond-payments.index') }}" class="btn btn-outline-secondary btn-sm">Clear</a>
@@ -132,10 +149,10 @@
                 <form class="row g-2 align-items-end" method="GET">
                     <div class="col-2">
                         <label class="form-label small">Arazi</label>
-                        <select id="filter-arazi" name="arazi_id" class="form-select form-select-sm">
+                        <select id="filter-arazi" name="arazi_code" class="form-select form-select-sm">
                             <option value="">All</option>
-                            @foreach($arazis ?? [] as $id => $label)
-                                <option value="{{ $id }}" @selected((string)$filter_arazi === (string)$id)>{{ $label }}</option>
+                            @foreach($arazis ?? [] as $code => $label)
+                                <option value="{{ $code }}" @selected((string)$filter_arazi === (string)$code)>{{ $label }}</option>
                             @endforeach
                         </select>
                     </div>
@@ -223,6 +240,10 @@
                                         </table>
                                     @endif
                                 </td>
+                            @elseif(!empty($isCustomerPaymentIndex) && $colIndex === 8 && $cell !== '—')
+                                <td class="text-success fw-semibold">{{ $cell }}</td>
+                            @elseif(!empty($isCustomerPaymentIndex) && $colIndex === 9 && $cell !== '—')
+                                <td class="text-danger fw-semibold">{{ $cell }}</td>
                             @else
                                 <td style="{{ $hasBondArazi ? 'padding:10px 8px;' : '' }}">{{ $cell }}</td>
                             @endif

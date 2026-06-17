@@ -11,7 +11,7 @@ class UserMasterController extends Controller
 {
     public function index()
     {
-        $users = User::orderBy('name')->get();
+        $users = User::withCount(['payments as receipt_count'])->orderBy('name')->get();
         return view('user_master.index', ['users' => $users]);
     }
 
@@ -91,6 +91,53 @@ class UserMasterController extends Controller
         }
         $userMaster->delete();
         return redirect()->route('user-master.index')->with('success', 'User deleted.');
+    }
+
+    public function receipts(Request $request, User $userMaster)
+    {
+        $dateFrom = $request->query('date_from', '');
+        $dateTo   = $request->query('date_to', '');
+
+        $payments = \App\Models\CustomerBondPayment::with([
+                'customerBond.customer',
+                'customerBond.arazi',
+                'customerBond.plots',
+            ])
+            ->where('taken_by_user_id', $userMaster->id)
+            ->when($dateFrom, fn ($q) => $q->whereDate('entry_date', '>=', $dateFrom))
+            ->when($dateTo,   fn ($q) => $q->whereDate('entry_date', '<=', $dateTo))
+            ->orderBy('entry_date')
+            ->orderBy('id')
+            ->get();
+
+        // Group by bond
+        $byBond = $payments->groupBy('customer_bond_id')->map(function ($entries) {
+            $bond       = $entries->first()->customerBond;
+            $totalCredit = $entries->whereNotIn('entry_type', ['return','discount'])->sum('amount');
+            $totalDebit  = $entries->whereIn('entry_type', ['return','discount'])->sum('amount');
+            return [
+                'bond'        => $bond,
+                'entries'     => $entries,
+                'credit'      => $totalCredit,
+                'debit'       => $totalDebit,
+                'net'         => $totalCredit - $totalDebit,
+            ];
+        })->values();
+
+        $grandCredit = $payments->whereNotIn('entry_type', ['return','discount'])->sum('amount');
+        $grandDebit  = $payments->whereIn('entry_type', ['return','discount'])->sum('amount');
+
+        return view('user_master.receipts', [
+            'user'        => $userMaster,
+            'byBond'      => $byBond,
+            'payments'    => $payments,
+            'grandCredit' => $grandCredit,
+            'grandDebit'  => $grandDebit,
+            'grandNet'    => $grandCredit - $grandDebit,
+            'dateFrom'    => $dateFrom,
+            'dateTo'      => $dateTo,
+            'title'       => 'Receipt Dashboard — ' . $userMaster->name,
+        ]);
     }
 
     /** JSON list for select boxes */

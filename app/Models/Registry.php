@@ -22,6 +22,8 @@ class Registry extends Model
         'agent_id',
         'check_by_agent_id',
         'registry_date',
+        'deed_no',
+        'circle_value',
         'booking_mode',
         'land_size',
         'registry_amount',
@@ -60,7 +62,7 @@ class Registry extends Model
 
     public function arazi()
     {
-        return $this->belongsTo(Arazi::class);
+        return $this->belongsTo(Arazi::class, 'arazi_code', 'legacy_arazi_code');
     }
 
     public function agent()
