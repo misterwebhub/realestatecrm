@@ -115,18 +115,22 @@ class CustomerBondPaymentController extends Controller
         $dateFrom        = $request->query('date_from', '');
         $dateTo          = $request->query('date_to', '');
         $lowProgress     = (bool) $request->query('low_progress', false);
+        $selectedBondId  = $request->query('bond_id');
+        $selectedCustomerId = $request->query('customer_id');
 
         $bondsQuery = CustomerBond::with(['customer', 'arazi', 'plots'])
             ->withSum(['payments as paid_amount' => function ($query) use ($dateFrom, $dateTo) {
                 if ($dateFrom) $query->whereDate('entry_date', '>=', $dateFrom);
                 if ($dateTo)   $query->whereDate('entry_date', '<=', $dateTo);
             }], 'amount')
-            ->when($q, fn ($query) => $query->whereHas('customer', fn ($c) =>
+            ->when($selectedBondId, fn ($query) => $query->where('id', $selectedBondId))
+            ->when($selectedCustomerId && !$selectedBondId, fn ($query) => $query->where('customer_id', $selectedCustomerId))
+            ->when(!$selectedBondId && !$selectedCustomerId && $q, fn ($query) => $query->whereHas('customer', fn ($c) =>
                 $c->where('name', 'like', '%'.$q.'%')
                   ->orWhere('mobile', 'like', '%'.$q.'%')
             ))
-            ->when($araziCode !== '', fn ($query) => $query->where('arazi_code', $araziCode))
-            ->when($plotQ, fn ($query) => $query->whereHas('plots', fn ($p) =>
+            ->when(!$selectedBondId && $araziCode !== '', fn ($query) => $query->where('arazi_code', $araziCode))
+            ->when(!$selectedBondId && $plotQ, fn ($query) => $query->whereHas('plots', fn ($p) =>
                 $p->where('title', 'like', '%'.$plotQ.'%')
                   ->orWhere('plot_number', 'like', '%'.$plotQ.'%')
             ))
@@ -157,9 +161,39 @@ class CustomerBondPaymentController extends Controller
             ];
         });
 
-        // Apply low-progress filter (< 50%) after mapping
-        if ($lowProgress) {
+        // Apply low-progress filter (< 50%) after mapping (only on full list, not single-bond)
+        if ($lowProgress && !$selectedBondId) {
             $bonds = $bonds->filter(fn ($b) => $b['pct'] < 50)->values();
+        }
+
+        // Load payment entries + full bond object when a specific bond is requested
+        $entries       = collect([]);
+        $selectedBond  = null;
+        if ($selectedBondId) {
+            $selectedBond = CustomerBond::with(['customer', 'arazi', 'plots', 'broker', 'witnesses'])
+                ->withSum('payments as total_paid', 'amount')
+                ->find($selectedBondId);
+
+            if ($selectedBond) {
+                $entries = \App\Models\CustomerBondPayment::with(['customerBond.customer'])
+                    ->where('customer_bond_id', $selectedBondId)
+                    ->orderBy('entry_date')
+                    ->orderBy('id')
+                    ->get()
+                    ->map(function (\App\Models\CustomerBondPayment $payment) {
+                        return [
+                            'entry_no'  => $payment->entry_no ?? '-',
+                            'bond_no'   => $payment->customerBond?->bond_no ?? '-',
+                            'party'     => $payment->customerBond?->customer?->name ?? '-',
+                            'date'      => optional($payment->entry_date)->format('d-m-Y') ?? '-',
+                            'type'      => ucfirst($payment->entry_type ?? 'payment'),
+                            'amount'    => (float) $payment->amount,
+                            'method'    => $payment->payment_method ?? '-',
+                            'remarks'   => $payment->remarks ?? '-',
+                            'is_debit'  => in_array($payment->entry_type, ['return', 'discount']),
+                        ];
+                    });
+            }
         }
 
         return view('ledgers.bond_payments', [
@@ -167,12 +201,13 @@ class CustomerBondPaymentController extends Controller
             'bondLabel'        => 'Customer Bond',
             'partyLabel'       => 'Customer',
             'filterName'       => 'bond_id',
-            'selectedBondId'   => null,
+            'selectedBondId'   => $selectedBondId,
+            'selectedBond'     => $selectedBond,
             'partyFilterName'  => 'customer_id',
-            'selectedPartyId'  => null,
+            'selectedPartyId'  => $selectedCustomerId,
             'isCustomerLedger' => true,
             'bonds'            => $bonds,
-            'entries'          => collect([]),
+            'entries'          => $entries,
             // filter state for repopulating form
             'cl_q'             => $q,
             'cl_arazi'         => $araziCode,
@@ -181,12 +216,13 @@ class CustomerBondPaymentController extends Controller
             'cl_date_to'       => $dateTo,
             'cl_low_progress'  => $lowProgress,
             'exportLedgerCsvUrl' => route('customer-bond-payments.ledger.export.csv', array_filter([
-                'q'            => $q,
-                'arazi_code'   => $araziCode,
-                'plot'         => $plotQ,
-                'date_from'    => $dateFrom,
-                'date_to'      => $dateTo,
-                'low_progress' => $lowProgress ? 1 : null,
+                'bond_id'      => $selectedBondId ?: null,
+                'q'            => $selectedBondId ? null : $q,
+                'arazi_code'   => $selectedBondId ? null : $araziCode,
+                'plot'         => $selectedBondId ? null : $plotQ,
+                'date_from'    => $selectedBondId ? null : $dateFrom,
+                'date_to'      => $selectedBondId ? null : $dateTo,
+                'low_progress' => (!$selectedBondId && $lowProgress) ? 1 : null,
             ], fn ($v) => $v !== null && $v !== '' && $v !== false)),
         ]);
     }
@@ -201,6 +237,7 @@ class CustomerBondPaymentController extends Controller
 
     public function ledgerExportCsv(\Illuminate\Http\Request $request)
     {
+        $bondId      = $request->query('bond_id');
         $q           = trim((string) $request->query('q', ''));
         $araziCode   = trim((string) $request->query('arazi_code', ''));
         $plotQ       = trim((string) $request->query('plot', ''));
@@ -208,6 +245,34 @@ class CustomerBondPaymentController extends Controller
         $dateTo      = $request->query('date_to', '');
         $lowProgress = (bool) $request->query('low_progress', false);
 
+        // ── Bond-level: export payment entries for a specific bond ──
+        if ($bondId) {
+            $bond = CustomerBond::with(['customer', 'arazi', 'plots'])->find($bondId);
+
+            $entries = \App\Models\CustomerBondPayment::where('customer_bond_id', $bondId)
+                ->orderBy('entry_date')
+                ->orderBy('id')
+                ->get();
+
+            $columns = ['#', 'Entry No', 'Date', 'Type', 'Amount (₹)', 'Method', 'Remarks'];
+
+            $rows = $entries->values()->map(function ($p, $i) {
+                return [
+                    $i + 1,
+                    $p->entry_no ?? '-',
+                    optional($p->entry_date)->format('d-m-Y') ?? '-',
+                    ucfirst($p->entry_type ?? '-'),
+                    number_format((float) $p->amount, 2, '.', ''),
+                    $p->payment_method ?? '-',
+                    $p->remarks ?? '',
+                ];
+            })->all();
+
+            $filename = 'payment-entries-' . ($bond?->bond_no ?? $bondId);
+            return $this->csvDownload($filename, $columns, $rows);
+        }
+
+        // ── Default: export bond-wise summary ──
         $bonds = CustomerBond::with(['customer', 'arazi', 'plots'])
             ->withSum(['payments as paid_amount' => function ($query) use ($dateFrom, $dateTo) {
                 if ($dateFrom) $query->whereDate('entry_date', '>=', $dateFrom);
@@ -328,7 +393,7 @@ class CustomerBondPaymentController extends Controller
                 'value' => $plotDisplay,
                 'help' => 'Taken from the selected bond.',
             ],
-            ['name' => 'arazi_id', 'type' => 'hidden', 'value' => $item?->arazi_id],
+            ['name' => 'arazi_code', 'type' => 'hidden', 'value' => $item?->arazi_code],
             ['name' => 'plot_id', 'type' => 'hidden', 'value' => $item?->plot_id],
             ['name' => 'entry_date', 'label' => 'Entry Date', 'type' => 'date', 'value' => optional($item?->entry_date)->format('Y-m-d'), 'required' => true],
             ['name' => 'entry_type', 'label' => 'Entry Type', 'type' => 'select', 'options' => ['advance' => 'Advance', 'installment' => 'Installment', 'final' => 'Final', 'penalty' => 'Penalty', 'return' => 'Return', 'discount' => 'Discount', 'other' => 'Other'], 'value' => $item?->entry_type ?? 'installment', 'required' => true],
@@ -353,11 +418,11 @@ class CustomerBondPaymentController extends Controller
                 }
             }],
             // registry removed; payments are now against arazi/plot
-            'arazi_id' => ['nullable', 'exists:arazis,id'],
+            'arazi_code' => ['nullable', 'string', 'exists:arazis,legacy_arazi_code'],
             'plot_id' => ['nullable', 'exists:plots,id', function($attr, $value, $fail) {
-                // if plot provided, ensure it belongs to provided arazi
+                // if plot provided, ensure it belongs to provided arazi code
                 $plot = \App\Models\Plot::find($value);
-                if($plot && request()->input('arazi_id') && (string)$plot->arazi_id !== (string)request()->input('arazi_id')){
+                if($plot && request()->input('arazi_code') && (string)$plot->arazi_code !== (string)request()->input('arazi_code')){
                     $fail('Selected plot does not belong to selected Arazi.');
                 }
             }],
@@ -392,7 +457,7 @@ class CustomerBondPaymentController extends Controller
 
         if ($bond) {
             $validated['customer_id'] = $bond->customer_id;
-            $validated['arazi_id'] = $bond->arazi_id;
+            $validated['arazi_code'] = $bond->arazi_code;
             $validated['plot_id'] = $bond->plots->first()?->id;
 
             if (empty($validated['land_size']) && ($bond->land_size ?? $bond->sale_land)) {

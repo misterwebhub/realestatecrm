@@ -53,6 +53,13 @@
                         </a>
                     </li>
 
+                    <li class="nav-item">
+                        <a href="{{ route('quick-access') }}" class="nav-link {{ request()->routeIs('quick-access') ? 'active' : '' }}">
+                            <i class="nav-icon bi bi-grid-3x3-gap-fill"></i>
+                            <p>Quick Access</p>
+                        </a>
+                    </li>
+
                     @if(auth()->check() && (auth()->user()->role === 'admin' || auth()->user()->role === 'manager'))
                         <li class="nav-item">
                             <a href="{{ route('arazis.index') }}" class="nav-link {{ request()->routeIs('arazis.*') ? 'active' : '' }}">
@@ -248,7 +255,7 @@
         try{
             jQuery(function(){
                 if(! (window.jQuery && jQuery.fn && jQuery.fn.select2)) return;
-                jQuery('select[name="arazi_id"]').each(function(){
+                jQuery('select[name="arazi_code"]').each(function(){
                     var $el = jQuery(this);
                     if($el.hasClass('select2-hidden-accessible')) return; // already initialized
                     $el.select2({

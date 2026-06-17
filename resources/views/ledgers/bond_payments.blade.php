@@ -3,6 +3,7 @@
 @section('content')
 @php
     $isCustomerLedger = $isCustomerLedger ?? false;
+    $selectedBond     = $selectedBond ?? null;
 
     $overallTotal   = $bonds->sum('total');
     $overallPaid    = $bonds->sum('paid');
@@ -19,8 +20,10 @@
         return array_merge($e, ['running_balance' => $runningBalance]);
     });
 
-    $totalCredit = $isCustomerLedger ? $overallPaid : collect($entries)->where('is_debit', false)->sum('amount');
-    $totalDebit  = $isCustomerLedger ? 0            : collect($entries)->where('is_debit', true)->sum('amount');
+    // When a specific bond is selected (customer ledger bond-detail view), use entries for totals
+    $useEntriesTotals = !$isCustomerLedger || $selectedBondId;
+    $totalCredit = $useEntriesTotals ? collect($entries)->where('is_debit', false)->sum('amount') : $overallPaid;
+    $totalDebit  = $useEntriesTotals ? collect($entries)->where('is_debit', true)->sum('amount')  : 0;
     $netCollected = $totalCredit - $totalDebit;
 @endphp
 
@@ -63,7 +66,7 @@
     .no-print,
     .filter-card,
     .row.g-3.mb-4,
-    .card:not(.print-bond-summary) { display: none !important; }
+    .card:not(.print-bond-summary):not(.print-entries) { display: none !important; }
 
     /* ── Reset layout wrappers ── */
     body, .app-wrapper, .app-main, .app-content, .container-fluid {
@@ -135,6 +138,26 @@
 
     /* Hide progress bar div, show % number */
     .print-bond-summary .no-print-progress-bar { display: none !important; }
+
+    /* Show print-only bond header inside entries card */
+    .print-bond-header { display: block !important; }
+
+    /* ── Entries card (bond-level print) ── */
+    .print-entries { display: block !important; border: none !important; box-shadow: none !important; margin: 0 !important; }
+    .print-entries table { width: 100% !important; border-collapse: collapse !important; font-size: 9.5px !important; }
+    .print-entries th {
+        background: #ddd !important; -webkit-print-color-adjust: exact; print-color-adjust: exact;
+        color: #000 !important; font-size: 8.5px !important; font-weight: 700 !important;
+        text-transform: uppercase !important; border: 1px solid #aaa !important;
+        padding: 4px 5px !important; white-space: nowrap !important;
+    }
+    .print-entries td {
+        border: 1px solid #ccc !important; padding: 3px 5px !important;
+        color: #000 !important; vertical-align: middle !important; font-size: 9px !important;
+    }
+    .print-entries tr:nth-child(even) td { background: #f9f9f9 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    .print-entries tfoot td { background: #eee !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; font-weight: 700 !important; }
+    .type-badge { border: 1px solid #aaa !important; background: #fff !important; color: #000 !important; }
 }
 </style>
 
@@ -158,8 +181,146 @@
     </div>
 </div>
 
+{{-- ── BOND DETAIL CARD (customer ledger, single bond view) ── --}}
+@if($isCustomerLedger && !empty($selectedBond))
+@php
+    $bd        = $selectedBond;
+    $bdTotal   = (float) ($bd->total_amount ?? $bd->bond_amount ?? 0);
+    $bdPaid    = (float) ($bd->total_paid ?? 0);
+    $bdBalance = max($bdTotal - $bdPaid, 0);
+    $bdPct     = $bdTotal > 0 ? min(round(($bdPaid / $bdTotal) * 100), 100) : 0;
+    $bdAraziCode = $bd->arazi ? ($bd->arazi->legacy_arazi_code ?: ($bd->arazi->plot_number ?? '-')) : ($bd->arazi_code ?? '-');
+    $bdPlots   = $bd->plots->map(fn($p) => $p->title ?? 'Plot-'.$p->id)->implode(', ') ?: '-';
+@endphp
+<div class="card border-0 shadow-sm mb-4 no-print" style="border-left:4px solid #1a3a6b !important; border-radius:10px;">
+    <div class="card-header bg-white border-bottom py-3 d-flex align-items-center gap-2 flex-wrap">
+        <i class="bi bi-file-earmark-text-fill text-primary fs-5"></i>
+        <span class="fw-bold fs-6">Bond Details — {{ $bd->bond_no }}</span>
+        <a href="{{ url()->current() }}" class="btn btn-sm btn-outline-secondary ms-auto" style="font-size:11px;">
+            <i class="bi bi-arrow-left"></i> All Bonds
+        </a>
+        <a href="{{ route('customer-bonds.edit', $bd->id) }}" class="btn btn-sm btn-outline-primary" style="font-size:11px;">
+            <i class="bi bi-pencil"></i> Edit Bond
+        </a>
+        <a href="{{ route('customer-bonds.print', $bd->id) }}" target="_blank" class="btn btn-sm btn-outline-secondary" style="font-size:11px;">
+            <i class="bi bi-printer"></i> Print Bond
+        </a>
+    </div>
+    <div class="card-body py-3">
+        <div class="row g-3">
+
+            {{-- Left column: Customer & Bond info --}}
+            <div class="col-md-4">
+                <div class="mb-3">
+                    <div class="text-muted fw-semibold mb-2" style="font-size:11px;text-transform:uppercase;letter-spacing:.5px;">Customer</div>
+                    <div class="fw-bold fs-6">{{ $bd->customer?->name ?? '-' }}</div>
+                    @if($bd->customer?->mobile)
+                        <div class="text-muted small"><i class="bi bi-telephone me-1"></i>{{ $bd->customer->mobile }}</div>
+                    @endif
+                    @if($bd->customer?->secondary_mobile)
+                        <div class="text-muted small"><i class="bi bi-telephone me-1"></i>{{ $bd->customer->secondary_mobile }}</div>
+                    @endif
+                    @if($bd->customer?->address)
+                        <div class="text-muted small mt-1"><i class="bi bi-geo-alt me-1"></i>{{ $bd->customer->address }}</div>
+                    @endif
+                </div>
+                <div>
+                    <div class="text-muted fw-semibold mb-1" style="font-size:11px;text-transform:uppercase;letter-spacing:.5px;">Broker / Agent</div>
+                    <div class="small">{{ $bd->broker?->name ?? 'None' }}</div>
+                </div>
+            </div>
+
+            {{-- Middle column: Land details --}}
+            <div class="col-md-4">
+                <div class="text-muted fw-semibold mb-2" style="font-size:11px;text-transform:uppercase;letter-spacing:.5px;">Land Details</div>
+                <table class="table table-sm mb-0" style="font-size:13px;">
+                    <tr>
+                        <td class="text-muted ps-0" style="width:40%;border:none;">Arazi No</td>
+                        <td style="border:none;">
+                            <span style="background:#1a3a6b;color:#fff;border-radius:3px;padding:1px 8px;font-size:12px;font-weight:700;">{{ $bdAraziCode }}</span>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="text-muted ps-0" style="border:none;">Plot(s)</td>
+                        <td style="border:none;font-weight:600;">{{ $bdPlots }}</td>
+                    </tr>
+                    <tr>
+                        <td class="text-muted ps-0" style="border:none;">Land Size</td>
+                        <td style="border:none;">{{ $bd->land_size ?? $bd->sale_land ?? '-' }} {{ $bd->land_size ? 'Gaz' : '' }}</td>
+                    </tr>
+                    <tr>
+                        <td class="text-muted ps-0" style="border:none;">Sale Rate</td>
+                        <td style="border:none;">{{ $bd->sale_rate ? '₹'.number_format((float)$bd->sale_rate, 2).' /Gaz' : '-' }}</td>
+                    </tr>
+                    <tr>
+                        <td class="text-muted ps-0" style="border:none;">Bond Date</td>
+                        <td style="border:none;">{{ optional($bd->bond_date)->format('d M Y') ?? '-' }}</td>
+                    </tr>
+                    @if($bd->expiry_date)
+                    <tr>
+                        <td class="text-muted ps-0" style="border:none;">Expiry Date</td>
+                        <td style="border:none;">{{ optional($bd->expiry_date)->format('d M Y') }}</td>
+                    </tr>
+                    @endif
+                    @if($bd->no_of_months)
+                    <tr>
+                        <td class="text-muted ps-0" style="border:none;">Installments</td>
+                        <td style="border:none;">{{ $bd->no_of_months }} months @ ₹{{ number_format((float)$bd->installment_amount, 2) }}</td>
+                    </tr>
+                    @endif
+                </table>
+            </div>
+
+            {{-- Right column: Financial summary --}}
+            <div class="col-md-4">
+                <div class="text-muted fw-semibold mb-2" style="font-size:11px;text-transform:uppercase;letter-spacing:.5px;">Financial Summary</div>
+                <div class="d-flex flex-column gap-2">
+                    <div class="d-flex justify-content-between align-items-center p-2 rounded" style="background:#f8fafc;">
+                        <span class="text-muted small">Total Bond Amount</span>
+                        <span class="fw-bold">₹{{ number_format($bdTotal, 2) }}</span>
+                    </div>
+                    <div class="d-flex justify-content-between align-items-center p-2 rounded" style="background:#dcfce7;">
+                        <span class="text-success small fw-semibold">Total Paid</span>
+                        <span class="fw-bold text-success">₹{{ number_format($bdPaid, 2) }}</span>
+                    </div>
+                    <div class="d-flex justify-content-between align-items-center p-2 rounded" style="background:{{ $bdBalance > 0 ? '#fee2e2' : '#dcfce7' }};">
+                        <span class="{{ $bdBalance > 0 ? 'text-danger' : 'text-success' }} small fw-semibold">Balance Remaining</span>
+                        <span class="fw-bold {{ $bdBalance > 0 ? 'text-danger' : 'text-success' }}">
+                            @if($bdBalance > 0) ₹{{ number_format($bdBalance, 2) }}
+                            @else <span class="badge bg-success">Cleared ✓</span>
+                            @endif
+                        </span>
+                    </div>
+                    {{-- Progress bar --}}
+                    <div class="mt-1">
+                        <div class="d-flex justify-content-between mb-1" style="font-size:11px;">
+                            <span class="text-muted">Payment Progress</span>
+                            <span class="fw-bold {{ $bdPct < 50 ? 'text-danger' : 'text-success' }}">{{ $bdPct }}%</span>
+                        </div>
+                        <div class="progress" style="height:8px;border-radius:4px;">
+                            <div class="progress-bar {{ $bdPct < 50 ? 'bg-danger' : 'bg-success' }}" style="width:{{ $bdPct }}%;"></div>
+                        </div>
+                    </div>
+                    @if($bd->bayana_mode || $bd->amount)
+                    <div class="d-flex justify-content-between align-items-center p-2 rounded" style="background:#f1f5f9;font-size:12px;">
+                        <span class="text-muted">Advance (Bayana)</span>
+                        <span>₹{{ number_format((float)($bd->amount ?? 0), 2) }}</span>
+                    </div>
+                    @endif
+                </div>
+                @if($bd->notes || $bd->customer_comment)
+                <div class="mt-2 p-2 rounded" style="background:#fffbeb;font-size:12px;color:#92400e;">
+                    <i class="bi bi-sticky me-1"></i>{{ $bd->notes ?? $bd->customer_comment }}
+                </div>
+                @endif
+            </div>
+        </div>
+    </div>
+</div>
+@endif
+
 {{-- ── FILTER BAR ── --}}
-@if($isCustomerLedger)
+@if($isCustomerLedger && !$selectedBondId)
 <div class="filter-card no-print">
     <form method="GET" id="ledger-filter-form" class="row g-2 align-items-end">
         <div class="col-md-3">
@@ -195,7 +356,7 @@
         </div>
     </form>
 </div>
-@else
+@elseif(!$isCustomerLedger)
 <div class="filter-card no-print">
     <form method="GET" id="ledger-filter-form" class="row g-2 align-items-end">
 
@@ -245,6 +406,7 @@
 @endif
 
 {{-- ── SUMMARY STATS ── --}}
+@if(!$selectedBondId)
 <div class="row g-3 mb-4">
     <div class="col-sm-4">
         <div class="ledger-stat bg-primary bg-opacity-10 border border-primary border-opacity-25">
@@ -274,6 +436,7 @@
         </div>
     </div>
 </div>
+@endif
 
 {{-- ── PRINT-ONLY: title + stats (hidden on screen) ── --}}
 @if(!$selectedBondId)
@@ -328,9 +491,7 @@
                         <th class="text-end" style="font-size:11px;font-weight:600;text-transform:uppercase;color:#64748b;letter-spacing:.4px;">Paid</th>
                         <th class="text-end" style="font-size:11px;font-weight:600;text-transform:uppercase;color:#64748b;letter-spacing:.4px;">Balance</th>
                         <th style="width:140px;font-size:11px;font-weight:600;text-transform:uppercase;color:#64748b;letter-spacing:.4px;">Progress</th>
-                        @if(!$isCustomerLedger)
                         <th class="no-print" style="font-size:11px;font-weight:600;text-transform:uppercase;color:#64748b;letter-spacing:.4px;"></th>
-                        @endif
                     </tr>
                 </thead>
                 <tbody>
@@ -369,11 +530,9 @@
                             </div>
                             <span style="font-size:10px;color:{{ $pct < 50 ? '#b91c1c' : '#64748b' }};font-weight:{{ $pct < 50 ? '700' : '400' }};">{{ $pct }}%</span>
                         </td>
-                        @if(!$isCustomerLedger)
                         <td class="no-print">
                             <a href="{{ url()->current() }}?bond_id={{ $bond['id'] }}" class="btn btn-xs btn-outline-primary" style="font-size:11px;padding:2px 8px;">View</a>
                         </td>
-                        @endif
                     </tr>
                     @empty
                     <tr><td colspan="{{ $colspan }}" class="text-center py-4 text-muted">No bonds found.</td></tr>
@@ -385,20 +544,13 @@
 </div>
 @endif
 
-{{-- ── ENTRIES TABLE (kisan ledger only) ── --}}
-@if(!$isCustomerLedger)
-<div class="card border-0 shadow-sm">
+{{-- ── ENTRIES TABLE ── --}}
+@if(!$isCustomerLedger || $selectedBondId)
+<div class="card border-0 shadow-sm{{ $selectedBondId ? ' print-entries' : '' }}">
+    @if(!$selectedBondId)
     <div class="card-header bg-white border-bottom py-3 d-flex align-items-center flex-wrap gap-2">
         <div>
-            <span class="fw-bold">
-                @if($selectedBondId)
-                    @php $selBond = $bonds->firstWhere('id', (int)$selectedBondId); @endphp
-                    Payment Entries — Bond {{ $selBond['bond_no'] ?? '' }}
-                    @if(!empty($selBond['party'])) <span class="text-muted fw-normal">({{ $selBond['party'] }})</span> @endif
-                @else
-                    All Payment Entries
-                @endif
-            </span>
+            <span class="fw-bold">All Payment Entries</span>
             <span class="text-muted small ms-2">{{ count($entries) }} entr{{ count($entries) === 1 ? 'y' : 'ies' }}</span>
         </div>
         {{-- mini totals for visible entries --}}
@@ -408,6 +560,26 @@
             <span>Net: <strong class="{{ ($totalCredit - $totalDebit) >= 0 ? 'text-primary' : 'text-danger' }}">₹{{ number_format($totalCredit - $totalDebit, 2) }}</strong></span>
         </div>
     </div>
+    @else
+    {{-- Print-only bond header (hidden on screen) --}}
+    @if(!empty($selectedBond))
+    <div style="display:none;" class="print-bond-header">
+        <div style="border-bottom:2px solid #000;padding-bottom:6px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:flex-end;">
+            <div>
+                <strong style="font-size:14px;">Payment Ledger — {{ $selectedBond->bond_no }}</strong>
+                <span style="font-size:11px;margin-left:12px;">{{ $selectedBond->customer?->name }}</span>
+            </div>
+            <span style="font-size:10px;color:#555;">Printed: {{ now()->format('d M Y, h:i A') }}</span>
+        </div>
+        <div style="display:flex;gap:20px;margin-bottom:8px;padding:5px 8px;background:#f4f4f4;border:1px solid #ddd;border-radius:3px;font-size:10px;">
+            <span>Bond: <strong>{{ $selectedBond->bond_no }}</strong></span>
+            <span>Total: <strong>₹{{ number_format((float)($selectedBond->total_amount ?? $selectedBond->bond_amount ?? 0), 2) }}</strong></span>
+            <span>Paid: <strong>₹{{ number_format($totalCredit, 2) }}</strong></span>
+            <span>Balance: <strong>₹{{ number_format(max((float)($selectedBond->total_amount ?? $selectedBond->bond_amount ?? 0) - $totalCredit, 0), 2) }}</strong></span>
+        </div>
+    </div>
+    @endif
+    @endif
     <div class="card-body p-0">
         <div class="table-responsive">
             <table class="table entries-table mb-0">
@@ -486,7 +658,7 @@
         </div>
     </div>
 </div>
-@endif {{-- !$isCustomerLedger --}}
+@endif {{-- !$isCustomerLedger || $selectedBondId --}}
 
 @push('scripts')
 <script>

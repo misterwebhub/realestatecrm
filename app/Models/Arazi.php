@@ -30,7 +30,7 @@ class Arazi extends Model
 
     public function plots()
     {
-        return $this->hasMany(Plot::class);
+        return $this->hasMany(Plot::class, 'arazi_code', 'legacy_arazi_code');
     }
 
     /**
@@ -84,32 +84,28 @@ class Arazi extends Model
      */
     public static function plotsForCode(string $code): \Illuminate\Support\Collection
     {
-        $araziIds = static::idsForCode($code);
-        if (empty($araziIds)) {
+        $code = trim($code);
+        if ($code === '') {
             return collect();
         }
 
-        return Plot::whereIn('arazi_id', $araziIds)->get();
+        return Plot::where('arazi_code', $code)->get();
     }
 
     public function registry()
     {
-        return $this->hasOne(Registry::class);
-    }
-
-    public function payments()
-    {
-        return $this->hasMany(Payment::class);
+        return $this->hasOne(Registry::class, 'arazi_code', 'legacy_arazi_code');
     }
 
     public function documents()
     {
-        return $this->hasMany(AraziDocument::class);
+        return $this->hasMany(AraziDocument::class, 'arazi_code', 'legacy_arazi_code');
     }
 
     public function expenses()
     {
-        return $this->hasMany(\App\Models\Expense::class);
+        // Aggregate expenses for all Arazi rows sharing the same legacy_arazi_code
+        return $this->hasMany(\App\Models\Expense::class, 'arazi_code', 'legacy_arazi_code');
     }
 
     public function getOriginalValueAttribute()

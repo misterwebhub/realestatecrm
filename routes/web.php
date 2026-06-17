@@ -34,6 +34,7 @@ Route::middleware('auth')->group(function () {
     Route::redirect('/', '/dashboard');
 
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
+    Route::get('/quick-access', [\App\Http\Controllers\QuickAccessController::class, 'index'])->name('quick-access');
 
     Route::resource('kisans', KisanController::class)->except(['show']);
     // AJAX endpoints to support modal creation of Kisan from other forms
@@ -122,6 +123,7 @@ Route::middleware('auth')->group(function () {
     Route::get('arazi/{arazi}/details', [\App\Http\Controllers\AraziController::class, 'details'])->name('arazis.details');
     Route::get('arazi/by-code', [\App\Http\Controllers\AraziController::class, 'byCode'])->name('arazis.by-code');
     Route::get('arazi-no/{code}/plots', [\App\Http\Controllers\AraziController::class, 'plotsByAraziNo'])->name('arazis.plots-by-code');
+    Route::get('arazi-code/{code}/saleable', [\App\Http\Controllers\AraziController::class, 'saleableByCode'])->name('arazis.saleable-by-code');
     Route::get('customer-bonds/by-plot/{plot}', [CustomerBondController::class, 'byPlot'])->name('customer-bonds.by-plot');
     
     // User Master

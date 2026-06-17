@@ -48,11 +48,13 @@ class CustomerBondController extends Controller
                 'value' => $item?->customer_id ?? request('customer_id'),
             ],
             [
-                'name' => 'arazi_id',
+                'name' => 'arazi_code',
                 'label' => 'Arazi',
                 'type' => 'select',
-                'options' => Arazi::orderBy('plot_number')->pluck('plot_number', 'id')->all(),
-                'value' => $item?->arazi_id,
+                'options' => Arazi::whereNotNull('legacy_arazi_code')->where('legacy_arazi_code', '<>', '')
+                    ->orderBy('legacy_arazi_code')->pluck('legacy_arazi_code')->unique()
+                    ->mapWithKeys(fn($c) => [$c => $c])->all(),
+                'value' => $item?->arazi_code,
             ],
             ['name' => 'bond_date', 'label' => 'Bond Date', 'type' => 'date', 'value' => optional($item?->bond_date)->format('Y-m-d')],
             ['name' => 'bond_amount', 'label' => 'Bond Amount', 'type' => 'number', 'step' => '0.01', 'value' => $item?->bond_amount],
@@ -67,14 +69,14 @@ class CustomerBondController extends Controller
         return [
             'bond_no' => ['nullable', 'string', 'max:50', Rule::unique('customer_bonds', 'bond_no')->ignore($item?->id)],
             'customer_id' => ['required', 'exists:customers,id'],
-            'arazi_id' => ['required', function ($attribute, $value, $fail) {
+            'arazi_code' => ['required', function ($attribute, $value, $fail) {
                 if (Arazi::arazisForCode((string) $value)->isEmpty()) {
                     $fail('Selected Arazi No is invalid.');
                 }
             }],
             'plot_ids' => ['nullable', 'array'],
             'plot_ids.*' => ['required', 'distinct', 'exists:plots,id', function ($attribute, $value, $fail) {
-                $plots = Arazi::plotsForCode((string) request()->input('arazi_id'));
+                $plots = Arazi::plotsForCode((string) request()->input('arazi_code'));
 
                 if ($plots->isNotEmpty() && ! $plots->contains('id', (int) $value)) {
                     $fail('Selected plot does not belong to the selected Arazi.');
@@ -116,13 +118,7 @@ class CustomerBondController extends Controller
         $payload = $validated;
         $plotIds = array_values(array_filter($validated['plot_ids'] ?? []));
 
-        // arazi_id is submitted as the "Arazi No" code; resolve it to a real arazis.id for the FK column.
-        if (isset($payload['arazi_id'])) {
-            $arazis = Arazi::arazisForCode((string) $payload['arazi_id']);
-            if ($arazis->isNotEmpty()) {
-                $payload['arazi_id'] = $arazis->min('id');
-            }
-        }
+        // arazi_code is the working key; the HasAraziCode trait resolves arazi_id automatically on save.
 
         $payload['bond_no'] = ($payload['bond_no'] ?? null) ?: $this->nextBondNumber();
 
@@ -201,8 +197,8 @@ class CustomerBondController extends Controller
         try {
             if (! empty($plotIds)) {
                 Plot::whereIn('id', $plotIds)->update(['status' => 'booked']);
-            } elseif (! empty($validated['arazi_id'])) {
-                Plot::whereIn('id', Arazi::plotsForCode((string) $validated['arazi_id'])->pluck('id'))
+            } elseif (! empty($validated['arazi_code'])) {
+                Plot::where('arazi_code', (string) $validated['arazi_code'])
                     ->update(['status' => 'booked']);
             }
         } catch (\Throwable $e) {
@@ -228,7 +224,7 @@ class CustomerBondController extends Controller
         CustomerBondPayment::create([
             'customer_bond_id' => $bond->id,
             'customer_id' => $bond->customer_id,
-            'arazi_id' => $bond->arazi_id,
+            'arazi_code' => $bond->arazi_code,
             'plot_id' => $bond->plots->first()?->id,
             'entry_no' => $this->nextCustomerBondPaymentEntryNo(),
             'entry_date' => $bond->bond_date ?? now(),
@@ -304,12 +300,12 @@ class CustomerBondController extends Controller
 
     public function index(\Illuminate\Http\Request $request)
     {
-        $araziId = $request->query('arazi_id');
+        $araziCode = $request->query('arazi_code');
         $plotQuery = trim((string) $request->query('plot'));
 
         $query = $this->resourceQuery();
-        if ($araziId) {
-            $query->whereIn('arazi_id', Arazi::idsForCode((string) $araziId));
+        if ($araziCode) {
+            $query->where('arazi_code', (string) $araziCode);
         }
         if ($plotQuery !== '') {
             // search by title only
@@ -337,7 +333,7 @@ class CustomerBondController extends Controller
             'createUrl' => route($routeName . '.create'),
             'exportCsvUrl' => $this->allowsCsvExport() ? route($routeName.'.export.csv') : null,
             'isCustomerBondIndex' => true,
-            'filter_arazi' => $araziId,
+            'filter_arazi' => $araziCode,
             'filter_plot' => $plotQuery,
             'arazis' => $arazis,
         ]);
@@ -361,13 +357,7 @@ class CustomerBondController extends Controller
         ])->all();
         $arazis = $this->uniqueArazisList();
 
-        // The select uses Arazi No codes as values; map the bond's stored arazis.id to its code for display.
-        if ($item->arazi_id) {
-            $current = \App\Models\Arazi::find($item->arazi_id);
-            if ($current) {
-                $item->arazi_id = $current->araziNoCode();
-            }
-        }
+        // The select uses Arazi No codes as values; arazi_code is already stored directly.
 
         $agents = Agent::where('broker_type', 'customer')->orderBy('name')->pluck('name', 'id')->all();
 
@@ -411,6 +401,11 @@ class CustomerBondController extends Controller
             'print_url' => route('customer-bonds.print', $item->id),
             'pdf_url' => route('customer-bonds.pdf', $item->id),
             'action_buttons' => [
+                [
+                    'url'   => route('customer-bond-payments.ledger', ['bond_id' => $item->id]),
+                    'label' => 'Ledger',
+                    'class' => 'btn-outline-success',
+                ],
                 [
                     'url' => route('customer-bonds.cheques-modal', $item->id),
                     'label' => 'Cheques',
@@ -547,7 +542,7 @@ class CustomerBondController extends Controller
             'bond_no'           => $bond->bond_no,
             'customer_id'       => $bond->customer_id,
             'customer_label'    => $bond->customer?->name ?? '-',
-            'arazi_id'          => $bond->arazi_id,
+            'arazi_code'        => $bond->arazi_code,
             'arazi_label'       => $araziLabel,
             'plots'             => $plots,
             'land_size'         => $bond->land_size ?? $bond->sale_land,

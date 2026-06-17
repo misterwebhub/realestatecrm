@@ -27,21 +27,6 @@
         }
         .toolbar .btn-print { background: #0d6efd; color: #fff; border-color: #0d6efd; }
 
-        /* Cut line between copies */
-        .cut-line {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            margin: 6px 0;
-            color: #aaa;
-            font-size: 10px;
-        }
-        .cut-line::before, .cut-line::after {
-            content: '';
-            flex: 1;
-            border-top: 1.5px dashed #bbb;
-        }
-
         /* ── Receipt card ── */
         .receipt {
             width: 100%;
@@ -165,13 +150,6 @@
 @if($receipt ?? false)
 @php $r = $receipt; @endphp
 
-{{-- Print 3 copies --}}
-@for($copy = 1; $copy <= 3; $copy++)
-
-@if($copy > 1)
-<div class="cut-line">✂ &nbsp; Copy {{ $copy }}</div>
-@endif
-
 <div class="receipt">
 
     {{-- Header --}}
@@ -181,7 +159,7 @@
             <div class="brand-sub">Payment Receipt</div>
         </div>
         <div class="receipt-label">
-            Copy {{ $copy }} of 3
+            Receipt No
         </div>
     </div>
 
@@ -240,8 +218,6 @@
 
     </div>
 </div>
-
-@endfor
 
 @else
     <p class="no-print" style="color:#666; margin-top:10px;">Enter a receipt number above to load the receipt.</p>
