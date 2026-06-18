@@ -49,7 +49,7 @@ class KisanBond extends Model
 
     public function arazi()
     {
-        return $this->belongsTo(Arazi::class);
+        return $this->belongsTo(Arazi::class, 'arazi_code', 'legacy_arazi_code');
     }
 
     public function arazis()

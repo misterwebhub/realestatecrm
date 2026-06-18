@@ -253,7 +253,7 @@
                                     if(ct.includes('application/json')){
                                         const json = await res.json();
                                         if(json.success){
-                                            const selectName = isKisan ? 'kisan_id' : 'arazi_id';
+                                            const selectName = isKisan ? 'kisan_id' : 'arazi_code';
                                             const select = document.querySelector('select[name="' + selectName + '"]');
                                             const payloadKey = isKisan ? 'kisan' : 'arazi';
                                             if(select && json[payloadKey]){
@@ -349,7 +349,7 @@
                                             <option value="{{ $optionValue }}" @selected((string) $value === (string) $optionValue)>{{ $optionLabel }}</option>
                                         @endforeach
                                     </select>
-                                    @if(($field['name'] ?? '') === 'arazi_id')
+                                    @if(($field['name'] ?? '') === 'arazi_code')
                                         <a href="#" class="btn btn-outline-primary btn-sm btn-new-arazi" data-create-url="{{ route('arazis.create-fragment') }}" title="Create new Arazi">New</a>
                                     @endif
                                     @if(($field['name'] ?? '') === 'kisan_id')
@@ -544,7 +544,7 @@
 
             // if there is a kisan select and an arazi select, fetch arazis when kisan changes
             const kisanSelect = document.querySelector('select[name="kisan_id"]');
-            const araziSelect = document.querySelector('select[name="arazi_id"]');
+            const araziSelect = document.querySelector('select[name="arazi_code"]');
             if(kisanSelect && araziSelect){
                 kisanSelect.addEventListener('change', async function(){
                     const kisanId = this.value;
@@ -558,7 +558,7 @@
                         if(!Array.isArray(data)) return;
                         data.forEach(function(a){
                             const opt = document.createElement('option');
-                            opt.value = a.id;
+                            opt.value = a.arazi_code || a.label;
                             opt.textContent = a.label;
                             araziSelect.appendChild(opt);
                         });
@@ -821,11 +821,11 @@
                 }
             }
 
-            const araziSaleableUrl = @json(route('arazis.saleable', ['arazi' => '__ARAZI_ID__']));
-            const araziPlotsUrl = @json(route('arazis.plots', ['arazi' => '__ARAZI_ID__']));
+            const araziSaleableUrl = @json(route('arazis.saleable-by-code', ['code' => '__ARAZI_CODE__']));
+            const araziPlotsUrl = @json(route('arazis.plots-by-code', ['code' => '__ARAZI_CODE__']));
             const paymentCtxUrl = @json(route('customer-bonds.payment-context', ['customer_bond' => '__BOND_ID__']));
             const customerBondChequesUrl = @json(route('customer-bond-cheques.for-bond', ['customer_bond' => '__BOND_ID__']));
-            const hiddenArazi = document.querySelector('input#arazi_id[type="hidden"]');
+            const hiddenArazi = document.querySelector('input#arazi_code[type="hidden"]');
             const hiddenPlot = document.querySelector('input#plot_id[type="hidden"]');
             const araziDisplayInput = document.getElementById('arazi_display');
             const plotDisplayInput = document.getElementById('plot_display');
@@ -843,7 +843,7 @@
                     if(!res.ok) return;
                     const ctx = await readJsonSafe(res);
                     if(!ctx) return;
-                    if(hiddenArazi && ctx.arazi_id !== undefined) hiddenArazi.value = ctx.arazi_id ?? '';
+                    if(hiddenArazi && ctx.arazi_code !== undefined) hiddenArazi.value = ctx.arazi_code ?? '';
                     if(hiddenPlot){
                         hiddenPlot.value = (ctx.plot_id !== undefined && ctx.plot_id !== null && ctx.plot_id !== '') ? ctx.plot_id : '';
                     }
@@ -938,7 +938,7 @@
                 });
             }
 
-            const select = document.querySelector('select[name="arazi_id"]');
+            const select = document.querySelector('select[name="arazi_code"]');
             if(!select){
                 return;
             }
@@ -952,17 +952,15 @@
                 select.parentNode.appendChild(info);
             }
 
-            async function fetchSaleable(id){
-                if(!id){ info.textContent=''; return; }
+            async function fetchSaleable(code){
+                if(!code){ info.textContent=''; return; }
                 try{
-                    const res = await fetch(araziSaleableUrl.replace('__ARAZI_ID__', encodeURIComponent(id)));
+                    const res = await fetch(araziSaleableUrl.replace('__ARAZI_CODE__', encodeURIComponent(code)));
                     if(!res.ok) throw new Error('Fetch failed');
                     const json = await readJsonSafe(res);
                     if(!json) throw new Error('Invalid response');
-                    const total = (json.saleable_total !== undefined) ? json.saleable_total : (json.saleable || 0);
-                    const remaining = (json.remaining !== undefined) ? json.remaining : (json.saleable || 0);
-                    const totalGaz = (json.saleable_gaz !== undefined) ? json.saleable_gaz : (json.saleable_gaz || 0);
-                    const remainingGaz = (json.remaining_gaz !== undefined) ? json.remaining_gaz : (json.saleable_gaz || 0);
+                    const totalGaz = (json.saleable_gaz !== undefined) ? json.saleable_gaz : (json.saleable_total || 0);
+                    const remainingGaz = (json.remaining_gaz !== undefined) ? json.remaining_gaz : (json.remaining || 0);
                     const unit = json.unit || 'gaz';
                     info.innerHTML = `<small class="text-muted">Saleable: <strong>${totalGaz}</strong> gaz — Available: <strong>${remainingGaz}</strong> gaz</small>`;
                 }catch(e){
@@ -971,16 +969,18 @@
             }
 
             // load plots for arazi into any plot_id select on the form
-            async function loadPlotsInto(araziId, selectedPlotId){
+            async function loadPlotsInto(araziCode, selectedPlotId){
                 const plotSelect = document.querySelector('select[name="plot_id"]');
                 const landSize = document.querySelector('input[name="land_size"]');
                 if(!plotSelect) return;
                 plotSelect.innerHTML = '<option value="">Select Plot</option>';
-                if(!araziId) return;
+                if(!araziCode) return;
                 try{
-                    const res = await fetch(araziPlotsUrl.replace('__ARAZI_ID__', encodeURIComponent(araziId)));
+                    const res = await fetch(araziPlotsUrl.replace('__ARAZI_CODE__', encodeURIComponent(araziCode)));
                     if(!res.ok) return;
-                    const data = await res.json();
+                    const raw = await res.json();
+                    // plots-by-code returns { found, plots } while older endpoint returned a flat array
+                    const data = Array.isArray(raw) ? raw : (raw.plots || []);
                     data.forEach(function(p){
                         const opt = document.createElement('option');
                         opt.value = p.id;
@@ -1010,6 +1010,7 @@
                 fetchSaleable(this.value);
                 loadPlotsInto(this.value, null);
             });
+
 
             if(plotSelect){
                 plotSelect.addEventListener('change', function(){

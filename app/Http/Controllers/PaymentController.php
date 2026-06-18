@@ -93,9 +93,6 @@ class PaymentController extends Controller
         $selectedKisanId = $request->query('kisan_id');
         $araziCode       = trim((string) $request->query('arazi_code', ''));
 
-        // Resolve arazi IDs from code
-        $araziIds = $araziCode !== '' ? Arazi::idsForCode($araziCode) : [];
-
         // All kisans for the kisan filter dropdown
         $allKisans = Kisan::orderBy('name')->get(['id', 'name', 'mobile']);
 
@@ -103,9 +100,9 @@ class PaymentController extends Controller
         $bonds = KisanBond::with(['kisan', 'arazis'])
             ->withSum('payments as paid_amount', 'amount')
             ->when($selectedKisanId, fn ($q) => $q->where('kisan_id', $selectedKisanId))
-            ->when($araziIds, fn ($q) => $q->where(fn ($q2) =>
-                $q2->whereIn('arazi_id', $araziIds)
-                   ->orWhereHas('arazis', fn ($a) => $a->whereIn('arazis.id', $araziIds))
+            ->when($araziCode !== '', fn ($q) => $q->where(fn ($q2) =>
+                $q2->where('arazi_code', $araziCode)
+                   ->orWhereHas('arazis', fn ($a) => $a->where('kisan_bond_arazi.arazi_code', $araziCode))
             ))
             ->latest()
             ->get();
@@ -113,9 +110,9 @@ class PaymentController extends Controller
         $entries = Payment::with(['kisanBond.kisan'])
             ->whereNotNull('kisan_bond_id')
             ->when($selectedKisanId, fn ($q) => $q->whereHas('kisanBond', fn ($b) => $b->where('kisan_id', $selectedKisanId)))
-            ->when($araziIds, fn ($q) => $q->whereHas('kisanBond', fn ($b) =>
-                $b->whereIn('arazi_id', $araziIds)
-                  ->orWhereHas('arazis', fn ($a) => $a->whereIn('arazis.id', $araziIds))
+            ->when($araziCode !== '', fn ($q) => $q->whereHas('kisanBond', fn ($b) =>
+                $b->where('arazi_code', $araziCode)
+                  ->orWhereHas('arazis', fn ($a) => $a->where('kisan_bond_arazi.arazi_code', $araziCode))
             ))
             ->when($selectedBondId, fn ($q) => $q->where('kisan_bond_id', $selectedBondId))
             ->latest('payment_date')
@@ -382,12 +379,11 @@ class PaymentController extends Controller
 
         // Search by arazi legacy code
         if ($araziCode !== '') {
-            $araziIds = Arazi::idsForCode($araziCode);
-            $query->where(function ($qb) use ($araziIds) {
+            $query->where(function ($qb) use ($araziCode) {
                 $qb->whereHas('kisanBond', fn($b) =>
-                    $b->whereIn('arazi_id', $araziIds)
-                      ->orWhereHas('arazis', fn($a) => $a->whereIn('arazis.id', $araziIds))
-                )->orWhereHas('registry.arazi', fn($a) => $a->whereIn('arazis.id', $araziIds));
+                    $b->where('arazi_code', $araziCode)
+                      ->orWhereHas('arazis', fn($a) => $a->where('kisan_bond_arazi.arazi_code', $araziCode))
+                )->orWhereHas('registry', fn($r) => $r->where('arazi_code', $araziCode));
             });
         }
 

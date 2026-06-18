@@ -158,9 +158,9 @@ class CustomerController extends Controller
             }
             $plots = $bond->plots->map(fn($p) => $p->title ?? $p->plot_number ?? ('Plot-'.$p->id))->implode(', ');
 
-            // Check if a registry exists for same arazi_id
-            $hasRegistry = $bond->arazi_id
-                ? $registries->where('arazi_id', $bond->arazi_id)->isNotEmpty()
+            // Check if a registry exists for same arazi code
+            $hasRegistry = $bond->arazi_code
+                ? $registries->where('arazi_code', $bond->arazi_code)->isNotEmpty()
                 : false;
 
             return [

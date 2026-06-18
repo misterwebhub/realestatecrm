@@ -44,7 +44,7 @@ class KisanRegistry extends Model
 
     public function arazi()
     {
-        return $this->belongsTo(\App\Models\Arazi::class);
+        return $this->belongsTo(\App\Models\Arazi::class, 'arazi_code', 'legacy_arazi_code');
     }
 
     public function getTotalExpensesAttribute(): float

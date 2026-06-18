@@ -44,6 +44,7 @@
           btn.textContent = 'Select';
           // attach safe dataset properties
           btn.dataset.araziId = String(m.id ?? '');
+          btn.dataset.araziCode = String(m.arazi_code ?? m.label ?? '');
           btn.dataset.araziLabel = String(m.label ?? '');
 
           tdAction.appendChild(btn);
@@ -68,6 +69,7 @@
             try{
               const data = {
                 id: this.dataset.araziId || null,
+                arazi_code: this.dataset.araziCode || null,
                 label: this.dataset.araziLabel || null,
                 kisan: null,
               };

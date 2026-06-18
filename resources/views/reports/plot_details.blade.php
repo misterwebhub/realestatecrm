@@ -13,7 +13,7 @@
                         <button type="button" id="arazi_find" class="btn btn-outline-primary">Find</button>
                         <button type="button" id="show_plots_btn" class="btn btn-outline-secondary" title="Show plots for this Arazi">Show plots</button>
                     </div>
-                    <input type="hidden" id="arazi_id_hidden" name="arazi_id">
+                    <input type="hidden" id="arazi_code_hidden" name="arazi_code">
                     <div id="arazi_label" class="form-text text-muted"></div>
                 </div>
             </div>
@@ -96,7 +96,7 @@
                 }
                 // found a single arazi
                 document.getElementById('arazi_label').textContent = json.arazi_label || '';
-                document.getElementById('arazi_id_hidden').value = json.arazi_id || '';
+                document.getElementById('arazi_code_hidden').value = json.arazi_code || '';
                         if(json.arazi_id){
                             try{ showAraziPlots(json.arazi_id); }catch(e){ }
                         }
@@ -104,9 +104,10 @@
         });
 
         document.getElementById('show_plots_btn').addEventListener('click', function(){
-            const id = document.getElementById('arazi_id_hidden').value || document.getElementById('arazi_input').value;
-            if(!id) return alert('Select or find an Arazi first');
-            try{ showAraziPlots(id); }catch(e){ console.debug(e); }
+            const code = document.getElementById('arazi_code_hidden').value || document.getElementById('arazi_input').value;
+            if(!code) return alert('Select or find an Arazi first');
+            // showAraziPlots needs an arazi ID; if we only have code, use it directly (plots-by-code handles it)
+            try{ showAraziPlots(code); }catch(e){ console.debug(e); }
         });
 
         // Render plots into table when showAraziPlots is called

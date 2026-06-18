@@ -144,10 +144,10 @@
                 </div>
                 <div>
                     <label for="arazi-select" class="form-label">Arazi No.</label>
-                    <select name="arazi_id" id="arazi-select" class="form-select">
+                    <select name="arazi_code" id="arazi-select" class="form-select">
                         <option value="">--Select Arazi--</option>
-                        @foreach($arazis as $id => $label)
-                            <option value="{{ $id }}" {{ (string)$id === (string) old('arazi_id', $item->arazi_id ?? '') ? 'selected' : '' }}>{{ $label }}</option>
+                        @foreach($arazis as $code => $label)
+                            <option value="{{ $code }}" {{ (string)$code === (string) old('arazi_code', $item->arazi_code ?? '') ? 'selected' : '' }}>{{ $label }}</option>
                         @endforeach
                     </select>
 
@@ -267,7 +267,7 @@
         const selectedPlotIds = @json($selectedPlotIds);
         const selectedPlotAmounts = @json($selectedPlotAmounts);
         const customerSelect = document.getElementById('customer-select');
-        const araziSelect = document.querySelector('select[name="arazi_id"]');
+        const araziSelect = document.querySelector('select[name="arazi_code"]');
         const plotSelect = document.getElementById('plot-select');
         const addPlotButton = document.getElementById('add-plot');
         const selectedPlotsBody = document.getElementById('selected-plots-body');
@@ -689,7 +689,7 @@
 
         // on load, if arazi selected, load plots and preselect plot if any
         document.addEventListener('DOMContentLoaded', function(){
-            const araziId = document.querySelector('select[name="arazi_id"]').value;
+            const araziId = document.querySelector('select[name="arazi_code"]').value;
             if(araziId){
                 loadPlots(araziId, selectedPlotIds);
             }

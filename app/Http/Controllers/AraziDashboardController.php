@@ -11,11 +11,11 @@ class AraziDashboardController extends Controller
 {
     public function show(Request $request, Arazi $arazi)
     {
-        $totalPlots = Plot::where('arazi_id', $arazi->id)->count();
-        $soldPlots = Plot::where('arazi_id', $arazi->id)->where('status', 'sold')->count();
+        $totalPlots = Plot::where('arazi_code', $arazi->legacy_arazi_code)->count();
+        $soldPlots = Plot::where('arazi_code', $arazi->legacy_arazi_code)->where('status', 'sold')->count();
         $leftPlots = max($totalPlots - $soldPlots, 0);
 
-        $bonds = CustomerBond::with('customer')->where('arazi_id', $arazi->id)->get();
+        $bonds = CustomerBond::with('customer')->where('arazi_code', $arazi->legacy_arazi_code)->get();
         $totalBonds = $bonds->count();
         $customers = $bonds->pluck('customer_id')->unique()->count();
 

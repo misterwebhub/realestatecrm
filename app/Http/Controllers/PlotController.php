@@ -35,7 +35,7 @@ class PlotController extends Controller
     {
         return [
             [
-                'name' => 'arazi_id',
+                'name' => 'arazi_code',
                 'label' => 'Arazi',
                 'type' => 'select',
                 'options' => Arazi::orderBy('legacy_arazi_code')
@@ -44,10 +44,9 @@ class PlotController extends Controller
                         return $a->araziNoCode();
                     })
                     ->mapWithKeys(function ($group, $label) {
-                        $first = $group->sortBy('id')->first();
-                        return [$first->id => $label];
+                        return [$label => $label];
                     })->all(),
-                'value' => $item?->arazi_id,
+                'value' => $item?->arazi_code,
             ],
             ['name' => 'title', 'label' => 'Plot No', 'type' => 'text', 'value' => $item?->title],
             ['name' => 'block', 'label' => 'Block', 'type' => 'text', 'value' => $item?->block],
@@ -71,7 +70,7 @@ class PlotController extends Controller
     protected function resourceRules(?Model $item = null): array
     {
         return [
-            'arazi_id' => ['required', 'exists:arazis,id'],
+            'arazi_code' => ['required', 'string', 'exists:arazis,legacy_arazi_code'],
             'title' => ['required', 'string', 'max:150'],
             'block' => ['nullable', 'string', 'max:20'],
             'area' => [
@@ -79,13 +78,13 @@ class PlotController extends Controller
                 'numeric',
                 'min:0',
                 function ($attribute, $value, $fail) use ($item) {
-                    $araziId = request()->input('arazi_id');
+                    $araziCode = request()->input('arazi_code');
 
-                    if (!$araziId) {
+                    if (!$araziCode) {
                         return;
                     }
 
-                    $arazi = Arazi::find($araziId);
+                    $arazi = Arazi::where('legacy_arazi_code', $araziCode)->first();
 
                     if (!$arazi) {
                         return;
@@ -96,7 +95,7 @@ class PlotController extends Controller
                         return;
                     }
 
-                    $existing = \App\Models\Plot::where('arazi_id', $arazi->id)
+                    $existing = \App\Models\Plot::where('arazi_code', $araziCode)
                         ->when(isset($item->id), fn($q) => $q->where('id', '!=', $item->id))
                         ->sum('area');
 

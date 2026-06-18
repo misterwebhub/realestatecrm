@@ -197,6 +197,7 @@ class KisanController extends Controller
             ->map(function ($a) {
             return [
                 'id' => $a->id,
+                'arazi_code' => $a->legacy_arazi_code ?: $a->plot_number,
                 'label' => $a->araziNoCode(),
                 'location' => $a->location,
                 'land_size' => (float) ($a->size ?? 0),
@@ -254,32 +255,31 @@ class KisanController extends Controller
         return response()->json($list);
     }
 
-    // Return kisans related to a given arazi id (used by AJAX in forms)
+    // Return kisans related to a given arazi code (used by AJAX in forms)
     public function byArazi(Request $request)
     {
-        $araziId = $request->query('arazi_id');
+        // Accept arazi_code (preferred); fall back to legacy arazi_id param if still sent.
+        $araziCode = $request->query('arazi_code');
+        if (! $araziCode && $request->query('arazi_id')) {
+            $araziCode = Arazi::whereKey($request->query('arazi_id'))->value('legacy_arazi_code');
+        }
 
-        if (! $araziId) {
+        if (! $araziCode) {
             return response()->json([]);
         }
 
-        $arazi = Arazi::find($araziId);
-        if (! $arazi) {
-            return response()->json([]);
-        }
-
-        $kisan = $arazi->kisan;
-        if (! $kisan) {
-            return response()->json([]);
-        }
-
-        $list = [
-            [
+        $list = Arazi::where('legacy_arazi_code', $araziCode)
+            ->with('kisan')
+            ->get()
+            ->pluck('kisan')
+            ->filter()
+            ->unique('id')
+            ->map(fn ($kisan) => [
                 'id' => $kisan->id,
                 'reg_no' => $kisan->reg_no,
                 'name' => $kisan->name,
-            ],
-        ];
+            ])
+            ->values();
 
         return response()->json($list);
     }

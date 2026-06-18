@@ -32,10 +32,10 @@
 
                     <div class="col-md-4" id="expense-arazi-wrapper">
                         <label class="form-label">Arazi (required for Arazi Expense)</label>
-                        <select id="expense-arazi" name="arazi_id" class="form-select">
+                        <select id="expense-arazi" name="arazi_code" class="form-select">
                             <option value="">None</option>
-                            @foreach($arazis as $id => $code)
-                                <option value="{{ $id }}">{{ $code }}</option>
+                            @foreach($arazis as $code)
+                                <option value="{{ $code }}" {{ old('arazi_code') === $code ? 'selected' : '' }}>{{ $code }}</option>
                             @endforeach
                         </select>
                     </div>

@@ -30,7 +30,7 @@ class UploadController extends Controller
         }
 
         if ($unassigned) {
-            $query->whereNull('arazi_id');
+            $query->whereNull('arazi_code');
         }
 
         if ($q) {
@@ -82,18 +82,12 @@ class UploadController extends Controller
             'file'               => 'required|file|max:10240',
         ]);
 
-        // Resolve arazi_code → first matching arazi_id
-        $araziId = null;
-        if (!empty($validated['arazi_code'])) {
-            $araziId = Arazi::where('legacy_arazi_code', $validated['arazi_code'])->value('id');
-        }
-
         $file = $request->file('file');
         $path = $file->store('uploads', 'public');
 
+        // arazi_code is the working key; the HasAraziCode trait fills arazi_id automatically.
         $upload = Upload::create([
             'upload_category_id' => $validated['upload_category_id'],
-            'arazi_id'           => $araziId,
             'arazi_code'         => $validated['arazi_code'] ?? null,
             'label' => $validated['label'] ?? null,
             'file_path' => $path,

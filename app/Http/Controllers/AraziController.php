@@ -129,8 +129,7 @@ class AraziController extends Controller
             $statusClass = $isActive ? 'success' : 'secondary';
 
             // compute per-group totals: total plots and total saleable area (in Gaz)
-            $araziIds = $group->pluck('id')->all();
-            $totalPlots = \App\Models\Plot::whereIn('arazi_id', $araziIds)->count();
+            $totalPlots = \App\Models\Plot::where('arazi_code', $araziCode)->count();
             $groupSaleableGaz = 0.0;
             foreach ($group as $a) {
                 $saleable = $a->saleable_area ?? null;
@@ -179,8 +178,8 @@ class AraziController extends Controller
         })->values()->all();
 
         // totals across the current result set
-        $araziIds = $records->pluck('id')->all();
-        $totalPlots = \App\Models\Plot::whereIn('arazi_id', $araziIds)->count();
+        $araziCodes = $records->pluck('legacy_arazi_code')->filter()->unique()->all();
+        $totalPlots = \App\Models\Plot::whereIn('arazi_code', $araziCodes)->count();
         $totalSaleArea = 0.0;
         foreach ($records as $a) {
             $saleable = $a->saleable_area ?? null;
@@ -209,7 +208,7 @@ class AraziController extends Controller
     public function saleable(Arazi $arazi)
     {
         $saleableTotal = $arazi->saleable_area;
-        $existing = (float) Plot::where('arazi_id', $arazi->id)->sum('area');
+        $existing = (float) Plot::where('arazi_code', $arazi->legacy_arazi_code)->sum('area');
         $remaining = $saleableTotal - $existing;
         if ($remaining < 0) $remaining = 0;
 
@@ -252,8 +251,41 @@ class AraziController extends Controller
 
         return response()->json([
             'found' => true,
-            'arazi_id' => $arazis->min('id'),
+            'arazi_code' => $code,
             'plots' => $plots,
+        ]);
+    }
+
+    /**
+     * Saleable area summary for an Arazi code (aggregated across all rows sharing the code).
+     * GET /arazi-code/{code}/saleable
+     */
+    public function saleableByCode(string $code)
+    {
+        $arazis = Arazi::where('legacy_arazi_code', $code)->get();
+        if ($arazis->isEmpty()) {
+            return response()->json(['remaining' => 0, 'remaining_gaz' => 0, 'unit' => 'gaz']);
+        }
+
+        $arazi = $arazis->first();
+        $saleableTotal = (float) ($arazi->saleable_area ?? 0);
+        $existing = (float) Plot::where('arazi_code', $code)->sum('area');
+        $remaining = max(0, $saleableTotal - $existing);
+
+        $unit = $arazi->unit ?? 'gaz';
+        try {
+            $saleableGaz = \App\Services\AreaConverter::toGaz($remaining, $unit);
+        } catch (\Exception $e) {
+            $saleableGaz = $remaining;
+        }
+
+        return response()->json([
+            'saleable_total' => $saleableTotal,
+            'existing'       => $existing,
+            'remaining'      => round($remaining, 2),
+            'unit'           => $unit,
+            'remaining_gaz'  => round($saleableGaz, 2),
+            'saleable_gaz'   => round($saleableGaz, 2),
         ]);
     }
 
@@ -332,6 +364,7 @@ class AraziController extends Controller
             $matches = $arazis->map(function (Arazi $a) {
                 return [
                     'id' => $a->id,
+                    'arazi_code' => $a->legacy_arazi_code ?: $a->plot_number,
                     'label' => $a->araziNoCode(),
                     'kisan' => $a->kisan?->name ?? null,
                     'location' => $a->location,
@@ -353,6 +386,7 @@ class AraziController extends Controller
         return response()->json([
             'found' => true,
             'arazi_id' => $arazi->id,
+            'arazi_code' => $arazi->legacy_arazi_code ?: $arazi->plot_number,
             'arazi_label' => $arazi->araziNoCode(),
             'plots' => $plots,
         ]);
@@ -365,7 +399,7 @@ class AraziController extends Controller
     public function info(Arazi $arazi)
     {
         $saleableTotal = $arazi->saleable_area;
-        $existing = (float) Plot::where('arazi_id', $arazi->id)->sum('area');
+        $existing = (float) Plot::where('arazi_code', $arazi->legacy_arazi_code)->sum('area');
         $remaining = $saleableTotal - $existing;
         if ($remaining < 0) $remaining = 0;
 
@@ -476,7 +510,7 @@ class AraziController extends Controller
                 if ($plotNumber === '') continue;
                 $area = isset($p['area']) && $p['area'] !== '' ? (float) $p['area'] : null;
                 Plot::create([
-                    'arazi_id' => $item->id,
+                    'arazi_code' => $item->legacy_arazi_code,
                     'plot_number' => $plotNumber,
                     'title' => $plotNumber,
                     'area' => $area,
@@ -520,7 +554,7 @@ class AraziController extends Controller
     public function bondInfo(Arazi $arazi)
     {
         try {
-            $bond = \App\Models\KisanBond::whereHas('arazis', function($q) use ($arazi) { $q->where('arazi_id', $arazi->id); })
+            $bond = \App\Models\KisanBond::whereHas('arazis', function($q) use ($arazi) { $q->where('kisan_bond_arazi.arazi_code', $arazi->legacy_arazi_code); })
                 ->orderByDesc('bond_date')->orderByDesc('id')->first();
 
             if (! $bond) {
@@ -556,7 +590,7 @@ class AraziController extends Controller
     public function customers(Arazi $arazi)
     {
         $bonds = \App\Models\CustomerBond::with(['customer', 'plots'])
-            ->where('arazi_id', $arazi->id)
+            ->where('arazi_code', $arazi->legacy_arazi_code)
             ->get();
 
         $grouped = $bonds->groupBy('customer_id')->map(function ($group, $customerId) {
@@ -646,7 +680,7 @@ class AraziController extends Controller
         })->values();
 
         // kisan bonds referencing this arazi
-        $kisanBonds = \App\Models\KisanBond::whereHas('arazis', function($q) use ($arazi){ $q->where('arazi_id', $arazi->id); })
+        $kisanBonds = \App\Models\KisanBond::whereHas('arazis', function($q) use ($arazi){ $q->where('kisan_bond_arazi.arazi_code', $arazi->legacy_arazi_code); })
             ->with(['kisan','payments'])
             ->orderByDesc('bond_date')->get()->map(function($b) use ($arazi){
                 $related = $b->arazis->firstWhere('id', $arazi->id);
@@ -664,7 +698,7 @@ class AraziController extends Controller
             })->values();
 
         // customer bonds for this arazi
-        $customerBonds = \App\Models\CustomerBond::with(['customer','payments','plots'])->where('arazi_id', $arazi->id)
+        $customerBonds = \App\Models\CustomerBond::with(['customer','payments','plots'])->where('arazi_code', $arazi->legacy_arazi_code)
             ->orderByDesc('bond_date')->get()->map(function($c){
                 return [
                     'id' => $c->id,
@@ -712,7 +746,7 @@ class AraziController extends Controller
     protected function resourceRow(Model $item): array
     {
         /** @var Arazi $item */
-        $existing = (float) Plot::where('arazi_id', $item->id)->sum('area');
+        $existing = (float) Plot::where('arazi_code', $item->legacy_arazi_code)->sum('area');
         $saleableTotal = (float) $item->saleable_area;
         $remaining = $saleableTotal - $existing;
         if ($remaining < 0) $remaining = 0;
@@ -733,7 +767,7 @@ class AraziController extends Controller
         $bondSaleRate = null;
         $originalCost = null;
         try {
-            $bond = \App\Models\KisanBond::whereHas('arazis', function($q) use ($item) { $q->where('arazi_id', $item->id); })
+            $bond = \App\Models\KisanBond::whereHas('arazis', function($q) use ($item) { $q->where('kisan_bond_arazi.arazi_code', $item->legacy_arazi_code); })
                 ->orderByDesc('bond_date')->orderByDesc('id')->first();
             if ($bond) {
                 $related = $bond->arazis->firstWhere('id', $item->id);

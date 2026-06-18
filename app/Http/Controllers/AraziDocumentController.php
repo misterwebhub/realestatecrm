@@ -38,16 +38,16 @@ class AraziDocumentController extends Controller
     {
         return [
             [
-                'name' => 'arazi_id',
+                'name' => 'arazi_code',
                 'label' => 'Arazi',
                 'type' => 'select',
                 'options' => Arazi::orderBy('legacy_arazi_code')
                     ->get()
                     ->mapWithKeys(function (Arazi $arazi) {
-                        return [$arazi->id => $arazi->araziNoCode()];
+                        return [$arazi->araziNoCode() => $arazi->araziNoCode()];
                     })
                     ->all(),
-                'value' => $item?->arazi_id,
+                'value' => $item?->arazi_code,
             ],
             ['name' => 'document_name', 'label' => 'Document Name', 'type' => 'text', 'value' => $item?->document_name ?? request('document_name', 'Arazi Registry')],
             ['name' => 'document_file', 'label' => 'File', 'type' => 'file', 'accept' => '.pdf,image/*'],
@@ -57,7 +57,7 @@ class AraziDocumentController extends Controller
     protected function resourceRules(?Model $item = null): array
     {
         return [
-            'arazi_id' => ['required', 'exists:arazis,id'],
+            'arazi_code' => ['required', 'string', 'exists:arazis,legacy_arazi_code'],
             'document_name' => ['required', 'string', 'max:150'],
             'document_file' => [$item ? 'nullable' : 'required', 'file', 'mimes:pdf,jpg,jpeg,png,webp', 'max:10240'],
         ];

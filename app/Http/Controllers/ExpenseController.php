@@ -11,21 +11,23 @@ class ExpenseController extends Controller
     public function index(Request $request)
     {
         $query = Expense::with('arazi')->latest();
-        if ($request->filled('arazi_id')) {
-            $query->where('arazi_id', $request->arazi_id);
+        if ($request->filled('arazi_code')) {
+            $query->where('arazi_code', $request->arazi_code);
         }
         if ($request->filled('type')) {
             $query->where('type', $request->type);
         }
         $expenses = $query->paginate(30)->withQueryString();
-        $arazis = Arazi::orderBy('legacy_arazi_code')->pluck('legacy_arazi_code','id');
+        $arazis = Arazi::whereNotNull('legacy_arazi_code')->where('legacy_arazi_code','<>','')
+            ->orderBy('legacy_arazi_code')->pluck('legacy_arazi_code')->unique()->values();
         $types = \App\Models\ExpenseType::orderBy('name')->pluck('name','id');
         return view('expenses.index', compact('expenses','arazis','types'));
     }
 
     public function create(Request $request)
     {
-        $arazis = Arazi::orderBy('legacy_arazi_code')->pluck('legacy_arazi_code','id');
+        $arazis = Arazi::whereNotNull('legacy_arazi_code')->where('legacy_arazi_code','<>','')
+            ->orderBy('legacy_arazi_code')->pluck('legacy_arazi_code')->unique()->values();
         $types = \App\Models\ExpenseType::orderBy('name')->pluck('name','id');
         $selectedType = $request->query('selected_type');
         return view('expenses.create', compact('arazis','types','selectedType'));
@@ -34,7 +36,7 @@ class ExpenseController extends Controller
     public function store(Request $request)
     {
         $validated = $request->validate([
-            'arazi_id' => 'nullable|exists:arazis,id',
+            'arazi_code' => 'nullable|string|exists:arazis,legacy_arazi_code',
             'scope' => 'required|string|in:personal,arazi',
             'expense_type_id' => 'required|exists:expense_types,id',
             'label' => 'nullable|string|max:191',
@@ -44,11 +46,11 @@ class ExpenseController extends Controller
         ]);
 
         if (($request->input('scope') ?? '') === 'arazi') {
-            $request->validate(['arazi_id' => 'required|exists:arazis,id']);
+            $request->validate(['arazi_code' => 'required|string|exists:arazis,legacy_arazi_code']);
         }
 
         $data = [
-            'arazi_id' => $request->input('arazi_id'),
+            'arazi_code' => $request->input('arazi_code'),
             'type' => $request->input('scope'),
             'expense_type_id' => $request->input('expense_type_id'),
             'label' => $request->input('label'),
