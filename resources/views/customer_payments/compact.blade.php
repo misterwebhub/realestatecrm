@@ -12,7 +12,7 @@
                     @csrf
                     <input type="hidden" name="customer_id"       id="customer_id">
                     <input type="hidden" name="customer_bond_id"  id="customer_bond_id">
-                    <input type="hidden" name="arazi_id"          id="arazi_id_hidden">
+                    <input type="hidden" name="arazi_code"        id="arazi_code_hidden">
                     <input type="hidden" name="plot_id"           id="plot_id_hidden">
 
                     <div class="row g-3 mb-3">
@@ -157,12 +157,11 @@
 </div>
 
 @include('partials.arazi_plots_modal')
-@include('partials.arazi_matches_modal')
 
 <script>
 (function(){
-    const arazisPlotsUrl        = @json(route('arazis.plots', ['arazi' => '__ARAZI_ID__']));
     const arazisByCodeUrl       = @json(route('arazis.by-code'));
+    const araziPlotsByCodeUrl   = @json(route('arazis.plots-by-code', ['code' => '__ARAZI_CODE__']));
     const bondByPlotUrl         = @json(route('customer-bonds.by-plot', ['plot' => '__PLOT_ID__']));
     const customerBondChequesUrl= @json(route('customer-bond-cheques.for-bond', ['customer_bond' => '__BOND_ID__']));
     const bondByBondNoUrl       = @json(route('customer-bonds.by-bond-no'));
@@ -176,7 +175,7 @@
     const chequeContainer  = document.getElementById('cheque_container');
     const chequeSelect     = document.getElementById('cheque_select');
     const amountInput      = document.getElementById('amount_input');
-    const araziIdHidden    = document.getElementById('arazi_id_hidden');
+    const araziIdHidden    = document.getElementById('arazi_code_hidden');
 
     const bondInfoCard      = document.getElementById('bond_info_card');
     const bondWitnessesCard = document.getElementById('bond_witnesses_card');
@@ -228,7 +227,7 @@
     }
 
     function applyBondData(json){
-        araziIdHidden.value   = json.arazi_id ?? '';
+        araziIdHidden.value   = json.arazi_code ?? '';
         document.getElementById('arazi_label').textContent = json.arazi_label ?? '';
         bondIdInput.value     = json.bond_id ?? '';
         customerIdInput.value = json.customer_id ?? '';
@@ -280,15 +279,15 @@
 
     // ─── Arazi code lookup (left panel) ─────────────────────────────────────
 
-    async function loadPlotsForArazi(araziId){
+    async function loadPlotsByCode(araziCode){
         pSelect.innerHTML = '<option value="">Select Plot</option>';
-        if(!araziId) return;
+        if(!araziCode) return;
         try{
-            const res  = await fetch(arazisPlotsUrl.replace('__ARAZI_ID__', encodeURIComponent(araziId)));
+            const res  = await fetch(araziPlotsByCodeUrl.replace('__ARAZI_CODE__', encodeURIComponent(araziCode)));
             if(!res.ok) return;
-            const data = await res.json();
-            if(!Array.isArray(data)) return;
-            populatePlots(data, data.length === 1);
+            const json = await res.json();
+            if(!json.found || !Array.isArray(json.plots)) return;
+            populatePlots(json.plots, json.plots.length === 1);
         }catch(e){}
     }
 
@@ -298,19 +297,15 @@
         pSelect.innerHTML = '<option value="">Select Plot</option>';
         if(!code) return;
         try{
-            const res  = await fetch(arazisByCodeUrl + '?code=' + encodeURIComponent(code));
+            const res  = await fetch(araziPlotsByCodeUrl.replace('__ARAZI_CODE__', encodeURIComponent(code)));
             if(!res.ok) return;
             const json = await res.json();
             if(!json.found){
                 document.getElementById('arazi_label').textContent = 'Arazi not found';
                 return;
             }
-            if(json.matches && Array.isArray(json.matches) && json.matches.length > 0){
-                try{ showAraziMatches(json.matches); }catch(e){}
-                return;
-            }
-            document.getElementById('arazi_label').textContent = json.arazi_label || '';
-            araziIdHidden.value = json.arazi_id || '';
+            araziIdHidden.value = json.arazi_code || code;
+            document.getElementById('arazi_label').textContent = json.arazi_code || code;
             populatePlots(json.plots || [], (json.plots || []).length === 1);
         }catch(e){}
     });
@@ -319,8 +314,8 @@
         const a = evt.detail || {};
         if(!a || !a.id) return;
         document.getElementById('arazi_label').textContent = a.label || '';
-        araziIdHidden.value = a.id;
-        loadPlotsForArazi(a.id);
+        araziIdHidden.value = a.arazi_code || a.label || '';
+        loadPlotsByCode(a.arazi_code || a.label || '');
     });
 
     // ─── Plot select change ──────────────────────────────────────────────────
