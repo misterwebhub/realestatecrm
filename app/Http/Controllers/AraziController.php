@@ -148,6 +148,12 @@ class AraziController extends Controller
 
             // Detail rows for popup (all records in this group)
             $details = $group->sortBy('id')->map(function (Arazi $a) use ($routeName) {
+                // A bond created against this Arazi (or one of its plots) blocks deletion.
+                $hasBonds = false;
+                if ($a->legacy_arazi_code) {
+                    $hasBonds = \App\Models\CustomerBond::where('arazi_code', $a->legacy_arazi_code)->exists();
+                }
+
                 return [
                     'id'               => $a->id,
                     'kisan'            => $a->kisan?->name ?? '-',
@@ -161,6 +167,7 @@ class AraziController extends Controller
                     'edit_url'         => route($routeName . '.edit', $a),
                     'delete_url'       => route($routeName . '.destroy', $a),
                     'grid_url'         => route('arazis.grid', $a),
+                    'has_bonds'        => $hasBonds,
                 ];
             })->values()->all();
 
@@ -501,6 +508,48 @@ class AraziController extends Controller
         if (isset($validated['plots'])) unset($validated['plots']);
         if (isset($validated['no_of_plots'])) unset($validated['no_of_plots']);
         return $validated;
+    }
+
+    /**
+     * Block deleting an Arazi while any bond exists against it (FK / data safety).
+     */
+    public function destroy($id)
+    {
+        $arazi = Arazi::findOrFail($id);
+
+        $code = $arazi->legacy_arazi_code;
+
+        // Block deletion while a bond exists against this Arazi.
+        if ($code && \App\Models\CustomerBond::where('arazi_code', $code)->exists()) {
+            return redirect()
+                ->route($this->resourceRouteName() . '.index')
+                ->with('error', 'Cannot delete this Arazi: a bond has been created against it. Remove the related bond(s) first.');
+        }
+
+        // Block deletion while a registry exists against this Arazi (by FK or legacy code).
+        $hasRegistry = \App\Models\Registry::where('arazi_id', $arazi->id)
+            ->when($code, fn ($q) => $q->orWhere('arazi_code', $code))
+            ->exists();
+        if ($hasRegistry) {
+            return redirect()
+                ->route($this->resourceRouteName() . '.index')
+                ->with('error', 'Cannot delete this Arazi: a registry exists against it. Remove the related registry first.');
+        }
+
+        \Illuminate\Support\Facades\DB::transaction(function () use ($arazi) {
+            // Remove all plots belonging to this Arazi (by FK and by legacy code).
+            $plotQuery = Plot::query()->where('arazi_id', $arazi->id);
+            if ($arazi->legacy_arazi_code) {
+                $plotQuery->orWhere('arazi_code', $arazi->legacy_arazi_code);
+            }
+            $plotQuery->delete();
+
+            $arazi->delete();
+        });
+
+        return redirect()
+            ->route($this->resourceRouteName() . '.index')
+            ->with('success', $this->resourceTitle() . ' and its plots deleted successfully.');
     }
 
     protected function resourceAfterSave(Model $item, Request $request, array $validated, ?Model $original = null): void

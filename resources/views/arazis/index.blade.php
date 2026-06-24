@@ -127,14 +127,24 @@
                                 <a href="{{ $detail['edit_url'] }}" class="btn btn-outline-secondary btn-sm ms-1">
                                     <i class="bi bi-pencil"></i> Edit
                                 </a>
-                                <form action="{{ $detail['delete_url'] }}" method="POST" class="d-inline-block ms-1"
-                                      onsubmit="return confirm('Delete this arazi entry?');">
-                                    @csrf
-                                    @method('DELETE')
-                                    <button type="submit" class="btn btn-outline-danger btn-sm">
+                                @if(!empty($detail['has_bonds']))
+                                    <button type="button" class="btn btn-outline-danger btn-sm ms-1 disabled"
+                                            tabindex="-1" aria-disabled="true"
+                                            title="Cannot delete: a bond exists against this Arazi"
+                                            style="pointer-events:auto;cursor:not-allowed;opacity:.55;"
+                                            onclick="return false;">
                                         <i class="bi bi-trash"></i>
                                     </button>
-                                </form>
+                                @else
+                                    <form action="{{ $detail['delete_url'] }}" method="POST" class="d-inline-block ms-1"
+                                          onsubmit="return confirm('Delete this arazi entry?');">
+                                        @csrf
+                                        @method('DELETE')
+                                        <button type="submit" class="btn btn-outline-danger btn-sm">
+                                            <i class="bi bi-trash"></i>
+                                        </button>
+                                    </form>
+                                @endif
                             </td>
                             @endif
                         </tr>
