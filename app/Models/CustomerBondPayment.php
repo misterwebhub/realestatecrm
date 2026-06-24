@@ -26,6 +26,8 @@ class CustomerBondPayment extends Model
         'witness_name',
         'amount',
         'payment_method',
+        'mtr_transaction_no',
+        'account_payee_name',
         'taken_by_user_id',
         'remarks',
     ];

@@ -11,12 +11,14 @@ use App\Services\RegistryLifecycleService;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
-use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 
 class RegistryController extends Controller
 {
-    use ManagesCrud;
+    use ManagesCrud {
+        store as crudStore;
+        update as crudUpdate;
+    }
 
     public function __construct(private readonly RegistryLifecycleService $registryLifecycleService)
     {
@@ -123,11 +125,58 @@ class RegistryController extends Controller
             'customer_id'      => ['required', 'exists:customers,id'],
             'arazi_code'       => [
                 'required', 'string', 'exists:arazis,legacy_arazi_code',
-                Rule::unique('registries', 'arazi_code')->ignore($item?->id),
             ],
             'plot_id'          => ['nullable', 'exists:plots,id'],
             'registry_date'    => ['required', 'date'],
-            'deed_no'          => ['required', 'string', 'max:100'],
+            'deed_no'          => [
+                'required', 'string', 'max:100',
+                function ($attribute, $value, $fail) use ($item) {
+                    $araziCode = trim((string) request()->input('arazi_code', ''));
+                    $deedNo    = trim((string) $value);
+
+                    if ($araziCode === '' || $deedNo === '') {
+                        return;
+                    }
+
+                    // Cap = total_gaz recorded in kisan_registries for this arazi + deed.
+                    $cap = (float) \App\Models\KisanRegistry::where('arazi_code', $araziCode)
+                        ->where(function ($q) use ($deedNo) {
+                            $q->where('arazi_deed_no', $deedNo)
+                              ->orWhere('name_deed_no', $deedNo);
+                        })
+                        ->sum('total_gaz');
+
+                    // No kisan-registry gaz recorded → nothing to cap against.
+                    if ($cap <= 0) {
+                        return;
+                    }
+
+                    // Area of the registry being saved (its plot's area, falling back to land_size).
+                    $plotId  = request()->input('plot_id');
+                    $newArea = 0.0;
+                    if ($plotId) {
+                        $newArea = (float) (\App\Models\Plot::whereKey($plotId)->value('area') ?? 0);
+                    }
+                    if ($newArea <= 0) {
+                        $newArea = (float) request()->input('land_size', 0);
+                    }
+
+                    // Sum of area already registered for this arazi + deed (excluding self on edit).
+                    $existing = (float) Registry::query()
+                        ->where('registries.arazi_code', $araziCode)
+                        ->where('registries.deed_no', $deedNo)
+                        ->when($item?->id, fn ($q) => $q->where('registries.id', '!=', $item->id))
+                        ->leftJoin('plots', 'plots.id', '=', 'registries.plot_id')
+                        ->sum(\Illuminate\Support\Facades\DB::raw('COALESCE(plots.area, registries.land_size, 0)'));
+
+                    $total = $existing + $newArea;
+
+                    if ($total > $cap + 0.001) {
+                        $remaining = max($cap - $existing, 0);
+                        $fail("Total registry area for this Arazi & Deed No ({$total}) exceeds the Kisan registry total gaz ({$cap}). Remaining allowed: {$remaining}.");
+                    }
+                },
+            ],
             'circle_value'     => ['nullable', 'numeric', 'min:0'],
             'booking_mode'     => ['nullable', 'in:cash,emi,mixed,other'],
             'land_size'        => ['nullable', 'numeric', 'min:0'],
@@ -200,35 +249,17 @@ class RegistryController extends Controller
 
     public function store(Request $request)
     {
-        $request->validate($this->resourceRules(), [
-            'arazi_code.unique' => 'A registry already exists for this Arazi. Each Arazi can only have one registry.',
-        ]);
-        try {
-            return parent::store($request);
-        } catch (\Illuminate\Database\QueryException $e) {
-            if ($e->errorInfo[1] === 1062) {
-                return redirect()->back()->withInput()
-                    ->with('error', 'A registry already exists for this Arazi. Each Arazi can only have one registry.');
-            }
-            throw $e;
-        }
+        $request->validate($this->resourceRules());
+
+        return $this->crudStore($request);
     }
 
     public function update(Request $request, $id)
     {
         $item = Registry::findOrFail($id);
-        $request->validate($this->resourceRules($item), [
-            'arazi_code.unique' => 'A registry already exists for this Arazi. Each Arazi can only have one registry.',
-        ]);
-        try {
-            return parent::update($request, $id);
-        } catch (\Illuminate\Database\QueryException $e) {
-            if ($e->errorInfo[1] === 1062) {
-                return redirect()->back()->withInput()
-                    ->with('error', 'A registry already exists for this Arazi. Each Arazi can only have one registry.');
-            }
-            throw $e;
-        }
+        $request->validate($this->resourceRules($item));
+
+        return $this->crudUpdate($request, $id);
     }
 
     // Override index to support search filters for plot registry listing
@@ -490,6 +521,35 @@ class RegistryController extends Controller
         return response()->json([
             'found'   => true,
             'results' => $results,
+        ]);
+    }
+
+    /**
+     * Return the list of deed numbers recorded in kisan_registries for a given arazi_code.
+     * Used to populate the Deed No dropdown on the registry create form once a bond is chosen.
+     */
+    public function deedsByArazi(Request $request)
+    {
+        $code = trim((string) $request->query('arazi_code', ''));
+
+        if ($code === '') {
+            return response()->json(['found' => false, 'deeds' => []]);
+        }
+
+        $rows = \App\Models\KisanRegistry::where('arazi_code', $code)
+            ->get(['arazi_deed_no', 'name_deed_no']);
+
+        $deeds = $rows->flatMap(function ($r) {
+            return [$r->arazi_deed_no, $r->name_deed_no];
+        })->filter(function ($v) {
+            return $v !== null && trim((string) $v) !== '';
+        })->map(function ($v) {
+            return trim((string) $v);
+        })->unique()->values()->all();
+
+        return response()->json([
+            'found' => count($deeds) > 0,
+            'deeds' => $deeds,
         ]);
     }
 

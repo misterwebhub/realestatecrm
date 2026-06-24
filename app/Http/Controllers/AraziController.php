@@ -324,7 +324,10 @@ class AraziController extends Controller
             }
 
             $desc = strtolower((string) ($p->description ?? ''));
-            if (str_contains($desc, 'issue') || empty($p->area) || (float) ($p->area ?? 0) <= 0) {
+            // Only treat as an issue when the description says so, or the area is
+            // explicitly set to <= 0. A blank/null area (e.g. plots created via the
+            // Arazi form without an area) should stay 'available', not become 'issue'.
+            if (str_contains($desc, 'issue') || (isset($p->area) && $p->area !== '' && (float) $p->area <= 0)) {
                 $status = 'issue';
             }
 

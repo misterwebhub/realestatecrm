@@ -56,6 +56,7 @@ Route::middleware('auth')->group(function () {
     Route::post('registries/{registry}/esign', [RegistryController::class, 'esign'])->name('registries.esign');
     Route::get('registries/waiting-payments', [RegistryController::class, 'waitingPayments'])->name('registries.waiting-payments');
     Route::get('registries/bond-lookup', [RegistryController::class, 'bondLookup'])->name('registries.bond-lookup');
+    Route::get('registries/deeds-by-arazi', [RegistryController::class, 'deedsByArazi'])->name('registries.deeds-by-arazi');
     Route::get('kisan-payment/print', [PaymentController::class, 'printReceipt'])->name('kisan-payment.print');
     Route::get('kisan-payment/receipt-pdf', [PaymentController::class, 'receiptPdf'])->name('kisan-payment.receipt-pdf');
     // Kisan-scoped payment routes (list/create for a specific kisan)

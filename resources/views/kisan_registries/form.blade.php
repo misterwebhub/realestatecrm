@@ -63,6 +63,9 @@
                     <label class="form-label">Total GAZ</label>
                           <input type="number" step="0.01" name="total_gaz" required class="form-control @error('total_gaz') is-invalid @enderror"
                               value="{{ old('total_gaz', $item->total_gaz) }}">
+                    <div class="form-text" id="arazi_area_hint" style="display:none;">
+                        Arazi area — Saleable: <strong id="hint_saleable">0</strong> gaz &middot; Remaining: <strong id="hint_remaining">0</strong> gaz
+                    </div>
                     @error('total_gaz')<div class="invalid-feedback">{{ $message }}</div>@enderror
                 </div>
                 <div class="col-md-3">
@@ -157,6 +160,17 @@
         const deedName = $('#deed_name_select');
         const araziInfoUrl = @json(route('arazis.info', ['arazi' => '__ARAZI_ID__']));
 
+        // Show the arazi's saleable/remaining area as a hint (total_gaz is filled manually).
+        function updateAraziAreaHint(info){
+            const hint = document.getElementById('arazi_area_hint');
+            if(!hint || !info) return;
+            const saleable  = info.saleable_total_gaz ?? 0;
+            const remaining = info.remaining_gaz ?? saleable;
+            try{ document.getElementById('hint_saleable').textContent = saleable; }catch(e){}
+            try{ document.getElementById('hint_remaining').textContent = remaining; }catch(e){}
+            hint.style.display = '';
+        }
+
         function resetKisanSelects(){
             try{ deedName.empty().append('<option></option>').val(null).trigger('change'); }catch(e){}
         }
@@ -209,7 +223,7 @@
                         const info = await res.json();
                         if(info){
                             if(!window.__skipAutoDeedFill) try{ document.getElementById('deed_no_input').value = info.legacy_arazi_code || ''; }catch(e){}
-                            try{ document.querySelector('input[name="total_gaz"]').value = info.remaining_gaz ?? info.saleable_total_gaz ?? ''; }catch(e){}
+                            try{ updateAraziAreaHint(info); }catch(e){}
                             try{ document.querySelector('input[name="road_land_gaj"]').value = info.road_area ?? 0; }catch(e){}
                             window.__skipAutoDeedFill = false;
                         }
@@ -230,7 +244,7 @@
                         if(!res.ok) return;
                         const info = await res.json();
                         if(info){
-                            try{ document.querySelector('input[name="total_gaz"]').value = info.remaining_gaz ?? info.saleable_total_gaz ?? ''; }catch(e){}
+                            try{ updateAraziAreaHint(info); }catch(e){}
                             try{ document.querySelector('input[name="road_land_gaj"]').value = info.road_area ?? 0; }catch(e){}
                         }
                     }catch(e){}
@@ -263,7 +277,7 @@
                             const info = await infoRes.json();
                             if(info){
                                 try{ document.getElementById('deed_no_input').value = info.legacy_arazi_code || ''; }catch(e){}
-                                try{ document.querySelector('input[name="total_gaz"]').value = info.remaining_gaz ?? info.saleable_total_gaz ?? ''; }catch(e){}
+                                try{ updateAraziAreaHint(info); }catch(e){}
                                 try{ document.querySelector('input[name="road_land_gaj"]').value = info.road_area ?? 0; }catch(e){}
                             }
                         }
@@ -343,7 +357,7 @@
                             const info = await res.json();
                             if(info){
                                 // do NOT auto-fill deed_no or name_deed_no here
-                                try{ document.querySelector('input[name="total_gaz"]').value = info.remaining_gaz ?? info.saleable_total_gaz ?? ''; }catch(e){}
+                                try{ updateAraziAreaHint(info); }catch(e){}
                                 try{ document.querySelector('input[name="road_land_gaj"]').value = info.road_area ?? 0; }catch(e){}
                             }
                         }catch(e){}

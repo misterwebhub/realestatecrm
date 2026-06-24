@@ -1,6 +1,27 @@
 @extends('layouts.app')
 
 @section('content')
+    <style>
+        /* Compact, tidy layout for the wide Customer Bond Payments table */
+        .cbp-table { font-size: 12.5px; }
+        .cbp-table thead th {
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: .3px;
+            color: #475569;
+            white-space: nowrap;
+            vertical-align: middle;
+        }
+        .cbp-table tbody td {
+            padding: 7px 9px;
+            vertical-align: middle;
+            white-space: nowrap;
+        }
+        /* Allow long free-text columns to wrap instead of stretching the table */
+        .cbp-table tbody td.cbp-wrap { white-space: normal; min-width: 120px; }
+        .cbp-table .btn-sm { padding: 2px 8px; font-size: 11.5px; }
+    </style>
     <div class="card card-outline card-primary">
         <div class="card-header d-flex align-items-center flex-wrap gap-2">
             @if(!empty($searchInHeader))
@@ -194,13 +215,13 @@
 
         <div class="card-body table-responsive p-0">
           
-            <table class="table table-striped table-hover mb-0 align-middle">
+            <table class="table table-striped table-hover mb-0 align-middle {{ !empty($isCustomerPaymentIndex) ? 'cbp-table' : '' }}">
                 <thead>
                 <tr>
                     @foreach($columns as $column)
-                        <th>{{ $column }}</th>
+                        <th class="text-nowrap">{{ $column }}</th>
                     @endforeach
-                    <th class="text-end">Actions</th>
+                    <th class="text-end text-nowrap">Actions</th>
                 </tr>
                 </thead>
                 <tbody>

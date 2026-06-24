@@ -160,10 +160,15 @@
                 </div>
                 <div class="col-md-3">
                     <label class="form-label small fw-semibold">Deed No <span class="text-danger">*</span></label>
-                    <input type="text" name="deed_no"
-                        value="{{ old('deed_no', $item->deed_no ?? '') }}"
-                        class="form-control form-control-sm @error('deed_no') is-invalid @enderror"
-                        placeholder="e.g. DEED-2024-001" required>
+                    <select name="deed_no" id="deed_no_select"
+                        class="form-select form-select-sm @error('deed_no') is-invalid @enderror"
+                        data-placeholder="Select a bond first" required>
+                        @php $selectedDeed = old('deed_no', $item->deed_no ?? ''); @endphp
+                        <option value=""></option>
+                        @if($selectedDeed !== '')
+                            <option value="{{ $selectedDeed }}" selected>{{ $selectedDeed }}</option>
+                        @endif
+                    </select>
                     @error('deed_no')<div class="invalid-feedback">{{ $message }}</div>@enderror
                 </div>
                 <div class="col-md-2">
@@ -271,17 +276,74 @@
 <script>
 (function(){
     const LOOKUP_URL = @json(route('registries.bond-lookup'));
+    const DEEDS_URL  = @json(route('registries.deeds-by-arazi'));
     const CSRF       = document.querySelector('meta[name="csrf-token"]')?.content ?? '';
 
     /* ── helpers ── */
     const $  = id => document.getElementById(id);
     const fmt = n  => Number(n||0).toLocaleString('en-IN',{minimumFractionDigits:2});
 
+    /* ── Deed No (Select2) ── */
+    const deedEl = $('deed_no_select');
+
+    function initDeedSelect2(){
+        if (!(window.jQuery && jQuery.fn && jQuery.fn.select2)) return;
+        const $el = jQuery(deedEl);
+        if ($el.hasClass('select2-hidden-accessible')) return;
+        $el.select2({
+            theme: 'bootstrap-5',
+            width: '100%',
+            placeholder: $el.data('placeholder') || 'Select Deed No',
+            allowClear: true,
+            dropdownParent: ($el.closest('form').length ? $el.closest('form') : jQuery(document.body))
+        });
+    }
+
+    async function loadDeeds(araziCode){
+        if (!deedEl) return;
+        // keep currently-selected value (e.g. on validation redirect) so it isn't wiped
+        const current = deedEl.value;
+
+        if (!araziCode) {
+            deedEl.innerHTML = '<option value=""></option>';
+            if (window.jQuery) jQuery(deedEl).val('').trigger('change');
+            return;
+        }
+
+        try {
+            const res  = await fetch(DEEDS_URL + '?arazi_code=' + encodeURIComponent(araziCode), {headers:{Accept:'application/json'}});
+            const data = await res.json();
+            const deeds = data.deeds || [];
+
+            let html = '<option value=""></option>';
+            const set = new Set(deeds.map(String));
+            if (current && !set.has(String(current))) {
+                html += `<option value="${current}" selected>${current}</option>`;
+            }
+            deeds.forEach(d => {
+                const sel = String(d) === String(current) ? 'selected' : '';
+                html += `<option value="${d}" ${sel}>${d}</option>`;
+            });
+            deedEl.innerHTML = html;
+
+            if (window.jQuery) {
+                initDeedSelect2();
+                jQuery(deedEl).val(current || '').trigger('change');
+            }
+        } catch(e) { /* ignore */ }
+    }
+
+    // initialise on load so an old() / edit value still renders as Select2
+    initDeedSelect2();
+
     function applyBond(b){
         $('h_bond_id').value      = b.bond_id    || '';
         $('h_customer_id').value  = b.customer_id || '';
         $('h_arazi_code').value   = b.arazi_code || '';
         $('h_bond_amount').value  = b.bond_amount || '';
+
+        // Load deed numbers for this bond's arazi into the Deed No dropdown
+        loadDeeds(b.arazi_code || '');
         $('h_pending').value      = b.pending_amount || '';
 
         // ── Plot handling: show all as info badges ──
@@ -426,6 +488,7 @@
         ['d_customer_name','d_mobile','d_alt_mobile','d_arazi_code','d_plot_title','d_bond_amount','d_pending'].forEach(id => {
             const el=$(id); if(el) el.value='';
         });
+        loadDeeds('');
         $('bondAppliedBanner').classList.add('d-none');
     });
 
@@ -471,6 +534,10 @@
     });
 
     reindex(); // init
+
+    // Preload deed options if an arazi is already set (edit mode / validation redirect)
+    const presetArazi = $('h_arazi_code')?.value || '';
+    if (presetArazi) loadDeeds(presetArazi);
 })();
 </script>
 @endpush

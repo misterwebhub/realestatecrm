@@ -33,6 +33,11 @@ class PlotController extends Controller
 
     protected function resourceFields(?Model $item = null): array
     {
+        $registryExists = $item && \App\Models\Registry::where('plot_id', $item->id)->exists();
+        // When the plot's status is 'registry', lock all detail fields except status.
+        $detailsLocked = $item && $item->status === 'registry';
+        $lockNote = $detailsLocked ? ' (locked — registry done)' : '';
+
         return [
             [
                 'name' => 'arazi_code',
@@ -47,14 +52,22 @@ class PlotController extends Controller
                         return [$label => $label];
                     })->all(),
                 'value' => $item?->arazi_code,
+                'readonly' => $detailsLocked,
             ],
-            ['name' => 'title', 'label' => 'Plot No', 'type' => 'text', 'value' => $item?->title],
-            ['name' => 'block', 'label' => 'Block', 'type' => 'text', 'value' => $item?->block],
-            ['name' => 'area', 'label' => 'Area', 'type' => 'number', 'step' => '0.01', 'value' => $item?->area],
-            ['name' => 'coordinates', 'label' => 'Coordinates', 'type' => 'text', 'value' => $item?->coordinates],
-            ['name' => 'latitude', 'label' => 'Latitude', 'type' => 'number', 'step' => '0.000001', 'value' => $item?->latitude],
-            ['name' => 'longitude', 'label' => 'Longitude', 'type' => 'number', 'step' => '0.000001', 'value' => $item?->longitude],
-            ['name' => 'description', 'label' => 'Description', 'type' => 'textarea', 'value' => $item?->description],
+            ['name' => 'title', 'label' => 'Plot No' . $lockNote, 'type' => 'text', 'value' => $item?->title, 'readonly' => $detailsLocked],
+            ['name' => 'block', 'label' => 'Block', 'type' => 'text', 'value' => $item?->block, 'readonly' => $detailsLocked],
+            [
+                'name' => 'area',
+                'label' => 'Area' . ($detailsLocked || $registryExists ? ' (locked — registry done)' : ''),
+                'type' => 'number',
+                'step' => '0.01',
+                'value' => $item?->area,
+                'readonly' => $detailsLocked || $registryExists,
+            ],
+            ['name' => 'coordinates', 'label' => 'Coordinates', 'type' => 'text', 'value' => $item?->coordinates, 'readonly' => $detailsLocked],
+            ['name' => 'latitude', 'label' => 'Latitude', 'type' => 'number', 'step' => '0.000001', 'value' => $item?->latitude, 'readonly' => $detailsLocked],
+            ['name' => 'longitude', 'label' => 'Longitude', 'type' => 'number', 'step' => '0.000001', 'value' => $item?->longitude, 'readonly' => $detailsLocked],
+            ['name' => 'description', 'label' => 'Description', 'type' => 'textarea', 'value' => $item?->description, 'readonly' => $detailsLocked],
             ['name' => 'status', 'label' => 'Status', 'type' => 'select', 'options' => [
                 'available' => 'Available',
                 'booked' => 'Booked',
@@ -81,6 +94,11 @@ class PlotController extends Controller
                     $araziCode = request()->input('arazi_code');
 
                     if (!$araziCode) {
+                        return;
+                    }
+
+                    // Skip validation if area hasn't changed (editing without changing area)
+                    if ($item && $item->area == $value) {
                         return;
                     }
 
@@ -112,6 +130,20 @@ class PlotController extends Controller
             'description' => ['nullable', 'string'],
             'status' => ['required', 'in:available,booked,booked_advance,hold,registry,blacklist,not_for_sale,locked,sold'],
         ];
+    }
+
+    protected function resourcePrepareData(array $validated, \Illuminate\Http\Request $request, ?Model $item = null): array
+    {
+        // When the existing plot's status is 'registry', all detail fields are locked.
+        // Only the status field may change — preserve the original values for everything else,
+        // even if a client bypassed the disabled inputs.
+        if ($item && $item->status === 'registry') {
+            foreach (['arazi_code', 'title', 'block', 'area', 'coordinates', 'latitude', 'longitude', 'description'] as $field) {
+                $validated[$field] = $item->getOriginal($field);
+            }
+        }
+
+        return $validated;
     }
 
     protected function resourceQuery()

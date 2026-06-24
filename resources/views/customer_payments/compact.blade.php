@@ -81,6 +81,14 @@
                                 <option value="">Select Cheque</option>
                             </select>
                         </div>
+                        <div class="col-md-4" id="mtr_container" style="display:none;">
+                            <label class="form-label">MTR Transaction No. <span class="text-danger">*</span></label>
+                            <input type="text" name="mtr_transaction_no" id="mtr_transaction_no" class="form-control" placeholder="Enter MTR / UTR / Txn No.">
+                        </div>
+                        <div class="col-md-4" id="payee_container" style="display:none;">
+                            <label class="form-label">Account / Payee Name</label>
+                            <input type="text" name="account_payee_name" id="account_payee_name" class="form-control" placeholder="Account holder / payee name">
+                        </div>
                         <div class="col-md-4">
                             <label class="form-label">Amount</label>
                             <input type="number" step="0.01" name="amount" id="amount_input" class="form-control">
@@ -174,6 +182,23 @@
     const paymentMethod    = document.getElementById('payment_method');
     const chequeContainer  = document.getElementById('cheque_container');
     const chequeSelect     = document.getElementById('cheque_select');
+    const mtrContainer     = document.getElementById('mtr_container');
+    const mtrInput         = document.getElementById('mtr_transaction_no');
+    const payeeContainer   = document.getElementById('payee_container');
+    const payeeInput       = document.getElementById('account_payee_name');
+
+    // Show & require MTR Transaction No. + Account/Payee Name for IMPS / RTGS / UPI
+    function toggleMtrField(){
+        const m = (paymentMethod.value || '').toLowerCase();
+        const needsMtr = ['imps','rtgs','upi'].includes(m);
+        if(mtrContainer) mtrContainer.style.display = needsMtr ? '' : 'none';
+        if(mtrInput){
+            if(needsMtr){ mtrInput.setAttribute('required','required'); }
+            else { mtrInput.removeAttribute('required'); mtrInput.value = ''; }
+        }
+        if(payeeContainer) payeeContainer.style.display = needsMtr ? '' : 'none';
+        if(payeeInput && !needsMtr){ payeeInput.value = ''; }
+    }
     const amountInput      = document.getElementById('amount_input');
     const araziIdHidden    = document.getElementById('arazi_code_hidden');
 
@@ -350,8 +375,10 @@
     // ─── Payment method / cheque handling ───────────────────────────────────
 
     paymentMethod.value = 'cash';
+    toggleMtrField();
 
     paymentMethod.addEventListener('change', function(){
+        toggleMtrField();
         if(this.value === 'cheque'){
             chequeContainer.style.display = '';
             const bid = bondIdInput.value;
@@ -446,6 +473,7 @@
                 chequeContainer.style.display = 'none';
                 paymentMethod.removeAttribute('disabled'); paymentMethod.value = 'cash';
                 amountInput.removeAttribute('readonly'); amountInput.classList.remove('bg-light');
+                toggleMtrField();
             } else {
                 alert('Save failed: ' + (json.error || 'Unknown error'));
             }

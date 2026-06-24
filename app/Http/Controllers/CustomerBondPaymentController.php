@@ -374,7 +374,7 @@ class CustomerBondPaymentController extends Controller
 
     protected function resourceColumns(): array
     {
-        return ['Entry No', 'Bond', 'Customer', 'Arazi', 'Plot', 'Land Size', 'Entry Date', 'Type', 'Credit', 'Debit', 'Taken By'];
+        return ['Entry No', 'Bond', 'Customer', 'Arazi', 'Plot', 'Land Size', 'Entry Date', 'Type', 'Credit', 'Debit', 'Method', 'MTR No', 'Payee Name', 'Taken By'];
     }
 
     protected function resourceFields(?Model $item = null): array
@@ -445,7 +445,16 @@ class CustomerBondPaymentController extends Controller
             ['name' => 'land_size', 'label' => 'Land Size', 'type' => 'number', 'step' => '0.01', 'value' => $item?->land_size],
             // witness_name removed per request
             ['name' => 'amount', 'label' => 'Amount', 'type' => 'number', 'step' => '0.01', 'value' => $item?->amount, 'required' => true],
-            ['name' => 'payment_method', 'label' => 'Payment Method', 'type' => 'text', 'value' => $item?->payment_method],
+            ['name' => 'payment_method', 'label' => 'Payment Method', 'type' => 'select', 'options' => [
+                'cash' => 'Cash',
+                'cheque' => 'Cheque',
+                'rtgs' => 'RTGS',
+                'imps' => 'IMPS',
+                'upi' => 'UPI',
+                'other' => 'Other',
+            ], 'value' => $item?->payment_method ?? 'cash'],
+            ['name' => 'mtr_transaction_no', 'label' => 'MTR Transaction No.', 'type' => 'text', 'value' => $item?->mtr_transaction_no, 'help' => 'Required for IMPS, RTGS and UPI.'],
+            ['name' => 'account_payee_name', 'label' => 'Account / Payee Name', 'type' => 'text', 'value' => $item?->account_payee_name],
             [
                 'name'    => 'taken_by_user_id',
                 'label'   => 'Taken By',
@@ -497,6 +506,16 @@ class CustomerBondPaymentController extends Controller
             'land_size' => ['nullable', 'numeric', 'min:0'],
             'amount' => ['required', 'numeric', 'min:0'],
             'payment_method' => ['nullable', 'string', 'max:40'],
+            'mtr_transaction_no' => [
+                'nullable', 'string', 'max:100',
+                function ($attribute, $value, $fail) {
+                    $method = strtolower(trim((string) request()->input('payment_method', '')));
+                    if (in_array($method, ['imps', 'rtgs', 'upi'], true) && trim((string) $value) === '') {
+                        $fail('MTR Transaction No. is required for IMPS, RTGS and UPI payments.');
+                    }
+                },
+            ],
+            'account_payee_name' => ['nullable', 'string', 'max:150'],
             'taken_by_user_id' => ['nullable', 'exists:users,id'],
             'remarks' => ['nullable', 'string'],
         ];
@@ -606,6 +625,9 @@ class CustomerBondPaymentController extends Controller
                 ucfirst($item->entry_type),
                 in_array($item->entry_type, ['return', 'discount']) ? '—' : number_format((float) $item->amount, 2),
                 in_array($item->entry_type, ['return', 'discount']) ? number_format((float) $item->amount, 2) : '—',
+                $item->payment_method ? strtoupper($item->payment_method) : '—',
+                $item->mtr_transaction_no ?: '—',
+                $item->account_payee_name ?: '—',
                 $item->takenByUser?->name ?? '—',
             ],
         ];
@@ -641,9 +663,11 @@ class CustomerBondPaymentController extends Controller
         })->all();
 
         $paymentMethods = [
+            'cash' => 'Cash',
             'cheque' => 'Cheque',
             'rtgs' => 'RTGS',
             'imps' => 'IMPS',
+            'upi' => 'UPI',
             'other' => 'Other',
         ];
 

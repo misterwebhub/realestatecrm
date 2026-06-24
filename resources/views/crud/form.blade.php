@@ -327,6 +327,7 @@
                                     class="form-control"
                                     rows="4"
                                     @if(!empty($field['required'])) required @endif
+                                    @if(!empty($field['readonly'])) readonly @endif
                                 >{{ $value }}</textarea>
                             @elseif(($field['type'] ?? 'text') === 'readonly_text')
                                 <input
@@ -343,16 +344,19 @@
                                 @endif
                             @elseif(($field['type'] ?? 'text') === 'select')
                                 <div class="d-flex align-items-center gap-2">
-                                    <select id="{{ $field['name'] }}" name="{{ $field['name'] }}" class="form-select" @if(!empty($field['required'])) required @endif>
+                                    <select id="{{ $field['name'] }}" @if(empty($field['readonly'])) name="{{ $field['name'] }}" @endif class="form-select" @if(!empty($field['required'])) required @endif @if(!empty($field['readonly'])) disabled tabindex="-1" @endif>
                                         <option value="">Select {{ $field['label'] }}</option>
                                         @foreach($field['options'] ?? [] as $optionValue => $optionLabel)
                                             <option value="{{ $optionValue }}" @selected((string) $value === (string) $optionValue)>{{ $optionLabel }}</option>
                                         @endforeach
                                     </select>
-                                    @if(($field['name'] ?? '') === 'arazi_code')
+                                    @if(!empty($field['readonly']))
+                                        <input type="hidden" name="{{ $field['name'] }}" value="{{ $value }}">
+                                    @endif
+                                    @if(($field['name'] ?? '') === 'arazi_code' && empty($field['readonly']))
                                         <a href="#" class="btn btn-outline-primary btn-sm btn-new-arazi" data-create-url="{{ route('arazis.create-fragment') }}" title="Create new Arazi">New</a>
                                     @endif
-                                    @if(($field['name'] ?? '') === 'kisan_id')
+                                    @if(($field['name'] ?? '') === 'kisan_id' && empty($field['readonly']))
                                         <a href="#" class="btn btn-outline-primary btn-sm btn-new-kisan" data-create-url="{{ route('kisans.create-fragment') }}" title="Create new Kisan">New</a>
                                     @endif
                                 </div>
@@ -1019,6 +1023,34 @@
                     if(opt && opt.dataset && opt.dataset.area) landSize.value = opt.dataset.area;
                 });
             }
+        })();
+    </script>
+    <script>
+        // Payment method → show/require MTR Transaction No. + Account/Payee Name
+        (function(){
+            const method = document.getElementById('payment_method');
+            const mtr    = document.getElementById('mtr_transaction_no');
+            const payee  = document.getElementById('account_payee_name');
+            if(!method || !mtr) return;
+
+            function groupOf(el){
+                if(!el) return null;
+                return el.closest('.mb-3, .form-group, .col, .col-md-6, .col-md-4, .row > div') || el.parentElement;
+            }
+            const mtrGroup   = groupOf(mtr);
+            const payeeGroup = groupOf(payee);
+
+            function toggle(){
+                const m = (method.value || '').toLowerCase();
+                const needs = ['imps','rtgs','upi'].includes(m);
+                if(mtrGroup) mtrGroup.style.display = needs ? '' : 'none';
+                if(needs){ mtr.setAttribute('required','required'); }
+                else { mtr.removeAttribute('required'); }
+                if(payeeGroup) payeeGroup.style.display = needs ? '' : 'none';
+            }
+            method.addEventListener('change', toggle);
+            if(window.jQuery){ try{ jQuery(method).on('select2:select', toggle); }catch(e){} }
+            toggle();
         })();
     </script>
 @endsection
