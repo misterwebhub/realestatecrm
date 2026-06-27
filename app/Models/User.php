@@ -23,6 +23,7 @@ class User extends Authenticatable
         'email',
         'password',
         'role',
+        'role_id',
         'mobile',
         'secondary_mobile',
         'address',
@@ -52,5 +53,36 @@ class User extends Authenticatable
     public function payments()
     {
         return $this->hasMany(\App\Models\CustomerBondPayment::class, 'taken_by_user_id');
+    }
+
+    public function roleModel()
+    {
+        return $this->belongsTo(\App\Models\Role::class, 'role_id');
+    }
+
+    /**
+     * Super Admin via the assigned role, or the legacy 'role' string === 'admin'/'super_admin'.
+     */
+    public function isSuperAdmin(): bool
+    {
+        if ($this->roleModel && $this->roleModel->isSuperAdmin()) {
+            return true;
+        }
+
+        return in_array($this->role, ['super_admin', 'admin'], true)
+            && $this->role_id === null; // legacy admins with no assigned role
+    }
+
+    /**
+     * Check a single permission name (e.g. "arazis.create").
+     * Super Admin always passes (also enforced by Gate::before).
+     */
+    public function hasPermission(string $permission): bool
+    {
+        if ($this->isSuperAdmin()) {
+            return true;
+        }
+
+        return (bool) $this->roleModel?->hasPermission($permission);
     }
 }

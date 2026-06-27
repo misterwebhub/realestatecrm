@@ -22,6 +22,7 @@ class UserMasterController extends Controller
             'action' => route('user-master.store'),
             'method' => 'POST',
             'item'   => null,
+            'roles'  => \App\Models\Role::orderBy('display_name')->get(),
         ]);
     }
 
@@ -35,12 +36,13 @@ class UserMasterController extends Controller
             'secondary_mobile' => ['nullable', 'string', 'max:20'],
             'address'          => ['nullable', 'string', 'max:300'],
             'password'         => ['required', 'string', 'min:6', 'confirmed'],
-            'role'             => ['nullable', 'in:admin,manager,accountant,staff'],
+            'role_id'          => ['required', 'exists:roles,id'],
             'is_active'        => ['nullable', 'boolean'],
         ]);
 
         $validated['password']  = Hash::make($validated['password']);
         $validated['is_active'] = $request->boolean('is_active', true);
+        $validated['role']      = $this->legacyRoleFor($validated['role_id']);
         if (empty($validated['email'])) unset($validated['email']);
 
         User::create($validated);
@@ -55,6 +57,7 @@ class UserMasterController extends Controller
             'action' => route('user-master.update', $userMaster),
             'method' => 'PUT',
             'item'   => $userMaster,
+            'roles'  => \App\Models\Role::orderBy('display_name')->get(),
         ]);
     }
 
@@ -68,7 +71,7 @@ class UserMasterController extends Controller
             'secondary_mobile' => ['nullable', 'string', 'max:20'],
             'address'          => ['nullable', 'string', 'max:300'],
             'password'         => ['nullable', 'string', 'min:6', 'confirmed'],
-            'role'             => ['nullable', 'in:admin,manager,accountant,staff'],
+            'role_id'          => ['required', 'exists:roles,id'],
             'is_active'        => ['nullable', 'boolean'],
         ]);
 
@@ -78,6 +81,7 @@ class UserMasterController extends Controller
             unset($validated['password']);
         }
         $validated['is_active'] = $request->boolean('is_active', true);
+        $validated['role']      = $this->legacyRoleFor($validated['role_id']);
 
         $userMaster->update($validated);
 
@@ -138,6 +142,25 @@ class UserMasterController extends Controller
             'dateTo'      => $dateTo,
             'title'       => 'Receipt Dashboard — ' . $userMaster->name,
         ]);
+    }
+
+    /**
+     * Map an assigned role (roles table) to the legacy users.role enum
+     * so the legacy column stays valid. Super Admin -> admin, otherwise
+     * match by slug, falling back to 'staff'.
+     */
+    protected function legacyRoleFor($roleId): string
+    {
+        $role = \App\Models\Role::find($roleId);
+        if (!$role) {
+            return 'staff';
+        }
+        if ($role->name === \App\Models\Role::SUPER_ADMIN) {
+            return 'admin';
+        }
+        return in_array($role->name, ['admin', 'manager', 'accountant', 'staff'], true)
+            ? $role->name
+            : 'staff';
     }
 
     /** JSON list for select boxes */

@@ -41,10 +41,10 @@ Route::middleware('auth')->group(function () {
     Route::get('kisans/create-fragment', [KisanController::class, 'createFragment'])->name('kisans.create-fragment');
     Route::post('kisans/ajax-store', [KisanController::class, 'storeAjax'])->name('kisans.ajax-store');
     // AJAX endpoints to support modal creation of Arazi from other forms
-    Route::get('arazis/create-fragment', [AraziController::class, 'createFragment'])->name('arazis.create-fragment')->middleware('role:admin,manager');
-    Route::post('arazis/ajax-store', [AraziController::class, 'storeAjax'])->name('arazis.ajax-store')->middleware('role:admin,manager');
+    Route::get('arazis/create-fragment', [AraziController::class, 'createFragment'])->name('arazis.create-fragment')->middleware('permission:arazis.create');
+    Route::post('arazis/ajax-store', [AraziController::class, 'storeAjax'])->name('arazis.ajax-store')->middleware('permission:arazis.create');
 
-    Route::resource('arazis', AraziController::class)->except(['show'])->middleware('role:admin,manager');
+    Route::resource('arazis', AraziController::class)->except(['show'])->middleware('permission:arazis.view');
     Route::resource('plots', PlotController::class)->except(['show']);
     Route::resource('customers', CustomerController::class)->except(['show']);
     Route::get('agents/type/{type}', [AgentController::class, 'typeIndex'])->name('agents.type.index');
@@ -131,6 +131,11 @@ Route::middleware('auth')->group(function () {
     Route::get('user-master/list', [UserMasterController::class, 'list'])->name('user-master.list');
     Route::get('user-master/{userMaster}/receipts', [UserMasterController::class, 'receipts'])->name('user-master.receipts');
     Route::resource('user-master', UserMasterController::class)->except(['show'])->parameters(['user-master' => 'userMaster']);
+
+    // Roles & Permissions (managed by users with the 'roles' permission; Super Admin always allowed)
+    Route::resource('roles', \App\Http\Controllers\RoleController::class)
+        ->except(['show'])
+        ->middleware('permission:roles.view');
 
     // Expenses
     Route::get('expenses', [\App\Http\Controllers\ExpenseController::class, 'index'])->name('expenses.index');

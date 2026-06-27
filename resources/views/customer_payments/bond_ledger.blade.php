@@ -84,6 +84,9 @@
                         <th class="text-end" style="font-size:11px;font-weight:700;text-transform:uppercase;color:#64748b;letter-spacing:.4px;">Debit</th>
                         <th class="text-end" style="font-size:11px;font-weight:700;text-transform:uppercase;color:#64748b;letter-spacing:.4px;">Running Balance</th>
                         <th style="font-size:11px;font-weight:700;text-transform:uppercase;color:#64748b;letter-spacing:.4px;">Method</th>
+                        <th style="font-size:11px;font-weight:700;text-transform:uppercase;color:#64748b;letter-spacing:.4px;">MTR No</th>
+                        <th style="font-size:11px;font-weight:700;text-transform:uppercase;color:#64748b;letter-spacing:.4px;">Payee Name</th>
+                        <th style="font-size:11px;font-weight:700;text-transform:uppercase;color:#64748b;letter-spacing:.4px;">Taken By</th>
                         <th style="font-size:11px;font-weight:700;text-transform:uppercase;color:#64748b;letter-spacing:.4px;">Remarks</th>
                         <th style="font-size:11px;font-weight:700;text-transform:uppercase;color:#64748b;letter-spacing:.4px;"></th>
                     </tr>
@@ -124,7 +127,10 @@
                         <td class="text-end fw-semibold" style="font-size:12px;color:{{ $running >= 0 ? '#1d4ed8' : '#b91c1c' }};">
                             ₹{{ number_format($running, 2) }}
                         </td>
-                        <td style="font-size:12px;color:#475569;">{{ $entry->payment_method ?? '-' }}</td>
+                        <td style="font-size:12px;color:#475569;">{{ $entry->payment_method ? strtoupper($entry->payment_method) : '-' }}</td>
+                        <td style="font-size:12px;color:#475569;">{{ $entry->mtr_transaction_no ?: '-' }}</td>
+                        <td style="font-size:12px;color:#475569;">{{ $entry->account_payee_name ?: '-' }}</td>
+                        <td style="font-size:12px;color:#475569;">{{ $entry->takenByUser->name ?? '-' }}</td>
                         <td style="font-size:12px;color:#64748b;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"
                             title="{{ $entry->remarks }}">
                             {{ $entry->remarks ?? '' }}
@@ -148,7 +154,7 @@
                     </tr>
                     @empty
                     <tr>
-                        <td colspan="10" class="text-center py-5 text-muted">
+                        <td colspan="13" class="text-center py-5 text-muted">
                             <div style="font-size:28px;">📋</div>
                             <div class="mt-2">No payment entries yet for this bond.</div>
                             <a href="{{ route('customer-bond-payments.compact') }}"
@@ -170,7 +176,7 @@
                         <td class="text-end fw-bold" style="font-size:12px;color:{{ $balance > 0 ? '#b91c1c' : '#15803d' }};">
                             ₹{{ number_format($running, 2) }}
                         </td>
-                        <td colspan="3"></td>
+                        <td colspan="6"></td>
                     </tr>
                 </tfoot>
                 @endif

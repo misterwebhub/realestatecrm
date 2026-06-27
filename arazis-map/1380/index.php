@@ -2179,6 +2179,7 @@ try {
         $plots[] = [
             'id' => $plotId,
             'plot_number' => $r['plot_number'],
+            'title' => $r['title'] ?? null,
             'status' => $status,
             'area' => $r['area'],
         ];
@@ -2207,13 +2208,28 @@ document.addEventListener('DOMContentLoaded', function(){
     };
 
     const plots = window.plots || [];
-    // build lookup by numeric part of plot_number; normalize status (fix typos like adwance)
+    function normStatus(s){
+        const raw = String(s || 'available').toLowerCase().replace(/adwance/g,'advance');
+        return raw.replace(/[_\s]+/g,'-') || 'available';
+    }
+    // Lookup by FULL plot_number label (e.g. "216A", "216") so suffixed plots
+    // like 216A and 216 don't collide. Also keep a numeric fallback map.
+    const plotStatusByLabel  = {};
     const plotStatusByNumber = {};
     plots.forEach(p => {
-        const numMatch = String(p.plot_number || p.id || '').match(/\d+/);
-        const rawStatus = String(p.status || 'available').toLowerCase().replace(/adwance/g,'advance');
-        const statusKey = rawStatus.replace(/[_\s]+/g,'-');
-        if (numMatch) plotStatusByNumber[numMatch[0]] = statusKey || 'available';
+        const statusKey = normStatus(p.status);
+        // Tile labels in this layout can match EITHER plot_number OR title
+        // (e.g. plot "216A" is stored only in the title column).
+        [p.plot_number, p.title].forEach(v => {
+            const label = String(v || '').trim().toUpperCase();
+            if (!label) return;
+            plotStatusByLabel[label] = statusKey;
+            // numeric fallback only for purely-numeric labels, so a suffixed
+            // label like "216A" never colors the plain "216" tile
+            if (/^\d+$/.test(label) && !plotStatusByNumber[label]) {
+                plotStatusByNumber[label] = statusKey;
+            }
+        });
     });
 
     // detect numbering offset
@@ -2244,8 +2260,15 @@ document.addEventListener('DOMContentLoaded', function(){
         const m = (el.id || '').match(/^p(\d+)$/);
         if (!m) return;
         const tileNum = m[1];
-        const mapped = mapTileNumberToPlotNumber(tileNum);
-        const status = (mapped && plotStatusByNumber[mapped]) ? plotStatusByNumber[mapped] : 'available';
+        // Prefer matching by the tile's visible label (real plot_number, e.g. "216A").
+        const label = (el.textContent || '').trim().toUpperCase();
+        let status = null;
+        if (label && plotStatusByLabel[label]) {
+            status = plotStatusByLabel[label];
+        } else {
+            const mapped = mapTileNumberToPlotNumber(tileNum);
+            status = (mapped && plotStatusByNumber[mapped]) ? plotStatusByNumber[mapped] : 'available';
+        }
         el.style.backgroundImage = 'none';
         const clr = colorMap[status] || colorMap['available'];
         el.style.backgroundColor = clr;

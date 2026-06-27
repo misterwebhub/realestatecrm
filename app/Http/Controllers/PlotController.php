@@ -143,6 +143,12 @@ class PlotController extends Controller
             }
         }
 
+        // Auto-fill plot_number from the title when it's empty, so the arazi
+        // map (which can match tiles by plot_number) always has a fallback.
+        if (empty($validated['plot_number'] ?? null) && !empty($validated['title'] ?? null)) {
+            $validated['plot_number'] = $validated['title'];
+        }
+
         return $validated;
     }
 

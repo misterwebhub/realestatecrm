@@ -594,6 +594,9 @@
                         <th class="text-end text-danger">Debit</th>
                         <th class="text-end">Balance</th>
                         <th>Method</th>
+                        <th>MTR No</th>
+                        <th>Payee Name</th>
+                        <th>Taken By</th>
                         <th>Remarks</th>
                     </tr>
                 </thead>
@@ -627,13 +630,16 @@
                                 <span class="text-muted">#{{ $entry['cheque_number'] }}</span>
                             @endif
                         </td>
+                        <td style="font-size:12px;">{{ ($entry['mtr_no'] ?? '-') !== '-' ? $entry['mtr_no'] : '' }}</td>
+                        <td style="font-size:12px;">{{ ($entry['payee'] ?? '-') !== '-' ? $entry['payee'] : '' }}</td>
+                        <td style="font-size:12px;">{{ ($entry['taken_by'] ?? '-') !== '-' ? $entry['taken_by'] : '' }}</td>
                         <td style="font-size:12px; color:#64748b; max-width:150px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="{{ $entry['remarks'] }}">
                             {{ $entry['remarks'] !== '-' ? $entry['remarks'] : '' }}
                         </td>
                     </tr>
                     @empty
                     <tr>
-                        <td colspan="11" class="text-center py-5 text-muted">
+                        <td colspan="14" class="text-center py-5 text-muted">
                             <div style="font-size:32px;">📋</div>
                             <div class="mt-2">No payment entries found.</div>
                             @if($selectedBondId)
@@ -650,7 +656,7 @@
                         <td class="text-end text-success">₹{{ number_format($totalCredit, 2) }}</td>
                         <td class="text-end text-danger">₹{{ number_format($totalDebit, 2) }}</td>
                         <td class="text-end text-primary">₹{{ number_format($totalCredit - $totalDebit, 2) }}</td>
-                        <td colspan="2"></td>
+                        <td colspan="5"></td>
                     </tr>
                 </tfoot>
                 @endif

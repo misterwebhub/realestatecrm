@@ -47,7 +47,8 @@ class CustomerBondPaymentController extends Controller
                 ->withSum('payments as total_paid', 'amount')
                 ->findOrFail($bondId);
 
-            $entries = CustomerBondPayment::where('customer_bond_id', $bondId)
+            $entries = CustomerBondPayment::with('takenByUser')
+                ->where('customer_bond_id', $bondId)
                 ->orderBy('entry_date')
                 ->orderBy('id')
                 ->get();
@@ -220,7 +221,7 @@ class CustomerBondPaymentController extends Controller
                 ->find($selectedBondId);
 
             if ($selectedBond) {
-                $entries = \App\Models\CustomerBondPayment::with(['customerBond.customer'])
+                $entries = \App\Models\CustomerBondPayment::with(['customerBond.customer', 'takenByUser'])
                     ->where('customer_bond_id', $selectedBondId)
                     ->orderBy('entry_date')
                     ->orderBy('id')
@@ -234,6 +235,9 @@ class CustomerBondPaymentController extends Controller
                             'type'      => ucfirst($payment->entry_type ?? 'payment'),
                             'amount'    => (float) $payment->amount,
                             'method'    => $payment->payment_method ?? '-',
+                            'mtr_no'    => $payment->mtr_transaction_no ?? '-',
+                            'payee'     => $payment->account_payee_name ?? '-',
+                            'taken_by'  => $payment->takenByUser->name ?? '-',
                             'remarks'   => $payment->remarks ?? '-',
                             'is_debit'  => in_array($payment->entry_type, ['return', 'discount']),
                         ];

@@ -58,16 +58,19 @@
                     @error('email')<div class="invalid-feedback">{{ $message }}</div>@enderror
                 </div>
 
-                {{-- Role --}}
+                {{-- Role (permissions) --}}
                 <div class="col-md-6">
-                    <label class="form-label fw-semibold">Role</label>
-                    <select name="role" class="form-select @error('role') is-invalid @enderror">
-                        <option value="staff"      @selected(old('role', $item?->role ?? 'staff') === 'staff')>Staff</option>
-                        <option value="accountant" @selected(old('role', $item?->role) === 'accountant')>Accountant</option>
-                        <option value="manager"    @selected(old('role', $item?->role) === 'manager')>Manager</option>
-                        <option value="admin"      @selected(old('role', $item?->role) === 'admin')>Admin</option>
+                    <label class="form-label fw-semibold">Role <span class="text-danger">*</span></label>
+                    <select name="role_id" class="form-select @error('role_id') is-invalid @enderror" required>
+                        <option value="">— Select role —</option>
+                        @foreach(($roles ?? []) as $r)
+                            <option value="{{ $r->id }}" @selected((string) old('role_id', $item?->role_id) === (string) $r->id)>
+                                {{ $r->display_name }}
+                            </option>
+                        @endforeach
                     </select>
-                    @error('role')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                    <div class="form-text">Controls which modules this user can access.</div>
+                    @error('role_id')<div class="invalid-feedback">{{ $message }}</div>@enderror
                 </div>
 
                 {{-- Address --}}
