@@ -299,7 +299,7 @@ class RegistryController extends Controller
                 'edit_url'     => route($this->resourceRouteName() . '.edit', $record),
                 'delete_url'   => route($this->resourceRouteName() . '.destroy', $record),
                 'print_url'    => route($this->resourceRouteName() . '.print', $record),
-                'doc_url'      => $record->document_path ? asset('storage/' . $record->document_path) : null,
+                'doc_url'      => $record->document_path ? route('registries.download', $record->id) : null,
             ]);
         })->all();
 
@@ -384,6 +384,23 @@ class RegistryController extends Controller
     {
         $registry = Registry::with(['customer', 'arazi', 'agent'])->findOrFail($id);
         return view('prints.registry_certificate', ['registry' => $registry, 'title' => 'Registry Certificate']);
+    }
+
+    public function download($id)
+    {
+        $registry = Registry::findOrFail($id);
+
+        if (! $registry->document_path) {
+            abort(404, 'No file attached.');
+        }
+
+        $path = storage_path('app/public/' . $registry->document_path);
+
+        if (! file_exists($path)) {
+            abort(404, 'File not found.');
+        }
+
+        return response()->download($path, basename($registry->document_path));
     }
 
     public function pdf($id)

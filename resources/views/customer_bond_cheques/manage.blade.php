@@ -6,6 +6,14 @@
     $b = $bond;
     $plots     = $b->plots ?? collect();
     $witnesses = $b->witnesses ?? collect();
+
+    // Frequency options used by the auto-generator and the per-row selector.
+    $frequencyOptions = [
+        'every_month'    => 'Every Month',
+        'every_2_months' => 'Every 2 Months',
+        'every_3_months' => 'Every 3 Months',
+        'twice_a_month'  => 'Twice in a Month',
+    ];
 @endphp
 
 {{-- Bond Info Strip --}}
@@ -82,6 +90,56 @@
 </div>
 
 {{-- ═══════════════════════════════════════════════════════ --}}
+{{-- AUTO GENERATE CHEQUE ENTRIES (available only until first cheques are saved) --}}
+{{-- ═══════════════════════════════════════════════════════ --}}
+@if($cheques->isEmpty())
+<div class="card border-0 shadow-sm mb-3">
+    <div class="card-header py-2 px-3 bg-white border-bottom d-flex align-items-center gap-2">
+        <span class="fw-bold" style="font-size:15px;"><i class="bi bi-magic me-1 text-primary"></i>Auto Generate Cheque Entries</span>
+        <span class="text-muted" style="font-size:12px;">Generate installment cheque rows automatically from the bond's installment due date. Available once — hidden after cheques are saved.</span>
+    </div>
+    <div class="card-body p-3">
+        <div class="row g-2 align-items-end">
+            <div class="col-6 col-md-3">
+                <label class="form-label small fw-semibold mb-1">Installment Due Date (start)</label>
+                <input type="date" id="genStartDate" class="form-control form-control-sm" value="{{ $installmentDueDate }}">
+            </div>
+            <div class="col-6 col-md-2">
+                <label class="form-label small fw-semibold mb-1">No. of Months</label>
+                <input type="number" min="1" max="120" step="1" id="genMonths" class="form-control form-control-sm" value="{{ $defaultMonths > 0 ? $defaultMonths : '' }}" placeholder="e.g. 36">
+            </div>
+            <div class="col-6 col-md-3">
+                <label class="form-label small fw-semibold mb-1">Frequency</label>
+                <select id="genFrequency" class="form-select form-select-sm">
+                    @foreach($frequencyOptions as $val => $label)
+                        <option value="{{ $val }}">{{ $label }}</option>
+                    @endforeach
+                </select>
+            </div>
+            <div class="col-6 col-md-2">
+                <label class="form-label small fw-semibold mb-1">Account</label>
+                <select id="genAccount" class="form-select form-select-sm">
+                    <option value="">— None —</option>
+                    @foreach($connectedAccounts as $acc)
+                        <option value="{{ $acc->id }}" @selected($loop->first)>{{ $acc->name }} / {{ $acc->mobile }}</option>
+                    @endforeach
+                </select>
+            </div>
+            <div class="col-6 col-md-2 d-flex gap-2">
+                <button type="button" id="genBtn" class="btn btn-primary btn-sm w-100">
+                    <i class="bi bi-lightning-charge me-1"></i>Generate
+                </button>
+            </div>
+        </div>
+        <div class="mt-2 d-flex align-items-center gap-3 flex-wrap">
+            <span class="text-muted small"><i class="bi bi-info-circle me-1"></i>The chosen account is applied to every generated row; you can change any row individually.</span>
+            <span id="genFeedback" class="small text-success"></span>
+        </div>
+    </div>
+</div>
+@endif
+
+{{-- ═══════════════════════════════════════════════════════ --}}
 {{-- CHEQUES TABLE --}}
 {{-- ═══════════════════════════════════════════════════════ --}}
 <div class="card border-0 shadow-sm">
@@ -106,8 +164,10 @@
                             <th style="width:36px">#</th>
                             <th style="min-width:140px">Account <span class="text-danger">*</span></th>
                             <th style="width:140px">Cheque No <span class="text-danger">*</span></th>
-                            <th style="width:130px">Cheque Date</th>
                             <th style="width:140px">Amount <span class="text-danger">*</span></th>
+                            <th style="width:130px">Cheque Date</th>
+                            <th style="width:130px">Due Date</th>
+                            <th style="width:150px">Frequency</th>
                             <th style="width:130px">Status</th>
                             <th style="width:120px">Type</th>
                             <th style="width:200px">Notes</th>
@@ -130,8 +190,19 @@
                                     </select>
                                 </td>
                                 <td><input name="cheques[{{ $i }}][cheque_number]" required class="form-control form-control-sm" value="{{ $c->cheque_number }}"></td>
-                                <td><input type="date" name="cheques[{{ $i }}][cheque_date]" class="form-control form-control-sm" value="{{ optional($c->cheque_date)->format('Y-m-d') ?: \Carbon\Carbon::now()->format('Y-m-d') }}"></td>
                                 <td><input type="number" step="0.01" name="cheques[{{ $i }}][amount]" required class="form-control form-control-sm" value="{{ $c->amount }}"></td>
+                                <td><input type="date" name="cheques[{{ $i }}][cheque_date]" class="form-control form-control-sm" value="{{ optional($c->cheque_date)->format('Y-m-d') ?: \Carbon\Carbon::now()->format('Y-m-d') }}"></td>
+                                <td><input type="date" name="cheques[{{ $i }}][action_due_date]" class="form-control form-control-sm due-date" value="{{ optional($c->action_due_date)->format('Y-m-d') }}"></td>
+                                <td>
+                                    <select name="cheques[{{ $i }}][frequency_type]" class="form-select form-select-sm freq-select" disabled title="Frequency is locked for saved entries">
+                                        <option value="">—</option>
+                                        @foreach($frequencyOptions as $val => $label)
+                                            <option value="{{ $val }}" @selected(($c->frequency_type ?? '')===$val)>{{ $label }}</option>
+                                        @endforeach
+                                    </select>
+                                    {{-- disabled selects don't submit; keep the value --}}
+                                    <input type="hidden" name="cheques[{{ $i }}][frequency_type]" value="{{ $c->frequency_type }}">
+                                </td>
                                 <td>
                                     <select name="cheques[{{ $i }}][status]" class="form-select form-select-sm">
                                         <option value="pending"   @selected($c->status==='pending')>Pending</option>
@@ -151,6 +222,19 @@
                             </tr>
                         @endforeach
                     </tbody>
+                    <tfoot>
+                        <tr style="background:#f8fafc;border-top:2px solid #e2e8f0;">
+                            <td colspan="3" class="text-end fw-semibold align-middle">Total Cheque Amount</td>
+                            <td class="fw-bold text-primary align-middle" id="chequeTotalCell">₹0.00</td>
+                            <td colspan="7" class="align-middle">
+                                <div class="d-flex flex-wrap gap-3" style="font-size:13px;">
+                                    <span>Bond Total: <span class="fw-semibold">₹{{ number_format((float)($bond->total_amount ?? 0), 2) }}</span></span>
+                                    <span>Cheques Total: <span class="fw-semibold text-primary" id="chequeTotalInline">₹0.00</span></span>
+                                    <span>Balance (Total − Cheques): <span class="fw-bold" id="chequeBalanceInline">₹0.00</span></span>
+                                </div>
+                            </td>
+                        </tr>
+                    </tfoot>
                 </table>
             </div>
 
@@ -179,8 +263,17 @@
             </select>
         </td>
         <td><input name="cheques[__IDX0__][cheque_number]" required class="form-control form-control-sm"></td>
-        <td><input type="date" name="cheques[__IDX0__][cheque_date]" class="form-control form-control-sm" value="{{ \Carbon\Carbon::now()->format('Y-m-d') }}"></td>
         <td><input type="number" step="0.01" name="cheques[__IDX0__][amount]" required class="form-control form-control-sm"></td>
+        <td><input type="date" name="cheques[__IDX0__][cheque_date]" class="form-control form-control-sm" value="{{ \Carbon\Carbon::now()->format('Y-m-d') }}"></td>
+        <td><input type="date" name="cheques[__IDX0__][action_due_date]" class="form-control form-control-sm due-date"></td>
+        <td>
+            <select name="cheques[__IDX0__][frequency_type]" class="form-select form-select-sm freq-select">
+                <option value="">—</option>
+                @foreach($frequencyOptions as $val => $label)
+                    <option value="{{ $val }}">{{ $label }}</option>
+                @endforeach
+            </select>
+        </td>
         <td>
             <select name="cheques[__IDX0__][status]" class="form-select form-select-sm">
                 <option value="pending">Pending</option>
@@ -253,6 +346,7 @@
                     inp.name = name.replace(/cheques\[\d+\]/, 'cheques[' + idx + ']');
                 });
             });
+            if(typeof recalcTotals === 'function') recalcTotals();
         }
 
         addBtn.addEventListener('click', function(){
@@ -261,6 +355,10 @@
             const tmp = document.createElement('tbody');
             tmp.innerHTML = html;
             const tr = tmp.querySelector('tr');
+            // Auto-select the default account; can still be changed per row.
+            const accSel = tr.querySelector('.acc-select');
+            const def = defaultAccountValue();
+            if(accSel && def) accSel.value = def;
             table.appendChild(tr);
             if(window.jQuery && jQuery.fn.select2){
                 try{ jQuery(tr).find('.acc-select').select2({ theme:'bootstrap-5', width:'100%', placeholder:'— Select —' }); }catch(e){}
@@ -287,6 +385,213 @@
             try{
                 jQuery('.acc-select').select2({ theme:'bootstrap-5', width:'100%', placeholder:'— Select —', allowClear:true });
             }catch(e){}
+        }
+
+        // ── Shared date helpers ────────────────────────────────────────
+        function pad(n){ return (n < 10 ? '0' : '') + n; }
+        function ymd(d){ return d.getFullYear() + '-' + pad(d.getMonth()+1) + '-' + pad(d.getDate()); }
+
+        // Add `months` months to a Y-M-D string, clamping the day to the
+        // target month's last day (e.g. Jan 31 + 1 month => Feb 28/29).
+        function addMonths(startStr, months, extraDays){
+            const parts = startStr.split('-').map(Number);
+            const y = parts[0], m = parts[1]-1, day = parts[2];
+            const target = new Date(y, m + months, 1);
+            const lastDay = new Date(target.getFullYear(), target.getMonth()+1, 0).getDate();
+            target.setDate(Math.min(day, lastDay));
+            if(extraDays){ target.setDate(target.getDate() + extraDays); }
+            return target;
+        }
+
+        // Compute the due date for the k-th generated slot given the frequency.
+        function computeDue(startStr, k, freq){
+            switch(freq){
+                case 'every_2_months': return addMonths(startStr, 2*k, 0);
+                case 'every_3_months': return addMonths(startStr, 3*k, 0);
+                case 'twice_a_month':  return addMonths(startStr, Math.floor(k/2), (k % 2) ? 15 : 0);
+                case 'every_month':
+                default:               return addMonths(startStr, k, 0);
+            }
+        }
+
+        // Remove previously auto-generated (unsaved) rows so a re-generate or
+        // frequency change recalculates cleanly. Saved rows (data-id) are kept.
+        function clearGeneratedRows(){
+            Array.from(table.querySelectorAll('tr[data-generated="1"]')).forEach(function(tr){
+                if(!tr.getAttribute('data-id')){ tr.remove(); }
+            });
+        }
+
+        function firstAccountValue(){
+            const sel = table.querySelector('.acc-select');
+            if(!sel) return '';
+            const opt = Array.from(sel.options).find(o => o.value);
+            return opt ? opt.value : '';
+        }
+
+        // Default account for new/generated rows: the generate panel's chosen
+        // account when present, otherwise the first available account.
+        function defaultAccountValue(){
+            const genAcc = document.getElementById('genAccount');
+            if(genAcc && genAcc.value) return genAcc.value;
+            return firstAccountValue();
+        }
+
+        function makeRow(idx){
+            const html = tpl.replace(/__IDX__/g, idx + 1).replace(/__IDX0__/g, idx);
+            const tmp = document.createElement('tbody');
+            tmp.innerHTML = html;
+            return tmp.querySelector('tr');
+        }
+
+        // ── Per-row frequency cascade ──────────────────────────────────
+        // When a row's frequency is selected, that row's due date becomes the
+        // base and every editable row BELOW it re-adjusts its due date and
+        // cheque date sequentially using the chosen frequency. Rows above and
+        // saved rows (disabled frequency select) are never touched.
+        function editableRows(){
+            return Array.from(table.querySelectorAll('tr')).filter(function(tr){
+                const sel = tr.querySelector('.freq-select');
+                return sel && !sel.disabled;
+            });
+        }
+
+        function cascadeFrom(row){
+            const freqSel = row.querySelector('.freq-select');
+            const baseDue = row.querySelector('input[name*="[action_due_date]"]');
+            if(!freqSel || !freqSel.value || !baseDue || !baseDue.value) return;
+
+            const freq    = freqSel.value;
+            const baseStr = baseDue.value;
+
+            const rows  = editableRows();
+            const start = rows.indexOf(row);
+            if(start === -1) return;
+
+            for(let j = start; j < rows.length; j++){
+                const r   = rows[j];
+                const due = computeDue(baseStr, j - start, freq);
+                const dueStr = ymd(due);
+                const dueInput  = r.querySelector('input[name*="[action_due_date]"]');
+                const dateInput = r.querySelector('input[name*="[cheque_date]"]');
+                const rFreq     = r.querySelector('.freq-select');
+                if(dueInput)  dueInput.value  = dueStr;
+                if(dateInput) dateInput.value = dueStr;
+                if(rFreq && j > start) rFreq.value = freq; // propagate frequency downward
+            }
+        }
+
+        table.addEventListener('change', function(e){
+            const sel = e.target.closest('.freq-select');
+            if(!sel || sel.disabled) return;
+            const row = sel.closest('tr');
+            if(row) cascadeFrom(row);
+        });
+
+        // ── Live totals: total cheque amount & balance vs bond total ────
+        const bondTotal = {{ (float) ($bond->total_amount ?? 0) }};
+        function fmtMoney(n){
+            return '₹' + (Number(n) || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        }
+        function recalcTotals(){
+            let total = 0;
+            table.querySelectorAll('input[name*="[amount]"]').forEach(function(inp){
+                const v = parseFloat(inp.value);
+                if(!isNaN(v)) total += v;
+            });
+            const balance = bondTotal - total;
+            const totalCell    = document.getElementById('chequeTotalCell');
+            const totalInline  = document.getElementById('chequeTotalInline');
+            const balanceInline= document.getElementById('chequeBalanceInline');
+            if(totalCell)   totalCell.textContent   = fmtMoney(total);
+            if(totalInline) totalInline.textContent = fmtMoney(total);
+            if(balanceInline){
+                balanceInline.textContent = fmtMoney(balance);
+                balanceInline.className = 'fw-bold ' + (balance > 0 ? 'text-danger' : 'text-success');
+            }
+        }
+        table.addEventListener('input', function(e){
+            if(e.target && /\[amount\]$/.test(e.target.name || '')) recalcTotals();
+        });
+        recalcTotals();
+
+        // ── Fast entry: Tab flow Cheque No → Amount → next row Cheque No ──
+        table.addEventListener('keydown', function(e){
+            if(e.key !== 'Tab' || e.shiftKey || e.altKey || e.ctrlKey || e.metaKey) return;
+            const t = e.target;
+            const name = (t && t.name) || '';
+            const row = t.closest && t.closest('tr');
+            if(!row) return;
+
+            if(/\[cheque_number\]$/.test(name)){
+                const amt = row.querySelector('input[name*="[amount]"]');
+                if(amt){ e.preventDefault(); amt.focus(); if(amt.select) amt.select(); }
+            } else if(/\[amount\]$/.test(name)){
+                const rows = Array.from(table.querySelectorAll('tr'));
+                const next = rows[rows.indexOf(row) + 1];
+                if(next){
+                    const chq = next.querySelector('input[name*="[cheque_number]"]');
+                    if(chq){ e.preventDefault(); chq.focus(); if(chq.select) chq.select(); }
+                }
+                // no next row → let the browser handle Tab normally
+            }
+        });
+
+        // ── Auto Generate (only present until first cheques are saved) ──
+        const genStart   = document.getElementById('genStartDate');
+        const genMonths  = document.getElementById('genMonths');
+        const genFreq    = document.getElementById('genFrequency');
+        const genBtn     = document.getElementById('genBtn');
+        const genFeedback= document.getElementById('genFeedback');
+
+        function generate(){
+            const startStr = genStart.value;
+            const months   = parseInt(genMonths.value, 10);
+            const freq     = genFreq.value;
+            genFeedback.textContent = '';
+
+            if(!startStr){ genFeedback.className = 'small text-danger'; genFeedback.textContent = 'Please set the installment due date.'; return; }
+            if(!months || months < 1){ genFeedback.className = 'small text-danger'; genFeedback.textContent = 'Enter the number of months (≥ 1).'; return; }
+
+            clearGeneratedRows();
+
+            const accVal = defaultAccountValue();
+
+            for(let k = 0; k < months; k++){
+                const due = computeDue(startStr, k, freq);
+
+                const idx = table.querySelectorAll('tr').length;
+                const tr  = makeRow(idx);
+                tr.setAttribute('data-generated', '1');
+
+                const dueStr = ymd(due);
+                const dueInput  = tr.querySelector('input[name*="[action_due_date]"]');
+                const dateInput = tr.querySelector('input[name*="[cheque_date]"]');
+                const freqSel   = tr.querySelector('.freq-select');
+                const accSel    = tr.querySelector('.acc-select');
+
+                if(dueInput)  dueInput.value  = dueStr;
+                if(dateInput) dateInput.value = dueStr;
+                if(freqSel)   freqSel.value   = freq;
+                if(accSel && accVal) accSel.value = accVal;
+
+                table.appendChild(tr);
+                if(window.jQuery && jQuery.fn.select2){
+                    try{ jQuery(tr).find('.acc-select').select2({ theme:'bootstrap-5', width:'100%', placeholder:'— Select —' }); }catch(e){}
+                }
+            }
+            reindex();
+
+            genFeedback.className = 'small text-success';
+            genFeedback.textContent = 'Generated ' + months + ' cheque row(s). Review and Save All.';
+        }
+
+        if(genBtn){
+            genBtn.addEventListener('click', generate);
+            // Changing the frequency before saving recalculates generated rows.
+            genFreq.addEventListener('change', function(){
+                if(table.querySelector('tr[data-generated="1"]')){ generate(); }
+            });
         }
 
         // ── Add Account Modal ──────────────────────────────────────────

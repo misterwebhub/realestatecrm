@@ -51,6 +51,7 @@ Route::middleware('auth')->group(function () {
     Route::post('agents/type/{type}', [AgentController::class, 'typeStore'])->name('agents.type.store');
     Route::resource('agents', AgentController::class)->except(['show']);
     Route::resource('registries', RegistryController::class)->except(['show']);
+    Route::get('registries/{registry}/download', [RegistryController::class, 'download'])->name('registries.download');
     Route::get('registries/{registry}/print', [RegistryController::class, 'print'])->name('registries.print');
     Route::get('registries/{registry}/pdf', [RegistryController::class, 'pdf'])->name('registries.pdf');
     Route::post('registries/{registry}/esign', [RegistryController::class, 'esign'])->name('registries.esign');

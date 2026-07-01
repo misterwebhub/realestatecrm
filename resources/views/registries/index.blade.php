@@ -65,7 +65,7 @@
                                 <a href="{{ $row['print_url'] }}?print=1" target="_blank" class="btn btn-outline-success btn-sm">Print</a>
                             @endif
                             @if(!empty($row['doc_url']))
-                                <a href="{{ $row['doc_url'] }}" target="_blank" download class="btn btn-outline-primary btn-sm ms-1">
+                                <a href="{{ $row['doc_url'] }}" class="btn btn-outline-primary btn-sm ms-1">
                                     <i class="bi bi-download"></i> Download
                                 </a>
                             @else

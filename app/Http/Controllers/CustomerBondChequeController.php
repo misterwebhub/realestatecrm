@@ -153,12 +153,20 @@ class CustomerBondChequeController extends Controller
         $balance     = ($customer_bond->total_amount ?? 0) - $netPaid;
         $installmentNo = $customer_bond->payments->whereNotIn('entry_type', $debitTypes)->count();
 
+        // Default starting point for auto-generated cheque schedules:
+        // the bond's Installment Due Date (stored in `last_date`), falling back
+        // to the bond date, then today.
+        $installmentDueDate = optional($customer_bond->last_date)->format('Y-m-d')
+            ?: (optional($customer_bond->bond_date)->format('Y-m-d') ?: now()->format('Y-m-d'));
+
         return view('customer_bond_cheques.manage', [
-            'bond'          => $customer_bond,
-            'cheques'       => $cheques,
-            'netPaid'       => $netPaid,
-            'balance'       => $balance,
-            'installmentNo' => $installmentNo,
+            'bond'               => $customer_bond,
+            'cheques'            => $cheques,
+            'netPaid'            => $netPaid,
+            'balance'            => $balance,
+            'installmentNo'      => $installmentNo,
+            'installmentDueDate' => $installmentDueDate,
+            'defaultMonths'      => (int) ($customer_bond->no_of_months ?? 0),
         ]);
     }
 
@@ -174,6 +182,8 @@ class CustomerBondChequeController extends Controller
             'cheques.*.bank_name' => ['nullable', 'string', 'max:150'],
             'cheques.*.branch_name' => ['nullable', 'string', 'max:150'],
             'cheques.*.cheque_date' => ['nullable', 'date'],
+            'cheques.*.action_due_date' => ['nullable', 'date'],
+            'cheques.*.frequency_type' => ['nullable', 'string', 'max:30'],
             'cheques.*.amount' => ['required', 'numeric', 'min:0'],
             'cheques.*.status' => ['nullable', 'in:pending,cleared,bounced,cancelled'],
             'cheques.*.type' => ['nullable', 'in:mentioned,not_mentioned'],
@@ -218,6 +228,38 @@ class CustomerBondChequeController extends Controller
             }
         }
 
+        try {
+            DB::transaction(function () use ($items, $bondId) {
+                $this->persistChequeRows($items, $bondId);
+            });
+        } catch (\Illuminate\Database\QueryException $e) {
+            // 23000 = integrity constraint violation (e.g. the composite unique
+            // index on customer_bond_id + cheque_number). Surface a readable
+            // message naming the duplicate cheque number instead of a 500 page.
+            if ((string) ($e->errorInfo[0] ?? '') === '23000') {
+                $message = 'A cheque with the same number already exists for this bond. Please use a unique cheque number for each cheque.';
+
+                // Extract the duplicate value, e.g. "Duplicate entry '51-786' for key ..."
+                if (preg_match("/Duplicate entry '([^']+)'/", $e->getMessage(), $m)) {
+                    $duplicate = $m[1];
+                    // The unique key is (customer_bond_id, cheque_number); strip the bond id prefix.
+                    $chequeNo = preg_replace('/^' . preg_quote((string) $bondId, '/') . '-/', '', $duplicate);
+                    $message = 'Duplicate cheque number "' . $chequeNo . '" — this cheque number already exists for this bond. Please use a unique cheque number.';
+                }
+
+                return redirect()->back()->withErrors(['cheques' => $message])->withInput();
+            }
+            throw $e;
+        }
+
+        return redirect()->route('customer-bond-cheques.manage', $bondId)->with('success', 'Cheques saved.');
+    }
+
+    /**
+     * Insert/update the submitted cheque rows for a bond.
+     */
+    protected function persistChequeRows(array $items, $bondId): void
+    {
         foreach ($items as $row) {
             // if id present, update existing; otherwise create
             if (!empty($row['id'])) {
@@ -229,6 +271,8 @@ class CustomerBondChequeController extends Controller
                     'bank_name' => $row['bank_name'] ?? null,
                     'branch_name' => $row['branch_name'] ?? null,
                     'cheque_date' => $row['cheque_date'] ?? null,
+                    'action_due_date' => $row['action_due_date'] ?? null,
+                    'frequency_type' => $row['frequency_type'] ?? null,
                     'amount' => $row['amount'],
                     'status' => $row['status'] ?? 'pending',
                     'type' => $row['type'] ?? 'mentioned',
@@ -243,6 +287,8 @@ class CustomerBondChequeController extends Controller
                     'bank_name' => $row['bank_name'] ?? null,
                     'branch_name' => $row['branch_name'] ?? null,
                     'cheque_date' => $row['cheque_date'] ?? null,
+                    'action_due_date' => $row['action_due_date'] ?? null,
+                    'frequency_type' => $row['frequency_type'] ?? null,
                     'amount' => $row['amount'],
                     'status' => $row['status'] ?? 'pending',
                     'type' => $row['type'] ?? 'mentioned',
@@ -251,8 +297,6 @@ class CustomerBondChequeController extends Controller
                 ]);
             }
         }
-
-        return redirect()->route('customer-bond-cheques.manage', $bondId)->with('success', 'Cheques saved.');
     }
 
     public function destroy(CustomerBondCheque $customerBondCheque)

@@ -17,6 +17,8 @@ class CustomerBondCheque extends Model
         'bank_name',
         'branch_name',
         'cheque_date',
+        'action_due_date',
+        'frequency_type',
         'amount',
         'status',
         'type',
@@ -26,6 +28,7 @@ class CustomerBondCheque extends Model
 
     protected $casts = [
         'cheque_date' => 'date',
+        'action_due_date' => 'date',
         'amount' => 'decimal:2',
     ];
 

@@ -246,7 +246,7 @@
                     @if(!empty($item->document_path))
                         <div class="form-text mt-1">
                             <i class="bi bi-paperclip"></i> Existing file:
-                            <a href="{{ asset('storage/' . $item->document_path) }}" target="_blank" class="fw-semibold">View / Download</a>
+                            <a href="{{ route('registries.download', $item->id) }}" target="_blank" class="fw-semibold">View / Download</a>
                             <span class="text-muted ms-1">(upload new to replace)</span>
                         </div>
                     @endif

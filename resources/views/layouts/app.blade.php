@@ -289,6 +289,20 @@
                         setTimeout(function(){ var el=document.getElementById('sessionErrorAlert'); if(el){ var a=bootstrap.Alert.getOrCreateInstance(el); a.close(); } }, 7000);
                     </script>
                 @endif
+                @if($errors->any())
+                    <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                        <div class="d-flex align-items-center gap-2">
+                            <i class="bi bi-exclamation-octagon-fill fs-5 flex-shrink-0"></i>
+                            <strong>Please fix the following:</strong>
+                            <button type="button" class="btn-close ms-auto" data-bs-dismiss="alert" aria-label="Close"></button>
+                        </div>
+                        <ul class="mb-0 mt-2">
+                            @foreach($errors->all() as $error)
+                                <li>{{ $error }}</li>
+                            @endforeach
+                        </ul>
+                    </div>
+                @endif
 
                 @yield('content')
             </div>
