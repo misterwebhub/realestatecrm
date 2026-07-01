@@ -193,6 +193,7 @@ class PlotController extends Controller
             'showSearch' => true,
             'searchQuery' => $q,
             'searchInHeader' => true,
+            'permModule' => $this->resourcePermModule(),
         ]);
     }
 

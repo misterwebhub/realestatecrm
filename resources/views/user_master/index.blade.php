@@ -4,7 +4,10 @@
 <div class="card card-outline card-primary">
     <div class="card-header d-flex align-items-center gap-2">
         <h5 class="card-title mb-0 fw-bold">User Master <span class="text-muted fw-normal" style="font-size:13px;">— {{ $users->count() }} user(s)</span></h5>
-        <a href="{{ route('user-master.create') }}" class="btn btn-primary btn-sm ms-auto">
+        <a href="{{ route('user-master.report') }}" class="btn btn-outline-primary btn-sm ms-auto">
+            <i class="bi bi-bar-chart-line"></i> User Report
+        </a>
+        <a href="{{ route('user-master.create') }}" class="btn btn-primary btn-sm">
             <i class="bi bi-plus-lg"></i> Add User
         </a>
     </div>

@@ -1,6 +1,27 @@
 @extends('layouts.app')
 
 @section('content')
+    @php
+        // Resolve the permission module: prefer the value passed by the controller,
+        // otherwise derive it from the current route name (e.g. "kisans.index" -> "kisans").
+        $pmMap = [
+            'customer-bonds'         => 'customer_bonds',
+            'customer-bond-payments' => 'customer_payments',
+            'customer-bond-cheques'  => 'cheques',
+            'kisan-payment'          => 'kisan_payments',
+        ];
+        $pm = $permModule ?? null;
+        if (!$pm) {
+            $rn   = optional(request()->route())->getName() ?? '';
+            $base = \Illuminate\Support\Str::beforeLast($rn, '.');
+            $pm   = $base ? ($pmMap[$base] ?? str_replace('-', '_', $base)) : null;
+        }
+        $authUser  = auth()->user();
+        $legacyOk  = $authUser && in_array($authUser->role, ['admin', 'manager']);
+        $canCreate = $authUser ? ($pm ? $authUser->can($pm . '.create') : $legacyOk) : false;
+        $canEdit   = $authUser ? ($pm ? $authUser->can($pm . '.edit')   : $legacyOk) : false;
+        $canDelete = $authUser ? ($pm ? $authUser->can($pm . '.delete') : $legacyOk) : false;
+    @endphp
     <style>
         /* Compact, tidy layout for the wide Customer Bond Payments table */
         .cbp-table { font-size: 12.5px; }
@@ -39,7 +60,7 @@
                 <h5 class="card-title mb-0 fw-bold">{{ $title }}</h5>
             @endif
 
-            @if(auth()->check() && in_array(auth()->user()->role, ['admin','manager']))
+            @if(($exportCsvUrl ?? null) || $canCreate)
                 <div class="d-flex flex-wrap gap-2 align-items-center ms-auto">
                     @if(isset($exportCsvUrl) && $exportCsvUrl)
                         <a href="{{ $exportCsvUrl }}" class="btn btn-outline-success btn-sm">
@@ -47,9 +68,11 @@
                         </a>
                     @endif
                     @php $isCustomerBondIndex = $isCustomerBondIndex ?? str_contains($title, 'Customer Bond'); @endphp
-                    <a href="{{ $createUrl }}" @if($isCustomerBondIndex) target="_blank" rel="noopener" @endif class="btn btn-primary btn-sm">
-                        <i class="bi bi-plus-lg"></i> Add New
-                    </a>
+                    @if($canCreate)
+                        <a href="{{ $createUrl }}" @if($isCustomerBondIndex) target="_blank" rel="noopener" @endif class="btn btn-primary btn-sm">
+                            <i class="bi bi-plus-lg"></i> Add New
+                        </a>
+                    @endif
                 </div>
             @endif
         </div>
@@ -286,8 +309,10 @@
                                     {{ $button['label'] }}
                                 </a>
                             @endforeach
-                            @if(auth()->check() && in_array(auth()->user()->role, ['admin','manager']))
+                            @if($canEdit && !empty($row['edit_url']))
                                 <a href="{{ $row['edit_url'] }}" @if(!empty($row['open_in_new_tab'])) target="_blank" rel="noopener" @endif class="btn btn-outline-secondary btn-sm">Edit</a>
+                            @endif
+                            @if($canDelete && !empty($row['delete_url']))
                                 <form action="{{ $row['delete_url'] }}" method="POST" class="d-inline-block" onsubmit="return confirm('Delete this record?');">
                                     @csrf
                                     @method('DELETE')

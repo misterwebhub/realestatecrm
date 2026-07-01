@@ -163,6 +163,78 @@ class UserMasterController extends Controller
             : 'staff';
     }
 
+    /**
+     * Consolidated report: how much each user collected, broken down by bond.
+     */
+    public function report(Request $request)
+    {
+        $dateFrom = $request->query('date_from', '');
+        $dateTo   = $request->query('date_to', '');
+        $userId   = $request->query('user_id', '');
+
+        $payments = \App\Models\CustomerBondPayment::with([
+                'takenByUser',
+                'customerBond.customer',
+                'customerBond.arazi',
+                'customerBond.plots',
+            ])
+            ->whereNotNull('taken_by_user_id')
+            ->when($userId,   fn ($q) => $q->where('taken_by_user_id', $userId))
+            ->when($dateFrom, fn ($q) => $q->whereDate('entry_date', '>=', $dateFrom))
+            ->when($dateTo,   fn ($q) => $q->whereDate('entry_date', '<=', $dateTo))
+            ->orderBy('entry_date')
+            ->orderBy('id')
+            ->get();
+
+        $isDebit = fn ($p) => in_array($p->entry_type, ['return', 'discount'], true);
+
+        // Group by user, then by bond
+        $byUser = $payments->groupBy('taken_by_user_id')->map(function ($userPayments) use ($isDebit) {
+            $user = $userPayments->first()->takenByUser;
+
+            $bonds = $userPayments->groupBy('customer_bond_id')->map(function ($entries) use ($isDebit) {
+                $bond   = $entries->first()->customerBond;
+                $credit = $entries->reject($isDebit)->sum('amount');
+                $debit  = $entries->filter($isDebit)->sum('amount');
+                return [
+                    'bond'   => $bond,
+                    'count'  => $entries->count(),
+                    'credit' => $credit,
+                    'debit'  => $debit,
+                    'net'    => $credit - $debit,
+                ];
+            })->values();
+
+            $credit = $userPayments->reject($isDebit)->sum('amount');
+            $debit  = $userPayments->filter($isDebit)->sum('amount');
+
+            return [
+                'user'    => $user,
+                'bonds'   => $bonds,
+                'count'   => $userPayments->count(),
+                'credit'  => $credit,
+                'debit'   => $debit,
+                'net'     => $credit - $debit,
+            ];
+        })->sortByDesc('net')->values();
+
+        $grandCredit = $payments->reject($isDebit)->sum('amount');
+        $grandDebit  = $payments->filter($isDebit)->sum('amount');
+
+        return view('user_master.report', [
+            'title'       => 'User Master Report — Collections by User & Bond',
+            'byUser'      => $byUser,
+            'users'       => User::orderBy('name')->get(['id', 'name']),
+            'grandCredit' => $grandCredit,
+            'grandDebit'  => $grandDebit,
+            'grandNet'    => $grandCredit - $grandDebit,
+            'totalCount'  => $payments->count(),
+            'dateFrom'    => $dateFrom,
+            'dateTo'      => $dateTo,
+            'userId'      => $userId,
+        ]);
+    }
+
     /** JSON list for select boxes */
     public function list()
     {

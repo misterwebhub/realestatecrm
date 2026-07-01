@@ -434,7 +434,30 @@ class RegistryController extends Controller
         if ($request->hasFile('document')) {
             $file = $request->file('document');
             if ($file->isValid()) {
-                $path = $file->store('registries', 'public');
+                $disk = \Illuminate\Support\Facades\Storage::disk('public');
+
+                // Ensure the target directory exists before storing the file.
+                if (! $disk->exists('registries')) {
+                    $disk->makeDirectory('registries');
+                }
+
+                // Keep the original file name; sanitise only what could break a path.
+                $original  = $file->getClientOriginalName();
+                $extension = pathinfo($original, PATHINFO_EXTENSION);
+                $baseName  = pathinfo($original, PATHINFO_FILENAME);
+                $baseName  = trim(preg_replace('/[\/\\\\:*?"<>|]+/', '_', $baseName)) ?: 'document';
+                $safeName  = $baseName . ($extension ? '.' . $extension : '');
+
+                // If a file with the same name already exists, keep both by
+                // storing this upload as a numbered copy instead of replacing it.
+                $fileName = $safeName;
+                $counter  = 1;
+                while ($disk->exists('registries/' . $fileName)) {
+                    $fileName = $baseName . ' (' . $counter . ')' . ($extension ? '.' . $extension : '');
+                    $counter++;
+                }
+
+                $path = $file->storeAs('registries', $fileName, 'public');
                 $item->document_path = $path;
                 $item->save();
             }

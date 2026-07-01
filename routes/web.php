@@ -129,6 +129,7 @@ Route::middleware('auth')->group(function () {
     
     // User Master
     Route::get('user-master/list', [UserMasterController::class, 'list'])->name('user-master.list');
+    Route::get('user-master/report', [UserMasterController::class, 'report'])->name('user-master.report');
     Route::get('user-master/{userMaster}/receipts', [UserMasterController::class, 'receipts'])->name('user-master.receipts');
     Route::resource('user-master', UserMasterController::class)->except(['show'])->parameters(['user-master' => 'userMaster']);
 
@@ -157,6 +158,7 @@ Route::middleware('auth')->group(function () {
     // Reports
     Route::get('reports', [\App\Http\Controllers\ReportsController::class, 'index'])->name('reports.index');
     Route::get('reports/plot-details', [\App\Http\Controllers\ReportsController::class, 'plotDetails'])->name('reports.plot.details');
+    Route::get('reports/customer-payments-by-user', [\App\Http\Controllers\ReportsController::class, 'customerPaymentsByUser'])->name('reports.customer-payments.by-user');
 
     // Arazis Map index: list folders under project root `arazis-map` and link to their index.php
     // Serve legacy map PHP files through Laravel to ensure environment variables (DB_*) are available.

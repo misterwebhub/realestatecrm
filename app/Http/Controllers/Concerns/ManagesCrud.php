@@ -110,7 +110,26 @@ trait ManagesCrud
             'rows' => $rows,
             'createUrl' => route($routeName . '.create'),
             'exportCsvUrl' => $this->allowsCsvExport() ? route($routeName.'.export.csv') : null,
+            'permModule' => $this->resourcePermModule(),
         ]);
+    }
+
+    /**
+     * Permission module key for this resource (used to gate create/edit/delete
+     * buttons in the shared CRUD views). Defaults to the route name with dashes
+     * converted to underscores; a few resources need an explicit mapping.
+     */
+    protected function resourcePermModule(): ?string
+    {
+        $map = [
+            'customer-bonds'         => 'customer_bonds',
+            'customer-bond-payments' => 'customer_payments',
+            'customer-bond-cheques'  => 'cheques',
+            'kisan-payment'          => 'kisan_payments',
+        ];
+        $route = $this->resourceRouteName();
+
+        return $map[$route] ?? str_replace('-', '_', $route);
     }
 
     public function create()

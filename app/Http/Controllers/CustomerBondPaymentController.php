@@ -150,6 +150,7 @@ class CustomerBondPaymentController extends Controller
             'cp_plot'                => $plotQ,
             'cp_entry_type'          => $entryType,
             'cp_credit_debit'        => $creditDebit,
+            'permModule'             => $this->resourcePermModule(),
         ]);
     }
 
