@@ -105,6 +105,13 @@
                                 <p>Arazi Maps</p>
                             </a>
                         </li>
+
+                        <li class="nav-item">
+                            <a href="{{ route('arazi-groups.index') }}" class="nav-link {{ request()->routeIs('arazi-groups.*') ? 'active' : '' }}">
+                                <i class="nav-icon bi bi-collection"></i>
+                                <p>Arazi Groups</p>
+                            </a>
+                        </li>
                     @endcan
 
                     @can('plots.view')

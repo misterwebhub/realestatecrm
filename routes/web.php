@@ -45,6 +45,12 @@ Route::middleware('auth')->group(function () {
     Route::post('arazis/ajax-store', [AraziController::class, 'storeAjax'])->name('arazis.ajax-store')->middleware('permission:arazis.create');
 
     Route::resource('arazis', AraziController::class)->except(['show'])->middleware('permission:arazis.view');
+
+    // Arazi Groups: select a map name + merge multiple arazis (create/list/delete only, no edit)
+    Route::get('arazi-groups', [\App\Http\Controllers\AraziGroupController::class, 'index'])->name('arazi-groups.index');
+    Route::get('arazi-groups/create', [\App\Http\Controllers\AraziGroupController::class, 'create'])->name('arazi-groups.create');
+    Route::post('arazi-groups', [\App\Http\Controllers\AraziGroupController::class, 'store'])->name('arazi-groups.store');
+    Route::delete('arazi-groups/{araziGroup}', [\App\Http\Controllers\AraziGroupController::class, 'destroy'])->name('arazi-groups.destroy');
     Route::resource('plots', PlotController::class)->except(['show']);
     Route::resource('customers', CustomerController::class)->except(['show']);
     Route::get('agents/type/{type}', [AgentController::class, 'typeIndex'])->name('agents.type.index');
@@ -58,6 +64,7 @@ Route::middleware('auth')->group(function () {
     Route::get('registries/waiting-payments', [RegistryController::class, 'waitingPayments'])->name('registries.waiting-payments');
     Route::get('registries/bond-lookup', [RegistryController::class, 'bondLookup'])->name('registries.bond-lookup');
     Route::get('registries/deeds-by-arazi', [RegistryController::class, 'deedsByArazi'])->name('registries.deeds-by-arazi');
+    Route::get('registries/arazi-group-options', [RegistryController::class, 'araziGroupOptions'])->name('registries.arazi-group-options');
     Route::get('kisan-payment/print', [PaymentController::class, 'printReceipt'])->name('kisan-payment.print');
     Route::get('kisan-payment/receipt-pdf', [PaymentController::class, 'receiptPdf'])->name('kisan-payment.receipt-pdf');
     // Kisan-scoped payment routes (list/create for a specific kisan)

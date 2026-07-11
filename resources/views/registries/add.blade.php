@@ -66,7 +66,8 @@
             <input type="hidden" name="receipt_no"        id="h_receipt_no"   value="{{ old('receipt_no', $item->receipt_no ?? '') }}">
             <input type="hidden" name="customer_bond_id"  id="h_bond_id"      value="{{ old('customer_bond_id', '') }}">
             <input type="hidden" name="customer_id"       id="h_customer_id"  value="{{ old('customer_id', $item->customer_id ?? '') }}">
-            <input type="hidden" name="arazi_code"        id="h_arazi_code"   value="{{ old('arazi_code', $item->arazi_code ?? '') }}">
+            {{-- Holds the bond's default arazi code; the visible Arazi No dropdown (name="arazi_code") is the submitted value --}}
+            <input type="hidden"                          id="h_arazi_code"   value="{{ old('arazi_code', $item->arazi_code ?? '') }}">
             <input type="hidden" name="plot_id"           id="h_plot_id"      value="{{ old('plot_id', $item->plot_id ?? '') }}">
             <input type="hidden" name="registry_amount"   id="h_bond_amount"  value="{{ old('registry_amount', $item->registry_amount ?? '') }}">
             <input type="hidden" name="pending_amount"    id="h_pending"      value="">
@@ -126,8 +127,15 @@
                 </div>
                 <div class="col-md-3">
                     <label class="form-label small fw-semibold">Arazi No</label>
-                    <input type="text" class="form-control form-control-sm bg-light" id="d_arazi_code"
-                        value="{{ $item->arazi?->legacy_arazi_code ?: ($item->arazi?->plot_number ?? '') }}" readonly placeholder="Auto-filled">
+                    @php $presetAraziCode = old('arazi_code', $item->arazi_code ?? ($item->arazi?->legacy_arazi_code ?? '')); @endphp
+                    <select name="arazi_code" id="arazi_code_select"
+                        class="form-select form-select-sm @error('arazi_code') is-invalid @enderror"
+                        data-placeholder="Auto-filled from bond">
+                        @if($presetAraziCode !== '')
+                            <option value="{{ $presetAraziCode }}" selected>{{ $presetAraziCode }}</option>
+                        @endif
+                    </select>
+                    <div class="form-text" id="arazi_group_hint" style="display:none;">Grouped arazis available — you can pick a merged one.</div>
                 </div>
                 <div class="col-md-4">
                     <label class="form-label small fw-semibold">Plots in Bond</label>
@@ -277,6 +285,7 @@
 (function(){
     const LOOKUP_URL = @json(route('registries.bond-lookup'));
     const DEEDS_URL  = @json(route('registries.deeds-by-arazi'));
+    const AGROUP_URL = @json(route('registries.arazi-group-options'));
     const CSRF       = document.querySelector('meta[name="csrf-token"]')?.content ?? '';
 
     /* ── helpers ── */
@@ -336,6 +345,46 @@
     // initialise on load so an old() / edit value still renders as Select2
     initDeedSelect2();
 
+    /* ── Arazi No dropdown (default = bond arazi; extra options if it belongs to an Arazi Group) ── */
+    const araziSelect = $('arazi_code_select');
+    const araziHint   = $('arazi_group_hint');
+
+    async function populateAraziOptions(defaultCode){
+        if (!araziSelect) return;
+        defaultCode = (defaultCode || '').trim();
+
+        if (!defaultCode) {
+            araziSelect.innerHTML = '<option value=""></option>';
+            if (araziHint) araziHint.style.display = 'none';
+            return;
+        }
+
+        // Show the default immediately so the field is never empty while fetching.
+        araziSelect.innerHTML = `<option value="${defaultCode}" selected>${defaultCode}</option>`;
+
+        try {
+            const res  = await fetch(AGROUP_URL + '?arazi_code=' + encodeURIComponent(defaultCode), {headers:{Accept:'application/json'}});
+            const data = await res.json();
+            const options = data.options || [];
+
+            if (options.length) {
+                araziSelect.innerHTML = options.map(o => {
+                    const sel = String(o.value) === String(defaultCode) ? 'selected' : '';
+                    return `<option value="${o.value}" ${sel}>${o.label}</option>`;
+                }).join('');
+            }
+
+            if (araziHint) araziHint.style.display = data.grouped ? '' : 'none';
+        } catch(e) { /* keep the default option on failure */ }
+    }
+
+    // When the user picks a merged arazi, reload the matching deeds and sync the holder.
+    araziSelect?.addEventListener('change', function(){
+        const code = this.value || '';
+        $('h_arazi_code').value = code;
+        loadDeeds(code);
+    });
+
     function applyBond(b){
         $('h_bond_id').value      = b.bond_id    || '';
         $('h_customer_id').value  = b.customer_id || '';
@@ -368,7 +417,8 @@
         $('d_customer_name').value = b.customer_name || '';
         $('d_mobile').value        = b.mobile        || '';
         $('d_alt_mobile').value    = b.secondary_mobile || '';
-        $('d_arazi_code').value    = b.arazi_code    || '';
+        // Populate the Arazi No dropdown (default = bond arazi, plus any grouped/merged options)
+        populateAraziOptions(b.arazi_code || '');
         $('d_bond_amount').value   = b.bond_amount   ? fmt(b.bond_amount)   : '';
         $('d_pending').value       = b.pending_amount !== undefined ? fmt(b.pending_amount) : '';
 
@@ -485,9 +535,10 @@
         ['h_bond_id','h_customer_id','h_arazi_code','h_plot_id','h_bond_amount','h_pending'].forEach(id => {
             const el=$(id); if(el) el.value='';
         });
-        ['d_customer_name','d_mobile','d_alt_mobile','d_arazi_code','d_plot_title','d_bond_amount','d_pending'].forEach(id => {
+        ['d_customer_name','d_mobile','d_alt_mobile','d_plot_title','d_bond_amount','d_pending'].forEach(id => {
             const el=$(id); if(el) el.value='';
         });
+        populateAraziOptions('');
         loadDeeds('');
         $('bondAppliedBanner').classList.add('d-none');
     });
@@ -535,9 +586,12 @@
 
     reindex(); // init
 
-    // Preload deed options if an arazi is already set (edit mode / validation redirect)
+    // Preload deed + arazi-group options if an arazi is already set (edit mode / validation redirect)
     const presetArazi = $('h_arazi_code')?.value || '';
-    if (presetArazi) loadDeeds(presetArazi);
+    if (presetArazi) {
+        loadDeeds(presetArazi);
+        populateAraziOptions(presetArazi);
+    }
 })();
 </script>
 @endpush

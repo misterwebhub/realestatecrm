@@ -57,7 +57,7 @@ class RegistryController extends Controller
 
     protected function resourceColumns(): array
     {
-        return ['Reg Code', 'Customer', 'Arazi', 'Plot', 'Booking Mode', 'Registry Date', 'Deed No', 'Circle Value', 'Amount', 'Lock', 'Status'];
+        return ['Reg Code', 'Customer', 'Bond Arazi', 'Registry Arazi', 'Plot', 'Booking Mode', 'Registry Date', 'Deed No', 'Circle Value', 'Amount', 'Lock', 'Status'];
     }
 
     protected function resourceFields(?Model $item = null): array
@@ -431,7 +431,8 @@ class RegistryController extends Controller
             'cells' => [
                 $item->registry_code ?? '-',
                 $item->customer?->name ?? '-',
-                $item->arazi?->legacy_arazi_code ?? '-',
+                $item->plot?->arazi_code ?: '-',
+                $item->arazi_code ?: '-',
                 $item->plot?->title ?? $item->plot?->plot_number ?? '-',
                 strtoupper((string) $item->booking_mode),
                 optional($item->registry_date)->format('d-m-Y') ?? '-',
@@ -590,6 +591,67 @@ class RegistryController extends Controller
         return response()->json([
             'found' => count($deeds) > 0,
             'deeds' => $deeds,
+        ]);
+    }
+
+    /**
+     * Return the list of arazi codes that share an Arazi Group with the given
+     * arazi code. The given code is always returned first (default selection);
+     * any merged/grouped arazi codes follow so the registry form can offer them
+     * as alternative options in the Arazi No dropdown.
+     */
+    public function araziGroupOptions(Request $request)
+    {
+        $code = trim((string) $request->query('arazi_code', ''));
+
+        if ($code === '') {
+            return response()->json(['options' => []]);
+        }
+
+        // Arazi record ids that match this code (legacy_arazi_code / plot_number).
+        $ids = \App\Models\Arazi::idsForCode($code);
+
+        $options = [];
+        $seen = [];
+
+        $push = function (?string $c, ?string $location = null) use (&$options, &$seen) {
+            $c = trim((string) $c);
+            if ($c === '' || isset($seen[$c])) {
+                return;
+            }
+            $seen[$c] = true;
+            $label = $location ? ($c . ' — ' . $location) : $c;
+            $options[] = ['value' => $c, 'label' => $label];
+        };
+
+        // Default option: the bond's own arazi code.
+        $push($code);
+
+        if (! empty($ids)) {
+            // Groups that contain any of these arazi ids.
+            $groupIds = \App\Models\AraziGroupItem::whereIn('arazi_id', $ids)
+                ->pluck('arazi_group_id')
+                ->unique()
+                ->all();
+
+            if (! empty($groupIds)) {
+                $memberIds = \App\Models\AraziGroupItem::whereIn('arazi_group_id', $groupIds)
+                    ->pluck('arazi_id')
+                    ->unique()
+                    ->all();
+
+                $arazis = \App\Models\Arazi::whereIn('id', $memberIds)
+                    ->get(['id', 'legacy_arazi_code', 'location']);
+
+                foreach ($arazis as $arazi) {
+                    $push($arazi->legacy_arazi_code ?: ('#' . $arazi->id), $arazi->location);
+                }
+            }
+        }
+
+        return response()->json([
+            'grouped' => count($options) > 1,
+            'options' => $options,
         ]);
     }
 
