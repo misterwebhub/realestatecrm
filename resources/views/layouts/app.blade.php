@@ -9,6 +9,22 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/select2-bootstrap-5-theme@1.3.0/dist/select2-bootstrap-5-theme.min.css">
+    <style>
+        /* Indent sidebar submenu items so they clearly nest under the parent menu */
+        .app-sidebar .nav-treeview > .nav-item > .nav-link {
+            padding-left: 2.25rem;
+            position: relative;
+        }
+        .app-sidebar .nav-treeview > .nav-item > .nav-link > .nav-icon {
+            font-size: .75rem;
+            opacity: .8;
+        }
+        /* subtle guide line down the left of the submenu */
+        .app-sidebar .nav-treeview {
+            border-left: 1px solid rgba(255,255,255,.12);
+            margin-left: 1.15rem;
+        }
+    </style>
     @stack('styles')
 </head>
 <body class="layout-fixed sidebar-expand-lg bg-body-tertiary">
@@ -195,7 +211,15 @@
                                 </p>
                             </a>
                             <ul class="nav nav-treeview">
-                                <li class="nav-item"><a href="{{ route('reports.plot.details') }}" class="nav-link {{ request()->routeIs('reports.plot.details') ? 'active' : '' }}"><i class="nav-icon bi bi-circle"></i><p>Plot Details</p></a></li>
+                                <li class="nav-item"><a href="{{ route('reports.index') }}" class="nav-link {{ request()->routeIs('reports.index') ? 'active' : '' }}"><i class="nav-icon bi bi-grid"></i><p>All Reports</p></a></li>
+                                <li class="nav-item"><a href="{{ route('reports.partners') }}" class="nav-link {{ request()->routeIs('reports.partners') ? 'active' : '' }}"><i class="nav-icon bi bi-people"></i><p>Partner-wise</p></a></li>
+                                <li class="nav-item"><a href="{{ route('reports.arazis') }}" class="nav-link {{ request()->routeIs('reports.arazis') ? 'active' : '' }}"><i class="nav-icon bi bi-map"></i><p>Arazi-wise</p></a></li>
+                                <li class="nav-item"><a href="{{ route('reports.brokers') }}" class="nav-link {{ request()->routeIs('reports.brokers') ? 'active' : '' }}"><i class="nav-icon bi bi-person-badge"></i><p>Broker</p></a></li>
+                                <li class="nav-item"><a href="{{ route('reports.registries') }}" class="nav-link {{ request()->routeIs('reports.registries') ? 'active' : '' }}"><i class="nav-icon bi bi-file-earmark-text"></i><p>Registry</p></a></li>
+                                <li class="nav-item"><a href="{{ route('reports.payments') }}" class="nav-link {{ request()->routeIs('reports.payments') ? 'active' : '' }}"><i class="nav-icon bi bi-cash-stack"></i><p>Payment Collection</p></a></li>
+                                <li class="nav-item"><a href="{{ route('reports.sales') }}" class="nav-link {{ request()->routeIs('reports.sales') ? 'active' : '' }}"><i class="nav-icon bi bi-graph-up-arrow"></i><p>Sales Summary</p></a></li>
+                                <li class="nav-item"><a href="{{ route('reports.customer-payments.by-user') }}" class="nav-link {{ request()->routeIs('reports.customer-payments.by-user') ? 'active' : '' }}"><i class="nav-icon bi bi-receipt"></i><p>Payments by User</p></a></li>
+                                <li class="nav-item"><a href="{{ route('reports.plot.details') }}" class="nav-link {{ request()->routeIs('reports.plot.details') ? 'active' : '' }}"><i class="nav-icon bi bi-grid-3x3-gap"></i><p>Plot Details</p></a></li>
                             </ul>
                         </li>
                     @endcan
@@ -338,16 +362,25 @@
         try{
             jQuery(function(){
                 if(! (window.jQuery && jQuery.fn && jQuery.fn.select2)) return;
-                jQuery('select[name="arazi_code"]').each(function(){
+                jQuery('select[name="arazi_code"], select.js-select2').each(function(){
                     var $el = jQuery(this);
                     if($el.hasClass('select2-hidden-accessible')) return; // already initialized
                     $el.select2({
                         theme: 'bootstrap-5',
                         width: '100%',
-                        placeholder: $el.data('placeholder') || 'Select Arazi',
+                        placeholder: $el.data('placeholder') || $el.find('option:first').text() || 'Select',
                         allowClear: true,
                         minimumResultsForSearch: 0,
                         dropdownParent: ($el.closest('form').length ? $el.closest('form') : jQuery(document.body))
+                    });
+                });
+
+                // Fix Select2 4.1.0-rc.0 bug: clicking the clear (×) button
+                // reopens the dropdown instead of clearing. Suppress the reopen.
+                jQuery(document).on('select2:clear', 'select[name="arazi_code"], select.js-select2', function(){
+                    jQuery(this).on('select2:opening.cancelOpen', function(e){
+                        e.preventDefault();
+                        jQuery(this).off('select2:opening.cancelOpen');
                     });
                 });
             });

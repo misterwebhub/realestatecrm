@@ -172,6 +172,12 @@ Route::middleware('auth')->group(function () {
     Route::get('reports', [\App\Http\Controllers\ReportsController::class, 'index'])->name('reports.index');
     Route::get('reports/plot-details', [\App\Http\Controllers\ReportsController::class, 'plotDetails'])->name('reports.plot.details');
     Route::get('reports/customer-payments-by-user', [\App\Http\Controllers\ReportsController::class, 'customerPaymentsByUser'])->name('reports.customer-payments.by-user');
+    Route::get('reports/partners', [\App\Http\Controllers\ReportsController::class, 'partners'])->name('reports.partners');
+    Route::get('reports/arazis', [\App\Http\Controllers\ReportsController::class, 'arazis'])->name('reports.arazis');
+    Route::get('reports/brokers', [\App\Http\Controllers\ReportsController::class, 'brokers'])->name('reports.brokers');
+    Route::get('reports/registries', [\App\Http\Controllers\ReportsController::class, 'registries'])->name('reports.registries');
+    Route::get('reports/payments', [\App\Http\Controllers\ReportsController::class, 'payments'])->name('reports.payments');
+    Route::get('reports/sales', [\App\Http\Controllers\ReportsController::class, 'sales'])->name('reports.sales');
 
     // Arazis Map index: list folders under project root `arazis-map` and link to their index.php
     // Serve legacy map PHP files through Laravel to ensure environment variables (DB_*) are available.

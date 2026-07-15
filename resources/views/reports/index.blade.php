@@ -31,6 +31,48 @@
             'icon'  => 'bi-receipt',
             'color' => '#9333ea',
         ],
+        [
+            'title' => 'Partner-wise Report',
+            'desc'  => 'Area purchased &amp; sold by each partner, per arazi, with remaining area and registry status.',
+            'url'   => route('reports.partners'),
+            'icon'  => 'bi-people',
+            'color' => '#0d6efd',
+        ],
+        [
+            'title' => 'Arazi-wise Report',
+            'desc'  => 'Every arazi: total, saleable, sold, remaining area with plots and registry counts.',
+            'url'   => route('reports.arazis'),
+            'icon'  => 'bi-map',
+            'color' => '#16a34a',
+        ],
+        [
+            'title' => 'Broker Report',
+            'desc'  => 'Bonds, commission, payments and registries handled by each broker.',
+            'url'   => route('reports.brokers'),
+            'icon'  => 'bi-person-badge',
+            'color' => '#d97706',
+        ],
+        [
+            'title' => 'Registry Report',
+            'desc'  => 'Registry pipeline by status with amounts, plus the latest registries.',
+            'url'   => route('reports.registries'),
+            'icon'  => 'bi-file-earmark-text',
+            'color' => '#0891b2',
+        ],
+        [
+            'title' => 'Payment Collection',
+            'desc'  => 'Customer payments collected by month and by entry type, with a date filter.',
+            'url'   => route('reports.payments'),
+            'icon'  => 'bi-cash-stack',
+            'color' => '#dc2626',
+        ],
+        [
+            'title' => 'Sales Summary',
+            'desc'  => 'Overall sold vs available area and revenue across all arazis.',
+            'url'   => route('reports.sales'),
+            'icon'  => 'bi-graph-up-arrow',
+            'color' => '#4b5563',
+        ],
     ];
 @endphp
 

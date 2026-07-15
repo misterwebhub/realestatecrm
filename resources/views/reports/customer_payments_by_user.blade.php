@@ -22,7 +22,7 @@
         <form method="GET" class="row g-2 align-items-end">
             <div class="col-md-2 col-sm-4">
                 <label class="form-label small fw-semibold mb-1">User</label>
-                <select name="user_id" class="form-select form-select-sm">
+                <select name="user_id" class="form-select form-select-sm js-select2">
                     <option value="">All Users</option>
                     @foreach($users as $u)
                         <option value="{{ $u->id }}" @selected((string) $userId === (string) $u->id)>{{ $u->name }}</option>
@@ -31,7 +31,7 @@
             </div>
             <div class="col-md-2 col-sm-4">
                 <label class="form-label small fw-semibold mb-1">Customer</label>
-                <select name="customer_id" class="form-select form-select-sm">
+                <select name="customer_id" class="form-select form-select-sm js-select2">
                     <option value="">All Customers</option>
                     @foreach($customers as $c)
                         <option value="{{ $c->id }}" @selected((string) $customerId === (string) $c->id)>{{ $c->name }}</option>
@@ -40,7 +40,7 @@
             </div>
             <div class="col-md-2 col-sm-4">
                 <label class="form-label small fw-semibold mb-1">Bond</label>
-                <select name="bond_id" class="form-select form-select-sm">
+                <select name="bond_id" class="form-select form-select-sm js-select2">
                     <option value="">All Bonds</option>
                     @foreach($bonds as $b)
                         <option value="{{ $b->id }}" @selected((string) $bondId === (string) $b->id)>{{ $b->bond_no }}</option>
@@ -49,7 +49,7 @@
             </div>
             <div class="col-md-2 col-sm-4">
                 <label class="form-label small fw-semibold mb-1">Arazi</label>
-                <select name="arazi_code" class="form-select form-select-sm">
+                <select name="arazi_code" class="form-select form-select-sm js-select2">
                     <option value="">All Arazi</option>
                     @foreach($araziCodes as $code)
                         <option value="{{ $code }}" @selected((string) $araziCode === (string) $code)>{{ $code }}</option>
@@ -58,7 +58,7 @@
             </div>
             <div class="col-md-2 col-sm-4">
                 <label class="form-label small fw-semibold mb-1">Type</label>
-                <select name="entry_type" class="form-select form-select-sm">
+                <select name="entry_type" class="form-select form-select-sm js-select2">
                     <option value="">All Types</option>
                     @foreach($entryTypes as $t)
                         <option value="{{ $t }}" @selected((string) $entryType === (string) $t)>{{ ucfirst($t) }}</option>
@@ -67,10 +67,37 @@
             </div>
             <div class="col-md-2 col-sm-4">
                 <label class="form-label small fw-semibold mb-1">Method</label>
-                <select name="payment_method" class="form-select form-select-sm">
+                <select name="payment_method" class="form-select form-select-sm js-select2">
                     <option value="">All Methods</option>
                     @foreach($paymentMethods as $m)
                         <option value="{{ $m }}" @selected((string) $paymentMethod === (string) $m)>{{ strtoupper($m) }}</option>
+                    @endforeach
+                </select>
+            </div>
+            <div class="col-md-2 col-sm-4">
+                <label class="form-label small fw-semibold mb-1">Broker</label>
+                <select name="broker_id" class="form-select form-select-sm js-select2">
+                    <option value="">All Brokers</option>
+                    @foreach($brokers as $b)
+                        <option value="{{ $b->id }}" @selected((string) $brokerId === (string) $b->id)>{{ $b->name }}</option>
+                    @endforeach
+                </select>
+            </div>
+            <div class="col-md-2 col-sm-4">
+                <label class="form-label small fw-semibold mb-1">Partner</label>
+                <select name="partner_id" class="form-select form-select-sm js-select2">
+                    <option value="">All Partners</option>
+                    @foreach($partners as $pn)
+                        <option value="{{ $pn->id }}" @selected((string) $partnerId === (string) $pn->id)>{{ $pn->name }}</option>
+                    @endforeach
+                </select>
+            </div>
+            <div class="col-md-2 col-sm-4">
+                <label class="form-label small fw-semibold mb-1">Deed No</label>
+                <select name="deed_no" class="form-select form-select-sm js-select2">
+                    <option value="">All Deeds</option>
+                    @foreach($deedNos as $d)
+                        <option value="{{ $d }}" @selected((string) $deedNo === (string) $d)>{{ $d }}</option>
                     @endforeach
                 </select>
             </div>
@@ -153,7 +180,7 @@
         <table class="table mb-0 align-middle" style="font-size:12px;">
             <thead style="background:#f8fafc;">
                 <tr>
-                    @foreach(['Entry No','Date','Bond','Customer','Arazi','Type','Method','MTR No','Payee'] as $h)
+                    @foreach(['Entry No','Date','Bond','Customer','Arazi','Plot','Broker','Partner','Deed No','Registry','Type','Method','MTR No','Payee'] as $h)
                         <th class="py-2 {{ $loop->first ? 'ps-3' : '' }}" style="font-size:10px;font-weight:700;text-transform:uppercase;color:#64748b;">{{ $h }}</th>
                     @endforeach
                     <th class="text-end" style="font-size:10px;font-weight:700;text-transform:uppercase;color:#64748b;">Credit</th>
@@ -167,6 +194,12 @@
                     $bond    = $p->customerBond;
                     $cust    = $bond?->customer?->name ?? $p->customer?->name ?? '—';
                     $code    = $bond?->arazi?->legacy_arazi_code ?? $p->arazi_code ?? '—';
+                    $plots   = $bond?->plots?->map(fn($pl) => $pl->plot_number ?: $pl->title)->filter()->implode(', ');
+                    $broker  = $bond?->broker?->name ?? '—';
+                    $reg     = $p->reg_info;
+                    $partner = $reg?->partner?->name ?? '—';
+                    $deed    = $reg?->deed_no ?: '—';
+                    $regDone = $reg && strtolower((string)$reg->status) === 'completed';
                 @endphp
                 <tr style="border-bottom:1px solid #f1f5f9;">
                     <td class="ps-3 fw-semibold">{{ $p->entry_no ?? '—' }}</td>
@@ -174,6 +207,17 @@
                     <td>{{ $bond?->bond_no ?? '—' }}</td>
                     <td>{{ $cust }}</td>
                     <td><span style="background:#1a3a6b;color:#fff;border-radius:3px;padding:1px 7px;font-size:11px;font-weight:700;">{{ $code }}</span></td>
+                    <td>{{ $plots ?: '—' }}</td>
+                    <td>{{ $broker }}</td>
+                    <td>{{ $partner }}</td>
+                    <td>{{ $deed }}</td>
+                    <td>
+                        @if($reg)
+                            <span class="badge {{ $regDone ? 'bg-success' : 'bg-warning text-dark' }}">{{ $regDone ? 'Done' : 'Pending' }}</span>
+                        @else
+                            <span class="text-muted">No registry</span>
+                        @endif
+                    </td>
                     <td>{{ ucfirst($p->entry_type ?? '—') }}</td>
                     <td class="text-muted">{{ $p->payment_method ? strtoupper($p->payment_method) : '—' }}</td>
                     <td class="text-muted">{{ $p->mtr_transaction_no ?: '—' }}</td>
@@ -185,7 +229,7 @@
             </tbody>
             <tfoot style="background:#f8fafc;border-top:2px solid #e2e8f0;">
                 <tr>
-                    <td colspan="9" class="ps-3 py-1 text-end text-muted fw-semibold" style="font-size:11px;">SUBTOTAL</td>
+                    <td colspan="14" class="ps-3 py-1 text-end text-muted fw-semibold" style="font-size:11px;">SUBTOTAL</td>
                     <td class="text-end text-success fw-bold">₹{{ number_format($group['credit'], 2) }}</td>
                     <td class="text-end pe-3 text-danger fw-bold">{{ $group['debit'] > 0 ? '₹'.number_format($group['debit'], 2) : '—' }}</td>
                 </tr>
