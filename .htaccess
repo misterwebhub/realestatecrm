@@ -1,0 +1,24 @@
+<IfModule mod_rewrite.c>
+    <IfModule mod_negotiation.c>
+        Options -MultiViews -Indexes
+    </IfModule>
+
+    DirectoryIndex index.php
+    RewriteEngine On
+
+    # Redirect old /public URLs to clean project-root URLs.
+    RewriteRule ^public/(.*)$ $1 [R=301,L]
+
+    # Serve common public asset directories from clean URLs.
+    RewriteRule ^(vendor|build|css|js|images|img|fonts|storage)/(.*)$ public/$1/$2 [L]
+
+    # Serve real public assets without exposing /public in the URL.
+    RewriteCond public/$1 -f [OR]
+    RewriteCond public/$1 -d
+    RewriteRule ^(.*)$ public/$1 [L]
+
+    # Send application requests to the root front controller.
+    RewriteCond %{REQUEST_FILENAME} !-d
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteRule ^ index.php [L]
+</IfModule>

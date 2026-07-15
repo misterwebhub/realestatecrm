@@ -1,0 +1,485 @@
+@extends('layouts.app')
+
+@section('content')
+    @php
+        // Resolve the permission module: prefer the value passed by the controller,
+        // otherwise derive it from the current route name (e.g. "kisans.index" -> "kisans").
+        $pmMap = [
+            'customer-bonds'         => 'customer_bonds',
+            'customer-bond-payments' => 'customer_payments',
+            'customer-bond-cheques'  => 'cheques',
+            'kisan-payment'          => 'kisan_payments',
+        ];
+        $pm = $permModule ?? null;
+        if (!$pm) {
+            $rn   = optional(request()->route())->getName() ?? '';
+            $base = \Illuminate\Support\Str::beforeLast($rn, '.');
+            $pm   = $base ? ($pmMap[$base] ?? str_replace('-', '_', $base)) : null;
+        }
+        $authUser  = auth()->user();
+        $legacyOk  = $authUser && in_array($authUser->role, ['admin', 'manager']);
+        $canCreate = $authUser ? ($pm ? $authUser->can($pm . '.create') : $legacyOk) : false;
+        $canEdit   = $authUser ? ($pm ? $authUser->can($pm . '.edit')   : $legacyOk) : false;
+        $canDelete = $authUser ? ($pm ? $authUser->can($pm . '.delete') : $legacyOk) : false;
+    @endphp
+    <style>
+        /* Compact, tidy layout for the wide Customer Bond Payments table */
+        .cbp-table { font-size: 12.5px; }
+        .cbp-table thead th {
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: .3px;
+            color: #475569;
+            white-space: nowrap;
+            vertical-align: middle;
+        }
+        .cbp-table tbody td {
+            padding: 7px 9px;
+            vertical-align: middle;
+            white-space: nowrap;
+        }
+        /* Allow long free-text columns to wrap instead of stretching the table */
+        .cbp-table tbody td.cbp-wrap { white-space: normal; min-width: 120px; }
+        .cbp-table .btn-sm { padding: 2px 8px; font-size: 11.5px; }
+    </style>
+    <div class="card card-outline card-primary">
+        <div class="card-header d-flex align-items-center flex-wrap gap-2">
+            @if(!empty($searchInHeader))
+                <div class="d-flex align-items-center gap-3 flex-grow-1">
+
+                    <form method="get" class="d-flex ms-3" action="{{ url()->current() }}">
+                        <input name="q" value="{{ $searchQuery ?? '' }}" placeholder="Search by Arazi code, plot no or title" class="form-control form-control-sm" style="min-width:320px;" />
+                        <button class="btn btn-sm btn-outline-secondary ms-2" type="submit">Search</button>
+                        @if(!empty($searchQuery))
+                            <a href="{{ url()->current() }}" class="btn btn-sm btn-outline-secondary ms-2">Clear</a>
+                        @endif
+                    </form>
+                </div>
+            @else
+                <h5 class="card-title mb-0 fw-bold">{{ $title }}</h5>
+            @endif
+
+            @if(($exportCsvUrl ?? null) || $canCreate)
+                <div class="d-flex flex-wrap gap-2 align-items-center ms-auto">
+                    @if(isset($exportCsvUrl) && $exportCsvUrl)
+                        <a href="{{ $exportCsvUrl }}" class="btn btn-outline-success btn-sm">
+                            <i class="bi bi-filetype-csv"></i> Export CSV
+                        </a>
+                    @endif
+                    @php $isCustomerBondIndex = $isCustomerBondIndex ?? str_contains($title, 'Customer Bond'); @endphp
+                    @if($canCreate)
+                        <a href="{{ $createUrl }}" @if($isCustomerBondIndex) target="_blank" rel="noopener" @endif class="btn btn-primary btn-sm">
+                            <i class="bi bi-plus-lg"></i> Add New
+                        </a>
+                    @endif
+                </div>
+            @endif
+        </div>
+
+        @if(!empty($isCustomerPaymentIndex))
+            <div class="card-body border-top py-2 px-3">
+                <form method="GET" class="row g-2 align-items-end">
+                    <div class="col-md-3">
+                        <label class="form-label small fw-semibold mb-1">Name / Mobile</label>
+                        <input type="text" name="q" value="{{ $cp_q ?? '' }}"
+                               class="form-control form-control-sm" placeholder="Customer name or mobile…">
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label small fw-semibold mb-1">Bond No</label>
+                        <input type="text" name="bond" value="{{ $cp_bond ?? '' }}"
+                               class="form-control form-control-sm" placeholder="e.g. CB00001…">
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label small fw-semibold mb-1">Arazi No</label>
+                        <input type="text" name="arazi_code" value="{{ $cp_arazi ?? '' }}"
+                               class="form-control form-control-sm" placeholder="e.g. 419…">
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label small fw-semibold mb-1">Plot Title</label>
+                        <input type="text" name="plot" value="{{ $cp_plot ?? '' }}"
+                               class="form-control form-control-sm" placeholder="Plot title…">
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label small fw-semibold mb-1">Type</label>
+                        <select name="entry_type" class="form-select form-select-sm">
+                            <option value="">All Types</option>
+                            @foreach(['advance'=>'Advance','installment'=>'Installment','final'=>'Final','penalty'=>'Penalty','return'=>'Return','discount'=>'Discount','other'=>'Other'] as $val => $label)
+                                <option value="{{ $val }}" {{ ($cp_entry_type ?? '') === $val ? 'selected' : '' }}>{{ $label }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div class="col-md-1">
+                        <label class="form-label small fw-semibold mb-1">Credit/Debit</label>
+                        <select name="credit_debit" class="form-select form-select-sm">
+                            <option value="">All</option>
+                            <option value="credit" {{ ($cp_credit_debit ?? '') === 'credit' ? 'selected' : '' }}>Credit</option>
+                            <option value="debit"  {{ ($cp_credit_debit ?? '') === 'debit'  ? 'selected' : '' }}>Debit</option>
+                        </select>
+                    </div>
+                    <div class="col-auto d-flex gap-2">
+                        <button type="submit" class="btn btn-primary btn-sm">Search</button>
+                        <a href="{{ route('customer-bond-payments.index') }}" class="btn btn-outline-secondary btn-sm">Clear</a>
+                    </div>
+                </form>
+            </div>
+        @endif
+
+        @if(!empty($isKisanPaymentIndex))
+            <div class="card-body border-top py-2 px-3">
+                <form method="GET" class="row g-2 align-items-end">
+                    <div class="col-md-5">
+                        <label class="form-label small fw-semibold mb-1">Kisan Name / Mobile</label>
+                        <input type="text" name="q" value="{{ $kp_q ?? '' }}"
+                               class="form-control form-control-sm" placeholder="Search kisan name or mobile…">
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label small fw-semibold mb-1">Arazi No</label>
+                        <input type="text" name="arazi_code" value="{{ $kp_arazi ?? '' }}"
+                               class="form-control form-control-sm" placeholder="e.g. 419, 375KA…">
+                    </div>
+                    <div class="col-auto d-flex gap-2">
+                        <button type="submit" class="btn btn-primary btn-sm">Search</button>
+                        <a href="{{ route('kisan-payment.index') }}" class="btn btn-outline-secondary btn-sm">Clear</a>
+                    </div>
+                </form>
+            </div>
+        @endif
+
+        @if(!empty($isKisanBondIndex))
+            <div class="card-body border-top py-2 px-3">
+                <form method="GET" class="row g-2 align-items-end">
+                    <div class="col-md-5">
+                        <label class="form-label small fw-semibold mb-1">Kisan Name / Mobile</label>
+                        <input type="text" name="q" value="{{ $kb_q ?? '' }}"
+                               class="form-control form-control-sm" placeholder="Search kisan name or mobile…">
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label small fw-semibold mb-1">Arazi No</label>
+                        <input type="text" name="arazi_code" value="{{ $kb_arazi ?? '' }}"
+                               class="form-control form-control-sm" placeholder="e.g. 419, 375KA…">
+                    </div>
+                    <div class="col-auto d-flex gap-2">
+                        <button type="submit" class="btn btn-primary btn-sm">Search</button>
+                        <a href="{{ route('kisan-bonds.index') }}" class="btn btn-outline-secondary btn-sm">Clear</a>
+                    </div>
+                </form>
+            </div>
+        @endif
+
+        @if(!empty($isKisanIndex))
+            <div class="card-body border-top py-2 px-3">
+                <form method="GET" class="row g-2 align-items-end">
+                    <div class="col-md-5">
+                        <label class="form-label small fw-semibold mb-1">Name / Mobile / Reg. No</label>
+                        <input type="text" name="q" value="{{ $kisan_q ?? '' }}"
+                               class="form-control form-control-sm" placeholder="Search name, mobile, reg no…">
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label small fw-semibold mb-1">Arazi No</label>
+                        <input type="text" name="arazi_code" value="{{ $kisan_arazi ?? '' }}"
+                               class="form-control form-control-sm" placeholder="e.g. 419, 375KA…">
+                    </div>
+                    <div class="col-auto d-flex gap-2">
+                        <button type="submit" class="btn btn-primary btn-sm">Search</button>
+                        <a href="{{ route('kisans.index') }}" class="btn btn-outline-secondary btn-sm">Clear</a>
+                    </div>
+                </form>
+            </div>
+        @endif
+
+        @if(!empty($isCustomerBondIndex))
+            <div class="card-body border-top">
+                <form class="row g-2 align-items-end" method="GET">
+                    <div class="col-2">
+                        <label class="form-label small">Arazi</label>
+                        <select id="filter-arazi" name="arazi_code" class="form-select form-select-sm">
+                            <option value="">All</option>
+                            @foreach($arazis ?? [] as $code => $label)
+                                <option value="{{ $code }}" @selected((string)$filter_arazi === (string)$code)>{{ $label }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <script>
+                        (function(){
+                            try{
+                                if(window.jQuery && jQuery.fn.select2){
+                                    jQuery(function(){
+                                        jQuery('#filter-arazi').select2({
+                                            theme: 'bootstrap-5',
+                                            placeholder: 'All Arazis',
+                                            allowClear: true,
+                                            minimumResultsForSearch: 0,
+                                            dropdownParent: jQuery(document.body),
+                                            matcher: function(params, data){
+                                                if(!params || !params.term) return data;
+                                                var term = params.term.toString().toLowerCase();
+                                                var txt = (data.text || '').toString().toLowerCase();
+                                                if(txt.indexOf(term) !== -1) return data;
+                                                return null;
+                                            }
+                                        });
+                                    });
+                                }
+                            }catch(e){ /* ignore */ }
+                        })();
+                    </script>
+                    <div class="col-auto">
+                        <label class="form-label small">Plot Title</label>
+                        <input type="text" name="plot" value="{{ $filter_plot ?? '' }}" class="form-control form-control-sm" placeholder="Plot title…">
+                    </div>
+                    <div class="col-auto">
+                        <button class="btn btn-sm btn-primary">Filter</button>
+                        <a href="{{ route('customer-bonds.index') }}" class="btn btn-sm btn-outline-secondary ms-1">Clear</a>
+                    </div>
+                </form>
+            </div>
+        @endif
+
+        <div class="card-body table-responsive p-0">
+          
+            <table class="table table-striped table-hover mb-0 align-middle {{ !empty($isCustomerPaymentIndex) ? 'cbp-table' : '' }}">
+                <thead>
+                <tr>
+                    @foreach($columns as $column)
+                        <th class="text-nowrap">{{ $column }}</th>
+                    @endforeach
+                    <th class="text-end text-nowrap">Actions</th>
+                </tr>
+                </thead>
+                <tbody>
+                @forelse($rows as $row)
+                    @php $hasBondArazi = isset($row['bond_arazi']); @endphp
+                    <tr class="{{ $hasBondArazi ? 'align-top' : 'align-middle' }}" style="{{ $hasBondArazi ? 'border-top:2px solid #d0ddf0;' : '' }}">
+                        @foreach($row['cells'] as $colIndex => $cell)
+                            @if($hasBondArazi && $colIndex === 2)
+                                {{-- Arazi column --}}
+                                <td style="padding:10px 8px;">
+                                    <span style="background:#1a3a6b;color:#fff;border-radius:4px;padding:3px 10px;font-size:11.5px;font-weight:700;letter-spacing:.3px;white-space:nowrap;">
+                                        {{ $row['bond_arazi'] }}
+                                    </span>
+                                </td>
+                            @elseif($hasBondArazi && $colIndex === 3)
+                                {{-- Plots column --}}
+                                <td style="padding:8px;min-width:200px;">
+                                    @if(empty($row['bond_plots']))
+                                        <span class="text-muted px-2" style="font-size:12px;">—</span>
+                                    @else
+                                        <table style="width:100%;border-collapse:collapse;font-size:12px;border:1px solid #d0ddf0;border-radius:6px;overflow:hidden;box-shadow:0 1px 4px rgba(26,58,107,.09);">
+                                            <thead>
+                                                <tr style="background:linear-gradient(90deg,#1a3a6b,#2a52a0);">
+                                                    <th style="padding:4px 8px;color:rgba(255,255,255,.75);font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;border-right:1px solid rgba(255,255,255,.12);">Plot</th>
+                                                    <th style="padding:4px 8px;color:rgba(255,255,255,.75);font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;">Area</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                @foreach($row['bond_plots'] as $pi => $plot)
+                                                    <tr style="background:{{ $pi % 2 === 0 ? '#fff' : '#f6f9ff' }};border-bottom:1px solid #e4ecf7;"
+                                                        onmouseover="this.style.background='#edf3ff'" onmouseout="this.style.background='{{ $pi % 2 === 0 ? '#fff' : '#f6f9ff' }}'">
+                                                        <td style="padding:4px 8px;font-weight:600;color:#1a3a6b;border-right:1px solid #e4ecf7;white-space:nowrap;">{{ $plot['title'] }}</td>
+                                                        <td style="padding:4px 8px;color:#374151;white-space:nowrap;">{{ $plot['area'] }}</td>
+                                                    </tr>
+                                                @endforeach
+                                            </tbody>
+                                        </table>
+                                    @endif
+                                </td>
+                            @elseif(!empty($isCustomerPaymentIndex) && $colIndex === 8 && $cell !== '—')
+                                <td class="text-success fw-semibold">{{ $cell }}</td>
+                            @elseif(!empty($isCustomerPaymentIndex) && $colIndex === 9 && $cell !== '—')
+                                <td class="text-danger fw-semibold">{{ $cell }}</td>
+                            @else
+                                <td style="{{ $hasBondArazi ? 'padding:10px 8px;' : '' }}">{{ $cell }}</td>
+                            @endif
+                        @endforeach
+                        <td class="text-end" style="white-space:nowrap;">
+                            @if(!empty($row['print_url']))
+                                <a href="{{ $row['print_url'] }}?print=1" target="_blank" class="btn btn-outline-success btn-sm">Print</a>
+                            @endif
+                            {{-- @if(!empty($row['pdf_url']))
+                                <a href="{{ $row['pdf_url'] }}" target="_blank" class="btn btn-outline-secondary btn-sm ms-1">PDF</a>
+                            @endif --}}
+                            @if(!empty($row['add_url']))
+                                <a href="{{ $row['add_url'] }}" @if(!empty($row['open_in_new_tab'])) target="_blank" rel="noopener" @endif class="btn btn-outline-primary btn-sm ms-1">Add Bond</a>
+                            @endif
+                            @foreach($row['action_buttons'] ?? [] as $button)
+                                <a href="{{ $button['url'] }}" 
+                                   class="btn {{ $button['class'] ?? 'btn-outline-primary' }} btn-sm ms-1"
+                                   @if(!empty($button['data_modal'])) data-bs-toggle="modal" data-bs-target="#{{ $button['data_target'] ?? 'modal' }}" @endif>
+                                    {{ $button['label'] }}
+                                </a>
+                            @endforeach
+                            @if($canEdit && !empty($row['edit_url']))
+                                <a href="{{ $row['edit_url'] }}" @if(!empty($row['open_in_new_tab'])) target="_blank" rel="noopener" @endif class="btn btn-outline-secondary btn-sm">Edit</a>
+                            @endif
+                            @if($canDelete && !empty($row['delete_url']))
+                                <form action="{{ $row['delete_url'] }}" method="POST" class="d-inline-block" onsubmit="return confirm('Delete this record?');">
+                                    @csrf
+                                    @method('DELETE')
+                                    <button type="submit" class="btn btn-outline-danger btn-sm">Delete</button>
+                                </form>
+                            @endif
+                        </td>
+                    </tr>
+                @empty
+                    <tr>
+                        <td colspan="{{ count($columns) + 1 }}" class="text-center py-4">No records found.</td>
+                    </tr>
+                @endforelse
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Cheques Modal -->
+    <div class="modal fade" id="chequesModal" tabindex="-1" role="dialog" aria-labelledby="chequesModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-xl" role="document">
+            <div class="modal-content">
+                <div class="modal-header bg-light">
+                    <div>
+                        <h4 class="modal-title mb-1 fw-bold" id="chequesModalLabel">
+                            Bond Cheques — <span id="modalBondNo" class="text-primary">Loading...</span>
+                        </h4>
+                        <div class="text-muted" style="font-size:16px;" id="modalCustomerName"></div>
+                    </div>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body p-0">
+
+                    {{-- Bond summary strip --}}
+                    <div id="modalBondSummary" style="display:none; background:#f8fafc; border-bottom:1px solid #e2e8f0; padding:18px 22px;">
+                        <div class="row g-3 align-items-start">
+                            <div class="col-6 col-md-3">
+                                <div class="text-muted" style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;">Bond Date</div>
+                                <div class="fw-semibold" style="font-size:16px;" id="mBondDate">—</div>
+                            </div>
+                            <div class="col-6 col-md-3">
+                                <div class="text-muted" style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;">End Date</div>
+                                <div class="fw-semibold" style="font-size:16px;" id="mEndDate">—</div>
+                            </div>
+                            <div class="col-6 col-md-3">
+                                <div class="text-muted" style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;">Arazi</div>
+                                <div class="fw-semibold" style="font-size:16px;" id="mArazi">—</div>
+                            </div>
+                            <div class="col-6 col-md-3">
+                                <div class="text-muted" style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;">Plot(s)</div>
+                                <div class="fw-semibold" style="font-size:16px;" id="mPlots">—</div>
+                            </div>
+                            <div class="col-6 col-md-3 mt-1">
+                                <div class="text-muted" style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;">Total Amount</div>
+                                <div class="fw-bold text-primary" style="font-size:16px;" id="mTotal">—</div>
+                            </div>
+                            <div class="col-6 col-md-3 mt-1">
+                                <div class="text-muted" style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;">Paid</div>
+                                <div class="fw-bold text-success" style="font-size:16px;" id="mPaid">—</div>
+                            </div>
+                            <div class="col-6 col-md-3 mt-1">
+                                <div class="text-muted" style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;">Balance</div>
+                                <div class="fw-bold text-danger" style="font-size:16px;" id="mBalance">—</div>
+                            </div>
+                            <div class="col-6 col-md-3 mt-1">
+                                <div class="text-muted" style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;">Last Installment</div>
+                                <div class="fw-semibold" style="font-size:16px;" id="mLastPayment">—</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {{-- Cheques body --}}
+                    <div id="chequesModalBody" class="p-3">
+                        <div class="text-center py-4">
+                            <div class="spinner-border text-primary" role="status">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    <a href="#" id="manageChequesBtnLink" target="_blank" class="btn btn-primary">Manage Cheques</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.getElementById('chequesModal').addEventListener('show.bs.modal', function (e) {
+            const button = e.relatedTarget;
+            const modalUrl = button.getAttribute('href');
+            const modalBody = document.getElementById('chequesModalBody');
+
+            // reset
+            document.getElementById('modalBondNo').textContent = 'Loading...';
+            document.getElementById('modalCustomerName').textContent = '';
+            document.getElementById('modalBondSummary').style.display = 'none';
+            modalBody.innerHTML = '<div class="text-center py-4"><div class="spinner-border text-primary" role="status"></div></div>';
+
+            fetch(modalUrl)
+                .then(r => { if (!r.ok) throw new Error('Network error'); return r.json(); })
+                .then(data => {
+                    // header
+                    document.getElementById('modalBondNo').textContent     = data.bond_no || '-';
+                    document.getElementById('modalCustomerName').textContent = data.customer_name || '';
+
+                    // bond summary strip
+                    document.getElementById('mBondDate').textContent    = data.bond_date || '-';
+                    document.getElementById('mEndDate').textContent      = data.end_date || '-';
+                    document.getElementById('mArazi').textContent        = data.arazi || '-';
+                    document.getElementById('mPlots').textContent        = data.plots || '-';
+                    document.getElementById('mTotal').textContent        = '₹' + (data.total_amount || '0.00');
+                    document.getElementById('mPaid').textContent         = '₹' + (data.paid_amount  || '0.00');
+                    document.getElementById('mBalance').textContent      = '₹' + (data.balance      || '0.00');
+                    const lastPmt = data.last_payment_date !== '-'
+                        ? data.last_payment_date + ' · ₹' + data.last_payment_amt
+                        : 'No payments yet';
+                    document.getElementById('mLastPayment').textContent  = lastPmt;
+                    document.getElementById('modalBondSummary').style.display = '';
+
+                    // manage button
+                    document.getElementById('manageChequesBtnLink').href = data.manage_url;
+
+                    // cheques table
+                    if (!data.cheques || data.cheques.length === 0) {
+                        modalBody.innerHTML = '<p class="text-center text-muted py-4">No cheques recorded yet.</p>';
+                        return;
+                    }
+
+                    const statusColors = { pending:'warning', cleared:'success', bounced:'danger', cancelled:'secondary' };
+                    let rows = '';
+                    data.cheques.forEach(c => {
+                        const color = statusColors[c.status] || 'info';
+                        rows += `<tr>
+                            <td class="ps-3 fw-semibold" style="font-size:16px;">${c.cheque_number || '-'}</td>
+                            <td style="font-size:16px;">${c.cheque_date || '-'}</td>
+                            <td class="fw-bold" style="font-size:16px;">₹${c.amount}</td>
+                            <td><span class="badge bg-${color}-subtle text-${color} border border-${color}-subtle" style="font-size:13px;padding:5px 11px;">${c.status}</span></td>
+                            <td style="font-size:16px;" class="text-muted">${c.type || '-'}</td>
+                            <td style="font-size:16px;">${c.account_name || '-'}</td>
+                            <td style="font-size:16px;color:#64748b;">${c.notes || ''}</td>
+                        </tr>`;
+                    });
+
+                    modalBody.innerHTML = `
+                        <div class="table-responsive">
+                            <table class="table table-hover mb-0 align-middle">
+                                <thead style="background:#f8fafc;">
+                                    <tr>
+                                        <th class="ps-3 py-3" style="font-size:12px;font-weight:700;text-transform:uppercase;color:#64748b;letter-spacing:.5px;">Cheque #</th>
+                                        <th style="font-size:12px;font-weight:700;text-transform:uppercase;color:#64748b;letter-spacing:.5px;">Date</th>
+                                        <th style="font-size:12px;font-weight:700;text-transform:uppercase;color:#64748b;letter-spacing:.5px;">Amount</th>
+                                        <th style="font-size:12px;font-weight:700;text-transform:uppercase;color:#64748b;letter-spacing:.5px;">Status</th>
+                                        <th style="font-size:12px;font-weight:700;text-transform:uppercase;color:#64748b;letter-spacing:.5px;">Type</th>
+                                        <th style="font-size:12px;font-weight:700;text-transform:uppercase;color:#64748b;letter-spacing:.5px;">Account</th>
+                                        <th style="font-size:12px;font-weight:700;text-transform:uppercase;color:#64748b;letter-spacing:.5px;">Notes</th>
+                                    </tr>
+                                </thead>
+                                <tbody>${rows}</tbody>
+                            </table>
+                        </div>`;
+                })
+                .catch(err => {
+                    console.error(err);
+                    modalBody.innerHTML = '<div class="alert alert-danger m-3">Error loading cheques data.</div>';
+                });
+        });
+    </script>
+@endsection

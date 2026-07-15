@@ -1,0 +1,23 @@
+<?php
+
+namespace Database\Seeders;
+
+// use Illuminate\Database\Console\Seeds\WithoutModelEvents;
+use Illuminate\Database\Seeder;
+
+class DatabaseSeeder extends Seeder
+{
+    /**
+     * Seed the application's database.
+     */
+    public function run(): void
+    {
+        $this->call([
+            LandManagementDemoSeeder::class,
+            AdminUserSeeder::class,
+            AdminRoleSeeder::class,
+            BasicSampleSeeder::class,
+            DummyAraziSeeder::class,
+        ]);
+    }
+}
