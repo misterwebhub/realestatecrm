@@ -52,13 +52,6 @@ class AraziController extends Controller
             ['name' => 'no_of_plots', 'label' => 'Number of Plots (optional)', 'type' => 'number', 'step' => '1', 'value' => $item?->no_of_plots ?? 0, 'hidden' => true],
             ['name' => 'sale_amount_per_gaz', 'label' => 'Sale amount per Gaz (₹)', 'type' => 'number', 'step' => '0.01', 'value' => $item?->sale_amount_per_gaz],
             ['name' => 'coordinates', 'label' => 'Coordinates', 'type' => 'text', 'value' => $item?->coordinates],
-            ['name' => 'status', 'label' => 'Status', 'type' => 'select', 'options' => [
-                'available' => 'Available',
-                'booked_advance' => 'Booked (advance)',
-                'registry' => 'Registry done',
-                'blacklist' => 'Blacklist',
-                'not_for_sale' => 'Not for sale',
-            ], 'value' => $item?->status ?? 'available'],
         ];
     }
 
@@ -89,7 +82,6 @@ class AraziController extends Controller
             'plots.*.plot_number' => ['required_with:plots', 'string', 'max:150'],
             'plots.*.area' => ['nullable', 'numeric', 'min:0'],
             'coordinates' => ['nullable', 'string', 'max:255'],
-            'status' => ['required', 'in:available,booked_advance,registry,blacklist,not_for_sale'],
         ];
     }
 
@@ -507,6 +499,10 @@ class AraziController extends Controller
         // remove plots and no_of_plots from payload so Arazi can be created without mass-assigning plots
         if (isset($validated['plots'])) unset($validated['plots']);
         if (isset($validated['no_of_plots'])) unset($validated['no_of_plots']);
+        // status field removed from the form; keep DB column valid on new records
+        if (! $item && empty($validated['status'])) {
+            $validated['status'] = 'available';
+        }
         return $validated;
     }
 

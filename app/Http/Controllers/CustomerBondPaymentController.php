@@ -215,6 +215,8 @@ class CustomerBondPaymentController extends Controller
 
         // Load payment entries + full bond object when a specific bond is requested
         $entries       = collect([]);
+        $cheques       = collect([]);
+        $chequeSummary = ['count' => 0, 'total' => 0, 'cleared' => 0, 'bounced' => 0, 'pending' => 0, 'cancelled' => 0, 'balance' => 0];
         $selectedBond  = null;
         if ($selectedBondId) {
             $selectedBond = CustomerBond::with(['customer', 'arazi', 'plots', 'broker', 'witnesses'])
@@ -243,6 +245,36 @@ class CustomerBondPaymentController extends Controller
                             'is_debit'  => in_array($payment->entry_type, ['return', 'discount']),
                         ];
                     });
+
+                // Cheque entries attached to this bond
+                $cheques = \App\Models\CustomerBondCheque::with('connectedAccount')
+                    ->where('customer_bond_id', $selectedBondId)
+                    ->orderBy('cheque_date')
+                    ->orderBy('id')
+                    ->get()
+                    ->map(function (\App\Models\CustomerBondCheque $c) {
+                        return [
+                            'cheque_number' => $c->cheque_number ?: '-',
+                            'bank_name'     => $c->bank_name ?: '-',
+                            'branch_name'   => $c->branch_name ?: '-',
+                            'account'       => $c->connectedAccount?->name ?? '-',
+                            'cheque_date'   => optional($c->cheque_date)->format('d-m-Y') ?? '-',
+                            'due_date'      => optional($c->action_due_date)->format('d-m-Y') ?? '-',
+                            'amount'        => (float) $c->amount,
+                            'status'        => $c->status ?: 'pending',
+                            'type'          => $c->type ?: '-',
+                            'notes'         => $c->notes ?: '',
+                        ];
+                    });
+
+                $chequeSummary['count']   = $cheques->count();
+                $chequeSummary['total']   = (float) $cheques->sum('amount');
+                $chequeSummary['cleared'] = (float) $cheques->where('status', 'cleared')->sum('amount');
+                $chequeSummary['bounced'] = (float) $cheques->where('status', 'bounced')->sum('amount');
+                $chequeSummary['pending'] = (float) $cheques->where('status', 'pending')->sum('amount');
+                $chequeSummary['cancelled'] = (float) $cheques->where('status', 'cancelled')->sum('amount');
+                // Balance = amounts not yet cleared/cancelled (pending + bounced awaiting re-collection)
+                $chequeSummary['balance'] = $chequeSummary['pending'] + $chequeSummary['bounced'];
             }
         }
 
@@ -258,6 +290,8 @@ class CustomerBondPaymentController extends Controller
             'isCustomerLedger' => true,
             'bonds'            => $bonds,
             'entries'          => $entries,
+            'cheques'          => $cheques,
+            'chequeSummary'    => $chequeSummary,
             // filter state for repopulating form
             'cl_q'             => $q,
             'cl_arazi'         => $araziCode,

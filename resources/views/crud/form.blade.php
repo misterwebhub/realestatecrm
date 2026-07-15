@@ -403,6 +403,57 @@
                     @endforeach
                 </div>
 
+                @if($isAraziForm)
+                    <hr />
+                    <h5 class="mt-3">Area Converter <small class="text-muted">(for reference only — not saved)</small></h5>
+                    <div class="row g-3 mb-2">
+                        <div class="col-md-3">
+                            <label class="form-label">Value</label>
+                            <input type="number" step="any" id="ac_value" class="form-control" placeholder="Enter value">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">From Unit</label>
+                            <select id="ac_unit" class="form-select">
+                                <option value="gaz">Gaz</option>
+                                <option value="marla">Marla</option>
+                                <option value="kanal">Kanal</option>
+                                <option value="sqft">Sq Ft</option>
+                                <option value="m2">Sq Meter</option>
+                                <option value="ha">Hectare</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Result (Gaz)</label>
+                            <input type="text" id="ac_result" class="form-control" readonly value="—">
+                        </div>
+                    </div>
+                    <script>
+                        (function(){
+                            var val = document.getElementById('ac_value');
+                            var unit = document.getElementById('ac_unit');
+                            var out = document.getElementById('ac_result');
+                            if (!val || !unit || !out) return;
+                            function toGaz(){
+                                var v = parseFloat(val.value);
+                                if (isNaN(v)) { out.value = '—'; return; }
+                                var u = unit.value, r;
+                                switch(u){
+                                    case 'gaz': r = v; break;
+                                    case 'marla': r = v * 30.25; break;
+                                    case 'kanal': r = v * 605; break;
+                                    case 'sqft': r = v / 9; break;
+                                    case 'm2': r = v / 0.83612736; break;
+                                    case 'ha': r = (v * 10000) / 0.83612736; break;
+                                    default: r = v;
+                                }
+                                out.value = (Math.round(r * 100) / 100) + ' gaz';
+                            }
+                            val.addEventListener('input', toGaz);
+                            unit.addEventListener('change', toGaz);
+                        })();
+                    </script>
+                @endif
+
                 @if($isAraziForm && $method === 'POST')
                     <hr />
                     <h5 class="mt-3">Plots</h5>

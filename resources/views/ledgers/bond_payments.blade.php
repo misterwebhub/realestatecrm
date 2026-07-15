@@ -205,6 +205,12 @@
         <a href="{{ route('customer-bonds.print', $bd->id) }}" target="_blank" class="btn btn-sm btn-outline-secondary" style="font-size:11px;">
             <i class="bi bi-printer"></i> Print Bond
         </a>
+        <button type="button" class="btn btn-sm btn-outline-info" style="font-size:11px;" data-bs-toggle="modal" data-bs-target="#chequeDetailsModal">
+            <i class="bi bi-bank"></i> Cheque Details
+            @if(($chequeSummary['count'] ?? 0) > 0)
+                <span class="badge bg-info text-dark ms-1">{{ $chequeSummary['count'] }}</span>
+            @endif
+        </button>
     </div>
     <div class="card-body py-3">
         <div class="row g-3">
@@ -291,6 +297,10 @@
                             @endif
                         </span>
                     </div>
+                    <div class="d-flex justify-content-between align-items-center p-2 rounded" style="background:#eff6ff;">
+                        <span class="text-primary small fw-semibold"><i class="bi bi-bank me-1"></i>Paid Cheque Amount</span>
+                        <span class="fw-bold text-primary">₹{{ number_format((float)($chequeSummary['cleared'] ?? 0), 2) }}</span>
+                    </div>
                     {{-- Progress bar --}}
                     <div class="mt-1">
                         <div class="d-flex justify-content-between mb-1" style="font-size:11px;">
@@ -313,6 +323,116 @@
                     <i class="bi bi-sticky me-1"></i>{{ $bd->notes ?? $bd->customer_comment }}
                 </div>
                 @endif
+            </div>
+        </div>
+    </div>
+</div>
+
+{{-- ── CHEQUE DETAILS MODAL ── --}}
+@php
+    $chSummary = $chequeSummary ?? ['count'=>0,'total'=>0,'cleared'=>0,'bounced'=>0,'pending'=>0,'cancelled'=>0,'balance'=>0];
+    $chList    = $cheques ?? collect([]);
+    $statusBadge = [
+        'pending'   => 'bg-warning text-dark',
+        'cleared'   => 'bg-success',
+        'bounced'   => 'bg-danger',
+        'cancelled' => 'bg-secondary',
+    ];
+@endphp
+<div class="modal fade" id="chequeDetailsModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header bg-light">
+                <h5 class="modal-title"><i class="bi bi-bank me-2"></i>Cheque Details — {{ $bd->bond_no }}</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                {{-- Summary cards --}}
+                <div class="row g-2 mb-3">
+                    <div class="col-6 col-md">
+                        <div class="p-2 rounded text-center" style="background:#f1f5f9;">
+                            <div class="text-muted small">Total Cheques</div>
+                            <div class="fw-bold">{{ $chSummary['count'] }}</div>
+                        </div>
+                    </div>
+                    <div class="col-6 col-md">
+                        <div class="p-2 rounded text-center" style="background:#eef2ff;">
+                            <div class="text-muted small">Total Amount</div>
+                            <div class="fw-bold">₹{{ number_format($chSummary['total'], 2) }}</div>
+                        </div>
+                    </div>
+                    <div class="col-6 col-md">
+                        <div class="p-2 rounded text-center" style="background:#dcfce7;">
+                            <div class="text-success small">Cleared (Paid)</div>
+                            <div class="fw-bold text-success">₹{{ number_format($chSummary['cleared'], 2) }}</div>
+                        </div>
+                    </div>
+                    <div class="col-6 col-md">
+                        <div class="p-2 rounded text-center" style="background:#fef9c3;">
+                            <div class="small" style="color:#92400e;">Balance (Pending)</div>
+                            <div class="fw-bold" style="color:#92400e;">₹{{ number_format($chSummary['balance'], 2) }}</div>
+                        </div>
+                    </div>
+                    <div class="col-6 col-md">
+                        <div class="p-2 rounded text-center" style="background:#fee2e2;">
+                            <div class="text-danger small">Bounced</div>
+                            <div class="fw-bold text-danger">₹{{ number_format($chSummary['bounced'], 2) }}</div>
+                        </div>
+                    </div>
+                </div>
+
+                {{-- Cheque list --}}
+                <div class="table-responsive">
+                    <table class="table table-sm table-hover align-middle mb-0" style="font-size:13px;">
+                        <thead class="table-light">
+                            <tr>
+                                <th>#</th>
+                                <th>Cheque No</th>
+                                <th>Bank / Branch</th>
+                                <th>Account</th>
+                                <th>Cheque Date</th>
+                                <th>Due Date</th>
+                                <th class="text-end">Amount</th>
+                                <th>Status</th>
+                                <th>Notes</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @forelse($chList as $i => $ch)
+                            <tr>
+                                <td class="text-muted">{{ $i + 1 }}</td>
+                                <td class="fw-semibold">{{ $ch['cheque_number'] }}</td>
+                                <td>{{ $ch['bank_name'] }}@if($ch['branch_name'] !== '-')<div class="text-muted small">{{ $ch['branch_name'] }}</div>@endif</td>
+                                <td>{{ $ch['account'] }}</td>
+                                <td style="white-space:nowrap;">{{ $ch['cheque_date'] }}</td>
+                                <td style="white-space:nowrap;">{{ $ch['due_date'] }}</td>
+                                <td class="text-end fw-semibold">₹{{ number_format($ch['amount'], 2) }}</td>
+                                <td><span class="badge {{ $statusBadge[$ch['status']] ?? 'bg-secondary' }}">{{ ucfirst($ch['status']) }}</span></td>
+                                <td class="text-muted small" style="max-width:160px;">{{ $ch['notes'] }}</td>
+                            </tr>
+                            @empty
+                            <tr>
+                                <td colspan="9" class="text-center py-4 text-muted">No cheque entries found for this bond.</td>
+                            </tr>
+                            @endforelse
+                        </tbody>
+                        @if($chList->count() > 0)
+                        <tfoot>
+                            <tr style="background:#f8fafc;font-weight:600;">
+                                <td colspan="6" class="text-end text-muted">TOTAL</td>
+                                <td class="text-end">₹{{ number_format($chSummary['total'], 2) }}</td>
+                                <td colspan="2"></td>
+                            </tr>
+                        </tfoot>
+                        @endif
+                    </table>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <a href="{{ route('customer-bond-cheques.manage', $bd->id) }}" class="btn btn-sm btn-outline-primary">
+                    <i class="bi bi-pencil-square"></i> Manage Cheques
+                </a>
+                <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal">Close</button>
             </div>
         </div>
     </div>
