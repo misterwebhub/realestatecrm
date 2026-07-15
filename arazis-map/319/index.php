@@ -1137,15 +1137,15 @@ try {
         }
 
         $desc = strtolower((string) ($r['description'] ?? ''));
-        if (strpos($desc, 'issue') !== false || empty($r['area']) || (float)($r['area'] ?? 0) <= 0) {
-            $status = 'issue';
-        }
+        // if (strpos($desc, 'issue') !== false || empty($r['area']) || (float)($r['area'] ?? 0) <= 0) {
+        //     $status = 'issue';
+        // }
 
         if ($status === null) $status = 'available';
 
         $plots[] = [
             'id' => $plotId,
-            'plot_number' => $r['plot_number'],
+            'plot_number' => ($r['plot_number']) ?  $r['plot_number'] :  $r['title'],
             'status' => $status,
             'area' => $r['area'],
         ];
@@ -1170,7 +1170,7 @@ document.addEventListener('DOMContentLoaded', function(){
         'blacklist':'#212529',
         'hold':'#A0522D',
         'registry':'#E53935',
-        'issue':'#6C757D'
+        'issue':'#FFC107'
     };
 
     const plots = window.plots || [];

@@ -268,6 +268,7 @@
     
     </div>
     </form>
+
 <?php
 // Load shared DB credentials
 require __DIR__ . '/../db-config.php';
@@ -298,7 +299,8 @@ try {
         $serverDebug['resolved_arazi_id'] = $araziId;
         $serverDebug['resolved_arazi_row'] = null;
     }
-    // Try to fetch plots by joining arazis using legacy_arazi_code first (hard-coded legacy code)
+
+    // Try to fetch plots by joining arazis using legacy_arazi_code first
     $stmt = $pdo->prepare('SELECT p.id, p.plot_number, p.area, p.status, p.title, p.description FROM plots p JOIN arazis a ON p.arazi_id = a.id WHERE a.legacy_arazi_code = ?');
     $stmt->execute([$legacyCode]);
     $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -339,15 +341,15 @@ try {
         }
 
         $desc = strtolower((string) ($r['description'] ?? ''));
-        if (strpos($desc, 'issue') !== false || empty($r['area']) || (float)($r['area'] ?? 0) <= 0) {
-            $status = 'issue';
-        }
+        // if (strpos($desc, 'issue') !== false || empty($r['area']) || (float)($r['area'] ?? 0) <= 0) {
+        //     $status = 'issue';
+        // }
 
         if ($status === null) $status = 'available';
 
         $plots[] = [
             'id' => $plotId,
-            'plot_number' => $r['plot_number'],
+            'plot_number' => ($r['plot_number']) ?  $r['plot_number'] :  $r['title'],
             'status' => $status,
             'area' => $r['area'],
         ];
@@ -374,19 +376,17 @@ document.addEventListener('DOMContentLoaded', function(){
         'blacklist':'#212529',
         'hold':'#A0522D',
         'registry':'#E53935',
-        'issue':'#6C757D'
+        'issue':'#FFC107'
     };
 
     const plots = window.plots || [];
     console.log('arazi plots payload:', plots);
 
-    // Simple number-based lookup: map plot_number (digits only) -> normalized status
+    // Simple number-based lookup: map plot_number (digits only) -> status
     const plotStatusByNumber = {};
     plots.forEach(p => {
         const numMatch = String(p.plot_number || p.id || '').match(/\d+/);
-        const rawStatus = String(p.status || 'available').toLowerCase().replace(/adwance/g,'advance');
-        const statusKey = rawStatus.replace(/[_\s]+/g,'-');
-        if (numMatch) plotStatusByNumber[numMatch[0]] = statusKey || 'available';
+        if (numMatch) plotStatusByNumber[numMatch[0]] = p.status || 'available';
     });
     console.log('plotStatusByNumber keys:', Object.keys(plotStatusByNumber));
 
