@@ -22,7 +22,7 @@
                         <th>Notes</th>
                         <th>Created By</th>
                         <th>Created</th>
-                        <th style="width:90px;" class="text-end">Actions</th>
+                        <th style="width:160px;" class="text-end">Actions</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -45,6 +45,9 @@
                             <td>{{ optional($group->creator)->name ?? '—' }}</td>
                             <td>{{ optional($group->created_at)->format('d M Y H:i') }}</td>
                             <td class="text-end">
+                                <a href="{{ route('arazi-groups.edit', $group->id) }}" class="btn btn-outline-primary btn-sm">
+                                    <i class="bi bi-pencil"></i> Edit
+                                </a>
                                 <form action="{{ route('arazi-groups.destroy', $group->id) }}" method="POST"
                                       onsubmit="return confirm('Delete this arazi group?');" class="d-inline">
                                     @csrf

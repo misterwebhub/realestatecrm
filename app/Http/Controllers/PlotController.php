@@ -160,6 +160,8 @@ class PlotController extends Controller
     public function index(\Illuminate\Http\Request $request)
     {
         $q = trim((string) $request->query('q', ''));
+        $filterArazi = trim((string) $request->query('arazi_code', ''));
+        $filterPlotId = trim((string) $request->query('plot_id', ''));
 
         $query = $this->resourceQuery();
         if ($q !== '') {
@@ -172,6 +174,40 @@ class PlotController extends Controller
                           ->orWhere('location', 'like', '%' . $q . '%');
                     });
             });
+        }
+
+        if ($filterArazi !== '') {
+            $query->where('arazi_code', $filterArazi);
+        }
+        if ($filterPlotId !== '') {
+            $query->where('id', $filterPlotId);
+        }
+
+        // Arazi options for the filter dropdown (unique legacy codes)
+        $araziOptions = Arazi::whereNotNull('legacy_arazi_code')
+            ->where('legacy_arazi_code', '!=', '')
+            ->orderBy('legacy_arazi_code')
+            ->get()
+            ->groupBy('legacy_arazi_code')
+            ->mapWithKeys(function ($group, $code) {
+                $first = $group->first();
+                $label = $first->araziNoCode() ?: $code;
+                return [$code => $label];
+            })->all();
+
+        // Plots belonging to the currently selected arazi (for the dependent dropdown)
+        $filterPlots = [];
+        if ($filterArazi !== '') {
+            $filterPlots = Plot::where('arazi_code', $filterArazi)
+                ->orderBy('title')
+                ->get(['id', 'title', 'block'])
+                ->map(function (Plot $p) {
+                    $label = $p->title ?: ('Plot #' . $p->id);
+                    if ($p->block) {
+                        $label .= ' (Block ' . $p->block . ')';
+                    }
+                    return ['id' => $p->id, 'label' => $label];
+                })->all();
         }
 
         $records = $query->get();
@@ -190,10 +226,16 @@ class PlotController extends Controller
             'rows' => $rows,
             'createUrl' => route($routeName . '.create'),
             'exportCsvUrl' => $this->allowsCsvExport() ? route($routeName.'.export.csv') : null,
-            'showSearch' => true,
+            'showSearch' => false,
             'searchQuery' => $q,
-            'searchInHeader' => true,
+            'searchInHeader' => false,
             'permModule' => $this->resourcePermModule(),
+            'isPlotIndex' => true,
+            'araziOptions' => $araziOptions,
+            'filterArazi' => $filterArazi,
+            'filterPlotId' => $filterPlotId,
+            'filterPlots' => $filterPlots,
+            'plotsByCodeBase' => url('arazi-no'),
         ]);
     }
 

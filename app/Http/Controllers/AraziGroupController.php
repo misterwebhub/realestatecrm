@@ -103,6 +103,53 @@ class AraziGroupController extends Controller
             ->with('success', 'Arazi group created successfully.');
     }
 
+    public function edit($id)
+    {
+        $group = AraziGroup::with('arazis')->findOrFail($id);
+
+        $arazis = Arazi::orderBy('legacy_arazi_code')
+            ->get(['id', 'legacy_arazi_code', 'location', 'size']);
+
+        return view('arazi_groups.edit', [
+            'title'      => 'Edit Arazi Group',
+            'mapNames'   => $this->mapNames(),
+            'arazis'     => $arazis,
+            'group'      => $group,
+            'selectedIds'=> $group->arazis->pluck('id')->all(),
+        ]);
+    }
+
+    public function update(Request $request, $id)
+    {
+        $group = AraziGroup::findOrFail($id);
+
+        $validated = $request->validate([
+            'name'       => ['nullable', 'string', 'max:150'],
+            'map_name'   => ['required', 'string', 'max:150'],
+            'notes'      => ['nullable', 'string', 'max:2000'],
+            'arazi_ids'  => ['required', 'array', 'min:2'],
+            'arazi_ids.*'=> ['integer', 'exists:arazis,id'],
+        ], [
+            'arazi_ids.required' => 'Please select at least two arazis to merge.',
+            'arazi_ids.min'      => 'Please select at least two arazis to merge.',
+        ]);
+
+        DB::transaction(function () use ($group, $validated) {
+            $group->update([
+                'name'     => $validated['name'] ?? null,
+                'map_name' => $validated['map_name'],
+                'notes'    => $validated['notes'] ?? null,
+            ]);
+
+            $ids = array_values(array_unique(array_map('intval', $validated['arazi_ids'])));
+            $group->arazis()->sync($ids);
+        });
+
+        return redirect()
+            ->route('arazi-groups.index')
+            ->with('success', 'Arazi group updated successfully.');
+    }
+
     public function destroy($id)
     {
         $group = AraziGroup::findOrFail($id);

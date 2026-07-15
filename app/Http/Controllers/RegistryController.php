@@ -34,10 +34,44 @@ class RegistryController extends Controller
             ->orderBy('due_date')
             ->get();
 
+        // Exclude registries where more than 50% of the linked bond amount is already paid.
+        $records = $records->reject(function (Registry $registry) {
+            return $this->registryPaymentProgress($registry) > 50.0;
+        })->values();
+
         return view('registries.waiting', [
             'title' => 'Waiting Payments',
             'records' => $records,
         ]);
+    }
+
+    /**
+     * Percentage of the linked bond amount that has already been paid for a registry.
+     * Bonds are matched by the registry's customer + arazi code.
+     */
+    protected function registryPaymentProgress(Registry $registry): float
+    {
+        if (! $registry->customer_id || ! $registry->arazi_code) {
+            return 0.0;
+        }
+
+        $bonds = \App\Models\CustomerBond::where('customer_id', $registry->customer_id)
+            ->where('arazi_code', $registry->arazi_code)
+            ->withSum('payments as paid_amount', 'amount')
+            ->get(['id', 'total_amount', 'bond_amount']);
+
+        if ($bonds->isEmpty()) {
+            return 0.0;
+        }
+
+        $total = (float) $bonds->sum(fn ($b) => (float) ($b->total_amount ?? $b->bond_amount ?? 0));
+        $paid  = (float) $bonds->sum(fn ($b) => (float) ($b->paid_amount ?? 0));
+
+        if ($total <= 0) {
+            return 0.0;
+        }
+
+        return ($paid / $total) * 100.0;
     }
 
     protected function resourceTitle(): string

@@ -210,6 +210,30 @@
                 <span><strong>Less than 50% paid</strong> — Paid: ₹<span id="w_paid">0</span> out of ₹<span id="w_total">0</span> &nbsp;(<span id="w_pct">0</span>% paid &nbsp;|&nbsp; Balance: ₹<span id="w_bal">0</span>)</span>
             </div>
 
+            {{-- ── Area Converter (reference only — not saved) ── --}}
+            <h6 class="fw-bold text-muted mb-2 border-bottom pb-1">Area Converter <small class="text-muted">(for reference only — not saved)</small></h6>
+            <div class="row g-2 mb-3" style="max-width:640px;">
+                <div class="col-md-4">
+                    <label class="form-label small fw-semibold">Value</label>
+                    <input type="number" step="any" id="rac_value" class="form-control form-control-sm" placeholder="Enter value">
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label small fw-semibold">From Unit</label>
+                    <select id="rac_unit" class="form-select form-select-sm">
+                        <option value="gaz">Gaz</option>
+                        <option value="marla">Marla</option>
+                        <option value="kanal">Kanal</option>
+                        <option value="sqft">Sq Ft</option>
+                        <option value="m2">Sq Meter</option>
+                        <option value="ha">Hectare</option>
+                    </select>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label small fw-semibold">Result (Gaz)</label>
+                    <input type="text" id="rac_result" class="form-control form-control-sm bg-light" readonly value="—">
+                </div>
+            </div>
+
             {{-- ── Section: Witnesses ── --}}
             <h6 class="fw-bold text-muted mb-2 border-bottom pb-1">Witnesses <span class="text-danger">*</span></h6>
             <div class="mb-2">
@@ -652,6 +676,31 @@
         populateAraziOptions(presetArazi);
         loadPartners(presetArazi);
     }
+
+    /* ── Area Converter (UI only — nothing submitted) ── */
+    (function(){
+        const val = document.getElementById('rac_value');
+        const unit = document.getElementById('rac_unit');
+        const out = document.getElementById('rac_result');
+        if (!val || !unit || !out) return;
+        function toGaz(){
+            const v = parseFloat(val.value);
+            if (isNaN(v)) { out.value = '—'; return; }
+            let r;
+            switch (unit.value) {
+                case 'gaz':   r = v; break;
+                case 'marla': r = v * 30.25; break;
+                case 'kanal': r = v * 605; break;
+                case 'sqft':  r = v / 9; break;
+                case 'm2':    r = v / 0.83612736; break;
+                case 'ha':    r = (v * 10000) / 0.83612736; break;
+                default:      r = v;
+            }
+            out.value = (Math.round(r * 100) / 100) + ' gaz';
+        }
+        val.addEventListener('input', toGaz);
+        unit.addEventListener('change', toGaz);
+    })();
 })();
 </script>
 @endpush

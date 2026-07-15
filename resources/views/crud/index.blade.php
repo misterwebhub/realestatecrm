@@ -117,12 +117,128 @@
                             <option value="debit"  {{ ($cp_credit_debit ?? '') === 'debit'  ? 'selected' : '' }}>Debit</option>
                         </select>
                     </div>
+                    <div class="col-md-2">
+                        <label class="form-label small fw-semibold mb-1">Created From</label>
+                        <input type="date" name="date_from" value="{{ $cp_date_from ?? '' }}"
+                               class="form-control form-control-sm">
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label small fw-semibold mb-1">Created To</label>
+                        <input type="date" name="date_to" value="{{ $cp_date_to ?? '' }}"
+                               class="form-control form-control-sm">
+                    </div>
                     <div class="col-auto d-flex gap-2">
                         <button type="submit" class="btn btn-primary btn-sm">Search</button>
                         <a href="{{ route('customer-bond-payments.index') }}" class="btn btn-outline-secondary btn-sm">Clear</a>
                     </div>
+                    <div class="col-auto ms-auto">
+                        <label class="form-label small fw-semibold mb-1">Delete by Entry No</label>
+                        <div class="d-flex gap-1">
+                            <input type="text" id="del-entry-no" class="form-control form-control-sm"
+                                   placeholder="e.g. CP00952" style="max-width:140px;">
+                            <button type="button" id="del-entry-btn" class="btn btn-danger btn-sm">
+                                <i class="bi bi-trash"></i> Delete
+                            </button>
+                        </div>
+                    </div>
                 </form>
             </div>
+
+            {{-- Delete-by-entry confirmation modal --}}
+            <div class="modal fade" id="deleteEntryModal" tabindex="-1" aria-hidden="true">
+                <div class="modal-dialog modal-dialog-centered">
+                    <div class="modal-content">
+                        <div class="modal-header bg-danger text-white">
+                            <h5 class="modal-title">Confirm Delete Payment Entry</h5>
+                            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                        </div>
+                        <div class="modal-body">
+                            <div id="del-entry-loading" class="text-center py-3 d-none">
+                                <div class="spinner-border text-danger" role="status"></div>
+                            </div>
+                            <div id="del-entry-notfound" class="alert alert-warning mb-0 d-none">
+                                No payment found for that entry number.
+                            </div>
+                            <div id="del-entry-details" class="d-none">
+                                <p class="mb-2">Do you want to delete this entry?</p>
+                                <table class="table table-sm mb-2">
+                                    <tbody>
+                                        <tr><th style="width:130px;">Entry No</th><td id="de-entry-no" class="fw-semibold"></td></tr>
+                                        <tr><th>Bond No</th><td id="de-bond-no"></td></tr>
+                                        <tr><th>Customer</th><td id="de-customer"></td></tr>
+                                        <tr><th>Arazi</th><td id="de-arazi"></td></tr>
+                                        <tr><th>Type</th><td id="de-type"></td></tr>
+                                        <tr><th>Amount</th><td id="de-amount" class="fw-semibold text-danger"></td></tr>
+                                        <tr><th>Entry Date</th><td id="de-date"></td></tr>
+                                    </tbody>
+                                </table>
+                                <div class="small text-muted">This action cannot be undone.</div>
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+                            <form id="del-entry-form" action="{{ route('customer-bond-payments.delete-by-entry') }}" method="POST" class="d-inline">
+                                @csrf
+                                @method('DELETE')
+                                <input type="hidden" name="entry_no" id="del-entry-hidden">
+                                <button type="submit" id="del-entry-proceed" class="btn btn-danger btn-sm" disabled>Proceed &amp; Delete</button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <script>
+                (function(){
+                    var LOOKUP_URL = @json(route('customer-bond-payments.lookup-entry'));
+                    var input   = document.getElementById('del-entry-no');
+                    var btn     = document.getElementById('del-entry-btn');
+                    var modalEl = document.getElementById('deleteEntryModal');
+                    if(!btn || !modalEl) return;
+
+                    var elLoading  = document.getElementById('del-entry-loading');
+                    var elNotFound = document.getElementById('del-entry-notfound');
+                    var elDetails  = document.getElementById('del-entry-details');
+                    var elProceed  = document.getElementById('del-entry-proceed');
+                    var elHidden   = document.getElementById('del-entry-hidden');
+
+                    function show(el, on){ el.classList.toggle('d-none', !on); }
+
+                    function openModal(){
+                        if(window.bootstrap && bootstrap.Modal){
+                            bootstrap.Modal.getOrCreateInstance(modalEl).show();
+                        }
+                    }
+
+                    function lookup(){
+                        var entry = (input.value || '').trim();
+                        if(!entry){ input.focus(); return; }
+                        show(elLoading, true); show(elNotFound, false); show(elDetails, false);
+                        elProceed.disabled = true;
+                        openModal();
+                        fetch(LOOKUP_URL + '?entry_no=' + encodeURIComponent(entry), {headers:{'Accept':'application/json'}})
+                            .then(function(r){ return r.json(); })
+                            .then(function(d){
+                                show(elLoading, false);
+                                if(!d || !d.found){ show(elNotFound, true); return; }
+                                document.getElementById('de-entry-no').textContent = d.entry_no;
+                                document.getElementById('de-bond-no').textContent  = d.bond_no;
+                                document.getElementById('de-customer').textContent = d.customer;
+                                document.getElementById('de-arazi').textContent    = d.arazi_code;
+                                document.getElementById('de-type').textContent     = d.entry_type;
+                                document.getElementById('de-amount').textContent   = d.amount;
+                                document.getElementById('de-date').textContent     = d.entry_date;
+                                elHidden.value = d.entry_no;
+                                show(elDetails, true);
+                                elProceed.disabled = false;
+                            })
+                            .catch(function(){ show(elLoading, false); show(elNotFound, true); });
+                    }
+
+                    btn.addEventListener('click', lookup);
+                    input.addEventListener('keydown', function(e){ if(e.key === 'Enter'){ e.preventDefault(); lookup(); } });
+                })();
+            </script>
         @endif
 
         @if(!empty($isKisanPaymentIndex))
@@ -236,8 +352,115 @@
             </div>
         @endif
 
+        @if(!empty($isPlotIndex))
+            <div class="card-body border-top">
+                <form class="row g-2 align-items-end" method="GET" action="{{ url()->current() }}">
+                    <div class="col-md-4">
+                        <label class="form-label small fw-semibold mb-1">Filter by Arazi</label>
+                        <select id="plot-filter-arazi" name="arazi_code" class="form-select form-select-sm">
+                            <option value="">All Arazis</option>
+                            @foreach($araziOptions ?? [] as $code => $label)
+                                <option value="{{ $code }}" @selected((string)($filterArazi ?? '') === (string)$code)>{{ $label }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label small fw-semibold mb-1">Filter by Plot</label>
+                        <select id="plot-filter-plot" name="plot_id" class="form-select form-select-sm" @if(empty($filterArazi)) disabled @endif>
+                            <option value="">All Plots</option>
+                            @foreach($filterPlots ?? [] as $p)
+                                <option value="{{ $p['id'] }}" @selected((string)($filterPlotId ?? '') === (string)$p['id'])>{{ $p['label'] }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div class="col-auto">
+                        <button class="btn btn-sm btn-primary">Filter</button>
+                        <a href="{{ url()->current() }}" class="btn btn-sm btn-outline-secondary ms-1">Clear</a>
+                    </div>
+                </form>
+            </div>
+            <script>
+                (function(){
+                    var PLOTS_BASE = @json($plotsByCodeBase ?? url('arazi-no'));
+                    var $arazi = document.getElementById('plot-filter-arazi');
+                    var $plot  = document.getElementById('plot-filter-plot');
+
+                    function resetPlots(placeholder){
+                        $plot.innerHTML = '<option value="">' + placeholder + '</option>';
+                    }
+
+                    function refreshSelect2(){
+                        if(window.jQuery && jQuery.fn.select2){ jQuery($plot).trigger('change.select2'); }
+                    }
+
+                    function loadPlots(code){
+                        if(!code){ resetPlots('All Plots'); $plot.disabled = true; refreshSelect2(); return; }
+                        $plot.disabled = true;
+                        resetPlots('Loading…');
+                        refreshSelect2();
+                        fetch(PLOTS_BASE + '/' + encodeURIComponent(code) + '/plots', {headers:{'Accept':'application/json'}})
+                            .then(function(r){ return r.json(); })
+                            .then(function(data){
+                                resetPlots('All Plots');
+                                (data.plots || []).forEach(function(p){
+                                    var opt = document.createElement('option');
+                                    opt.value = p.id;
+                                    opt.textContent = p.label || ('Plot #' + p.id);
+                                    $plot.appendChild(opt);
+                                });
+                                $plot.disabled = false;
+                                refreshSelect2();
+                            })
+                            .catch(function(){ resetPlots('All Plots'); $plot.disabled = false; refreshSelect2(); });
+                    }
+
+                    var bound = false;
+                    function bindNative(){
+                        if(bound || !$arazi) return;
+                        bound = true;
+                        $arazi.addEventListener('change', function(){ loadPlots(this.value); });
+                    }
+                    function initSelect2(){
+                        if(!(window.jQuery && jQuery.fn && jQuery.fn.select2)) return false;
+                        var $a = jQuery('#plot-filter-arazi');
+                        var $p = jQuery('#plot-filter-plot');
+                        if(!$a.length) return true;
+                        var opts = {
+                            theme: 'bootstrap-5',
+                            allowClear: true,
+                            width: '100%',
+                            dropdownParent: jQuery(document.body),
+                            minimumResultsForSearch: 0,
+                            matcher: function(params, data){
+                                if(!params || !params.term) return data;
+                                var term = params.term.toString().toLowerCase();
+                                var txt = (data.text || '').toString().toLowerCase();
+                                return txt.indexOf(term) !== -1 ? data : null;
+                            }
+                        };
+                        if(!$a.hasClass('select2-hidden-accessible')) $a.select2(opts);
+                        if(!$p.hasClass('select2-hidden-accessible')) $p.select2(opts);
+                        // Select2 fires jQuery 'change'; bind here so AJAX always fires on selection.
+                        bound = true;
+                        $a.off('change.plotfilter').on('change.plotfilter', function(){ loadPlots(this.value); });
+                        return true;
+                    }
+
+                    // Wait until jQuery + Select2 are ready (they load in the page footer).
+                    var tries = 0;
+                    var timer = setInterval(function(){
+                        tries++;
+                        if(initSelect2() || tries > 50){
+                            clearInterval(timer);
+                            if(!bound) bindNative(); // fallback to plain <select>
+                        }
+                    }, 100);
+                })();
+            </script>
+        @endif
+
         <div class="card-body table-responsive p-0">
-          
+
             <table class="table table-striped table-hover mb-0 align-middle {{ !empty($isCustomerPaymentIndex) ? 'cbp-table' : '' }}">
                 <thead>
                 <tr>
@@ -284,6 +507,13 @@
                                         </table>
                                     @endif
                                 </td>
+                            @elseif(!empty($isCustomerPaymentIndex) && $colIndex === 2)
+                                <td>
+                                    <span class="cbp-cust-name" tabindex="0" role="button"
+                                          data-bs-toggle="popover" data-bs-trigger="hover focus"
+                                          data-bs-placement="top" data-bs-content="{{ $cell }}"
+                                          title="Customer">{{ \Illuminate\Support\Str::limit($cell, 15) }}</span>
+                                </td>
                             @elseif(!empty($isCustomerPaymentIndex) && $colIndex === 8 && $cell !== '—')
                                 <td class="text-success fw-semibold">{{ $cell }}</td>
                             @elseif(!empty($isCustomerPaymentIndex) && $colIndex === 9 && $cell !== '—')
@@ -312,7 +542,7 @@
                             @if($canEdit && !empty($row['edit_url']))
                                 <a href="{{ $row['edit_url'] }}" @if(!empty($row['open_in_new_tab'])) target="_blank" rel="noopener" @endif class="btn btn-outline-secondary btn-sm">Edit</a>
                             @endif
-                            @if($canDelete && !empty($row['delete_url']))
+                            @if($canDelete && !empty($row['delete_url']) && empty($isCustomerPaymentIndex))
                                 <form action="{{ $row['delete_url'] }}" method="POST" class="d-inline-block" onsubmit="return confirm('Delete this record?');">
                                     @csrf
                                     @method('DELETE')
@@ -330,6 +560,23 @@
             </table>
         </div>
     </div>
+
+    @if(!empty($isCustomerPaymentIndex))
+        <script>
+            (function(){
+                function initCustNamePopovers(){
+                    if(!(window.bootstrap && bootstrap.Popover)) return;
+                    document.querySelectorAll('.cbp-cust-name[data-bs-toggle="popover"]').forEach(function(el){
+                        if(el._popoverInit) return;
+                        el._popoverInit = true;
+                        new bootstrap.Popover(el, {container:'body'});
+                    });
+                }
+                if(document.readyState !== 'loading') initCustNamePopovers();
+                else document.addEventListener('DOMContentLoaded', initCustNamePopovers);
+            })();
+        </script>
+    @endif
 
     <!-- Cheques Modal -->
     <div class="modal fade" id="chequesModal" tabindex="-1" role="dialog" aria-labelledby="chequesModalLabel" aria-hidden="true">

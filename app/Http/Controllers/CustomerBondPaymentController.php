@@ -76,6 +76,8 @@ class CustomerBondPaymentController extends Controller
         $plotQ       = trim((string) $request->input('plot', ''));
         $entryType   = trim((string) $request->input('entry_type', ''));
         $creditDebit = trim((string) $request->input('credit_debit', ''));
+        $dateFrom    = trim((string) $request->input('date_from', ''));
+        $dateTo      = trim((string) $request->input('date_to', ''));
 
         $query = $this->resourceQuery();
 
@@ -124,6 +126,14 @@ class CustomerBondPaymentController extends Controller
             $query->whereIn('entry_type', ['return', 'discount']);
         }
 
+        // Filter by creation date range
+        if ($dateFrom !== '') {
+            $query->whereDate('created_at', '>=', $dateFrom);
+        }
+        if ($dateTo !== '') {
+            $query->whereDate('created_at', '<=', $dateTo);
+        }
+
         $records   = $query->get();
         $routeName = $this->resourceRouteName();
 
@@ -150,6 +160,8 @@ class CustomerBondPaymentController extends Controller
             'cp_plot'                => $plotQ,
             'cp_entry_type'          => $entryType,
             'cp_credit_debit'        => $creditDebit,
+            'cp_date_from'           => $dateFrom,
+            'cp_date_to'             => $dateTo,
             'permModule'             => $this->resourcePermModule(),
         ]);
     }
@@ -413,7 +425,7 @@ class CustomerBondPaymentController extends Controller
 
     protected function resourceColumns(): array
     {
-        return ['Entry No', 'Bond', 'Customer', 'Arazi', 'Plot', 'Land Size', 'Entry Date', 'Type', 'Credit', 'Debit', 'Method', 'MTR No', 'Payee Name', 'Taken By'];
+        return ['Entry No', 'Bond', 'Customer', 'Arazi', 'Plot', 'Land Size', 'Entry Date', 'Type', 'Credit', 'Debit', 'Method', 'MTR No', 'Payee Name', 'Taken By', 'Created'];
     }
 
     protected function resourceFields(?Model $item = null): array
@@ -668,6 +680,7 @@ class CustomerBondPaymentController extends Controller
                 $item->mtr_transaction_no ?: '—',
                 $item->account_payee_name ?: '—',
                 $item->takenByUser?->name ?? '—',
+                optional($item->created_at)->format('d-m-Y H:i') ?? '—',
             ],
         ];
     }
@@ -802,6 +815,55 @@ class CustomerBondPaymentController extends Controller
         }
 
         return response($html, 200)->header('Content-Type', 'text/html; charset=UTF-8');
+    }
+
+    /**
+     * Return payment details for a given entry number (for the delete confirmation popup).
+     */
+    public function lookupEntry(Request $request)
+    {
+        $entryNo = trim((string) $request->query('entry_no', ''));
+        $payment = $this->findCustomerPaymentByEntry($entryNo);
+
+        if (! $payment) {
+            return response()->json(['found' => false]);
+        }
+
+        $customerName = $payment->customer?->name
+            ?? $payment->customerBond?->customer?->name
+            ?? '-';
+
+        return response()->json([
+            'found'       => true,
+            'entry_no'    => $payment->entry_no,
+            'bond_no'     => $payment->customerBond?->bond_no ?? '-',
+            'customer'    => $customerName,
+            'arazi_code'  => $payment->arazi_code ?? '-',
+            'entry_type'  => ucfirst((string) $payment->entry_type),
+            'amount'      => number_format((float) $payment->amount, 2),
+            'entry_date'  => optional($payment->entry_date)->format('d-m-Y') ?? '-',
+        ]);
+    }
+
+    /**
+     * Delete a payment identified by its entry number (from the listing's delete-by-entry box).
+     */
+    public function deleteByEntry(Request $request)
+    {
+        $entryNo = trim((string) $request->input('entry_no', ''));
+        $payment = $this->findCustomerPaymentByEntry($entryNo);
+
+        if (! $payment) {
+            return redirect()
+                ->route('customer-bond-payments.index')
+                ->with('error', 'No payment found for entry number "' . $entryNo . '".');
+        }
+
+        $payment->delete();
+
+        return redirect()
+            ->route('customer-bond-payments.index')
+            ->with('success', 'Payment entry "' . $entryNo . '" deleted successfully.');
     }
 
     private function findCustomerPaymentByEntry(string $entryNo): ?CustomerBondPayment

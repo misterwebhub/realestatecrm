@@ -96,7 +96,7 @@ class CustomerController extends Controller
             $query->whereIn('id', $bondCustomerIds);
         }
 
-        $customers = $query->with(['bonds.arazi', 'bonds.plots', 'registries'])->paginate(50)->withQueryString();
+        $customers = $query->with(['bonds.arazi', 'bonds.plots', 'bonds.broker', 'registries'])->paginate(50)->withQueryString();
         $routeName = $this->resourceRouteName();
 
         $rows = $customers->map(function (Customer $item) use ($routeName) {
@@ -156,7 +156,16 @@ class CustomerController extends Controller
             if ($bond->arazi) {
                 $araziCode = $bond->arazi->legacy_arazi_code ?: ('Arazi-' . $bond->arazi->id);
             }
-            $plots = $bond->plots->map(fn($p) => $p->title ?? $p->plot_number ?? ('Plot-'.$p->id))->implode(', ');
+            // Build per-plot list with gaz (area) so multiple plots each show their own gaz.
+            $plotList = $bond->plots->map(function ($p) {
+                $name = $p->title ?? $p->plot_number ?? ('Plot-' . $p->id);
+                $gaz  = ($p->area !== null && $p->area !== '') ? (float) $p->area : null;
+                return [
+                    'name' => $name,
+                    'gaz'  => $gaz,
+                ];
+            })->all();
+            $plotsGaz = collect($plotList)->sum(fn($p) => (float) ($p['gaz'] ?? 0));
 
             // Check if a registry exists for same arazi code
             $hasRegistry = $bond->arazi_code
@@ -166,7 +175,9 @@ class CustomerController extends Controller
             return [
                 'bond_no'      => $bond->bond_no ?? ('Bond-' . $bond->id),
                 'arazi_code'   => $araziCode,
-                'plots'        => $plots ?: '-',
+                'plots'        => $plotList,
+                'plots_gaz'    => $plotsGaz,
+                'broker'       => optional($bond->broker)->name ?: '-',
                 'bond_id'      => $bond->id,
                 'has_registry' => $hasRegistry,
             ];

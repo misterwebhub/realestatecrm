@@ -50,6 +50,8 @@ Route::middleware('auth')->group(function () {
     Route::get('arazi-groups', [\App\Http\Controllers\AraziGroupController::class, 'index'])->name('arazi-groups.index');
     Route::get('arazi-groups/create', [\App\Http\Controllers\AraziGroupController::class, 'create'])->name('arazi-groups.create');
     Route::post('arazi-groups', [\App\Http\Controllers\AraziGroupController::class, 'store'])->name('arazi-groups.store');
+    Route::get('arazi-groups/{araziGroup}/edit', [\App\Http\Controllers\AraziGroupController::class, 'edit'])->name('arazi-groups.edit');
+    Route::put('arazi-groups/{araziGroup}', [\App\Http\Controllers\AraziGroupController::class, 'update'])->name('arazi-groups.update');
     Route::delete('arazi-groups/{araziGroup}', [\App\Http\Controllers\AraziGroupController::class, 'destroy'])->name('arazi-groups.destroy');
     Route::resource('plots', PlotController::class)->except(['show']);
     Route::resource('customers', CustomerController::class)->except(['show']);
@@ -94,6 +96,8 @@ Route::middleware('auth')->group(function () {
     Route::get('customer-bond-payments/export/csv', [CustomerBondPaymentController::class, 'exportCsv'])->name('customer-bond-payments.export.csv');
     Route::get('customer-bond-payments/receipt', [CustomerBondPaymentController::class, 'printReceipt'])->name('customer-bond-payments.receipt');
     Route::get('customer-bond-payments/receipt-pdf', [CustomerBondPaymentController::class, 'receiptPdf'])->name('customer-bond-payments.receipt-pdf');
+    Route::get('customer-bond-payments/lookup-entry', [CustomerBondPaymentController::class, 'lookupEntry'])->name('customer-bond-payments.lookup-entry');
+    Route::delete('customer-bond-payments/delete-by-entry', [CustomerBondPaymentController::class, 'deleteByEntry'])->name('customer-bond-payments.delete-by-entry');
     Route::resource('customer-bond-payments', CustomerBondPaymentController::class)->except(['show']);
     Route::resource('customer-bond-cheques', CustomerBondChequeController::class)->except(['show']);
     Route::get('customer-bond-cheques/by-bond/{customer_bond}', [CustomerBondChequeController::class, 'forBond'])->name('customer-bond-cheques.for-bond');

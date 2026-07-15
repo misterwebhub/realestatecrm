@@ -69,7 +69,7 @@
                 @forelse($rows as $row)
                     <tr class="align-top">
                         <td class="text-muted">{{ $row['cells'][0] }}</td>
-                        <td class="fw-semibold">{{ $row['cells'][1] }}</td>
+                        <td class="fw-semibold" title="{{ $row['cells'][1] }}">{{ \Illuminate\Support\Str::limit($row['cells'][1], 35) }}</td>
                         <td>{{ $row['cells'][2] }}</td>
                         <td class="text-muted">{{ $row['cells'][3] }}</td>
 
@@ -84,7 +84,8 @@
                                     <tr style="background:linear-gradient(90deg,#1a3a6b 0%,#2a52a0 100%);">
                                         <th style="padding:5px 10px;color:rgba(255,255,255,.75);font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.6px;border-right:1px solid rgba(255,255,255,.12);white-space:nowrap;">Bond No</th>
                                         <th style="padding:5px 10px;color:rgba(255,255,255,.75);font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.6px;border-right:1px solid rgba(255,255,255,.12);">Arazi</th>
-                                        <th style="padding:5px 10px;color:rgba(255,255,255,.75);font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.6px;border-right:1px solid rgba(255,255,255,.12);">Plot(s)</th>
+                                        <th style="padding:5px 10px;color:rgba(255,255,255,.75);font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.6px;border-right:1px solid rgba(255,255,255,.12);">Plot(s) / Gaz</th>
+                                        <th style="padding:5px 10px;color:rgba(255,255,255,.75);font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.6px;border-right:1px solid rgba(255,255,255,.12);">Broker</th>
                                         <th style="padding:5px 10px;color:rgba(255,255,255,.75);font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.6px;text-align:center;">Registry</th>
                                     </tr>
                                 </thead>
@@ -102,8 +103,26 @@
                                         <td style="padding:5px 10px;border-right:1px solid #e4ecf7;white-space:nowrap;">
                                             <span style="background:#1a3a6b;color:#fff;border-radius:4px;padding:2px 8px;font-size:11px;font-weight:700;letter-spacing:.3px;">{{ $b['arazi_code'] }}</span>
                                         </td>
-                                        <td style="padding:5px 10px;border-right:1px solid #e4ecf7;color:#374151;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
-                                            {{ $b['plots'] }}
+                                        <td style="padding:5px 10px;border-right:1px solid #e4ecf7;color:#374151;max-width:220px;">
+                                            @php $plotList = is_array($b['plots']) ? $b['plots'] : []; @endphp
+                                            @if(count($plotList) === 0)
+                                                <span class="text-muted">-</span>
+                                            @else
+                                                @foreach($plotList as $pl)
+                                                    <div style="display:flex;justify-content:space-between;gap:8px;white-space:nowrap;{{ !$loop->last ? 'border-bottom:1px dashed #e4ecf7;padding-bottom:2px;margin-bottom:2px;' : '' }}">
+                                                        <span style="font-weight:600;color:#1a3a6b;">{{ $pl['name'] }}</span>
+                                                        <span style="color:#374151;">{{ $pl['gaz'] !== null ? rtrim(rtrim(number_format($pl['gaz'],2),'0'),'.').' gaz' : '—' }}</span>
+                                                    </div>
+                                                @endforeach
+                                                @if(count($plotList) > 1)
+                                                    <div style="text-align:right;margin-top:3px;padding-top:2px;border-top:1px solid #d0ddf0;font-weight:700;color:#15803d;">
+                                                        Total: {{ rtrim(rtrim(number_format((float)($b['plots_gaz'] ?? 0),2),'0'),'.') }} gaz
+                                                    </div>
+                                                @endif
+                                            @endif
+                                        </td>
+                                        <td style="padding:5px 10px;border-right:1px solid #e4ecf7;color:#374151;white-space:nowrap;">
+                                            {{ $b['broker'] ?? '-' }}
                                         </td>
                                         <td style="padding:5px 10px;text-align:center;white-space:nowrap;">
                                             @if($b['has_registry'])
