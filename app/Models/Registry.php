@@ -19,6 +19,7 @@ class Registry extends Model
         'customer_id',
         'arazi_id',
         'arazi_code',
+        'partner_id',
         'agent_id',
         'check_by_agent_id',
         'registry_date',
@@ -68,6 +69,11 @@ class Registry extends Model
     public function agent()
     {
         return $this->belongsTo(Agent::class);
+    }
+
+    public function partner()
+    {
+        return $this->belongsTo(Partner::class);
     }
 
     public function checkByAgent()

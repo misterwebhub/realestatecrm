@@ -74,14 +74,53 @@
                               value="{{ old('road_land_gaj', $item->road_land_gaj) }}">
                     @error('road_land_gaj')<div class="invalid-feedback">{{ $message }}</div>@enderror
                 </div>
-                <div class="col-md-6">
-                    <label class="form-label">BUY BY (Buyer)</label>
-                          <input type="text" name="buy_by" required class="form-control @error('buy_by') is-invalid @enderror"
-                              value="{{ old('buy_by', $item->buy_by) }}">
-                    @error('buy_by')<div class="invalid-feedback">{{ $message }}</div>@enderror
-                </div>
                 <input type="hidden" id="sale_by_input" name="sale_by" value="{{ old('sale_by', $item->sale_by) }}">
             </div>
+
+            {{-- BUY BY (Buyers) — dynamic rows --}}
+            <h6 class="fw-bold text-muted mt-4 mb-2 border-bottom pb-1">BUY BY (Buyers)</h6>
+            @php
+                $partnerOptions = collect($partners ?? []);
+                $oldBuyers = old('buyers');
+                if (is_array($oldBuyers)) {
+                    $buyerRows = array_values($oldBuyers);
+                } elseif (!empty($item->buyers) && count($item->buyers)) {
+                    $buyerRows = $item->buyers->map(fn($b) => ['partner_id' => $b->partner_id, 'area' => $b->area])->all();
+                } else {
+                    $buyerRows = [['partner_id' => '', 'area' => '']];
+                }
+            @endphp
+            @error('buyers')<div class="alert alert-danger py-2">{{ $message }}</div>@enderror
+            <div class="d-flex flex-wrap gap-3 mb-2" style="font-size:13px;">
+                <span>Saleable (Total − Road): <strong id="buyers_saleable">0</strong> gaz</span>
+                <span>Allocated: <strong id="buyers_allocated">0</strong> gaz</span>
+                <span>Remaining: <strong id="buyers_remaining" class="text-success">0</strong> gaz</span>
+            </div>
+            <div id="buyers_container">
+                @foreach($buyerRows as $bi => $row)
+                <div class="row g-2 align-items-end buyer-row mb-2">
+                    <div class="col-md-5">
+                        @if($bi === 0)<label class="form-label">Partner</label>@endif
+                        <select name="buyers[{{ $bi }}][partner_id]" class="form-select buyer-partner" required>
+                            <option value="">-- select partner --</option>
+                            @foreach($partnerOptions as $p)
+                                <option value="{{ $p->id }}" {{ (string)($row['partner_id'] ?? '') === (string)$p->id ? 'selected' : '' }}>{{ $p->name }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        @if($bi === 0)<label class="form-label">Area to sell (gaz)</label>@endif
+                        <input type="number" step="0.01" min="0" name="buyers[{{ $bi }}][area]" class="form-control buyer-area" value="{{ $row['area'] ?? '' }}" required>
+                    </div>
+                    <div class="col-md-3">
+                        <button type="button" class="btn btn-outline-danger btn-remove-buyer"><i class="bi bi-trash"></i> Remove</button>
+                    </div>
+                </div>
+                @endforeach
+            </div>
+            <button type="button" id="add_buyer_btn" class="btn btn-outline-primary btn-sm mt-1">
+                <i class="bi bi-plus-lg"></i> Add Buyer
+            </button>
 
             {{-- Registry File --}}
             <h6 class="fw-bold text-muted mt-4 mb-3 border-bottom pb-1">Upload Registry Document</h6>
@@ -422,3 +461,106 @@
 </script>
 @endpush
 @include('partials.arazi_matches_modal')
+
+@push('scripts')
+<script>
+    (function(){
+        const container = document.getElementById('buyers_container');
+        const addBtn    = document.getElementById('add_buyer_btn');
+        if(!container || !addBtn) return;
+
+        const partnerOptionsHtml = @json(
+            '<option value="">-- select partner --</option>' .
+            collect($partners ?? [])->map(fn($p) => '<option value="'.$p->id.'">'.e($p->name).'</option>')->implode('')
+        );
+
+        const totalGazEl = document.querySelector('input[name="total_gaz"]');
+        const roadEl     = document.querySelector('input[name="road_land_gaj"]');
+        const saleableEl = document.getElementById('buyers_saleable');
+        const allocEl    = document.getElementById('buyers_allocated');
+        const remainEl   = document.getElementById('buyers_remaining');
+
+        function num(v){ const n = parseFloat(v); return isNaN(n) ? 0 : n; }
+
+        function reindex(){
+            container.querySelectorAll('.buyer-row').forEach(function(row, idx){
+                const sel = row.querySelector('.buyer-partner');
+                const area = row.querySelector('.buyer-area');
+                if(sel)  sel.name  = 'buyers['+idx+'][partner_id]';
+                if(area) area.name = 'buyers['+idx+'][area]';
+            });
+        }
+
+        function recalc(){
+            const saleable = Math.max(num(totalGazEl && totalGazEl.value) - num(roadEl && roadEl.value), 0);
+            let allocated = 0;
+            container.querySelectorAll('.buyer-area').forEach(function(a){ allocated += num(a.value); });
+            const remaining = saleable - allocated;
+
+            saleableEl.textContent = (Math.round(saleable*100)/100);
+            allocEl.textContent    = (Math.round(allocated*100)/100);
+            remainEl.textContent   = (Math.round(remaining*100)/100);
+            remainEl.className = remaining < -0.001 ? 'text-danger fw-bold' : 'text-success';
+
+            container.querySelectorAll('.buyer-area').forEach(function(a){
+                a.classList.toggle('is-invalid', remaining < -0.001);
+            });
+        }
+
+        function addRow(){
+            const row = document.createElement('div');
+            row.className = 'row g-2 align-items-end buyer-row mb-2';
+            row.innerHTML =
+                '<div class="col-md-5"><select class="form-select buyer-partner" required>'+partnerOptionsHtml+'</select></div>'+
+                '<div class="col-md-4"><input type="number" step="0.01" min="0" class="form-control buyer-area" required></div>'+
+                '<div class="col-md-3"><button type="button" class="btn btn-outline-danger btn-remove-buyer"><i class="bi bi-trash"></i> Remove</button></div>';
+            container.appendChild(row);
+            reindex();
+            recalc();
+        }
+
+        addBtn.addEventListener('click', addRow);
+
+        container.addEventListener('click', function(e){
+            const btn = e.target.closest('.btn-remove-buyer');
+            if(!btn) return;
+            const rows = container.querySelectorAll('.buyer-row');
+            if(rows.length <= 1){
+                // keep at least one row — just clear it
+                const row = btn.closest('.buyer-row');
+                row.querySelector('.buyer-partner').value = '';
+                row.querySelector('.buyer-area').value = '';
+            } else {
+                btn.closest('.buyer-row').remove();
+            }
+            reindex();
+            recalc();
+        });
+
+        container.addEventListener('input', function(e){
+            if(e.target.classList.contains('buyer-area')) recalc();
+        });
+        if(totalGazEl) totalGazEl.addEventListener('input', recalc);
+        if(roadEl)     roadEl.addEventListener('input', recalc);
+
+        // Block submit when buyers exceed saleable area
+        const formEl = container.closest('form');
+        if(formEl){
+            formEl.addEventListener('submit', function(e){
+                const saleable = Math.max(num(totalGazEl && totalGazEl.value) - num(roadEl && roadEl.value), 0);
+                let allocated = 0;
+                container.querySelectorAll('.buyer-area').forEach(function(a){ allocated += num(a.value); });
+                if(allocated > saleable + 0.001){
+                    e.preventDefault();
+                    e.stopImmediatePropagation();
+                    recalc();
+                    alert('Total buyer area ('+(Math.round(allocated*100)/100)+' gaz) cannot exceed saleable area of '+(Math.round(saleable*100)/100)+' gaz.');
+                    remainEl.scrollIntoView({behavior:'smooth', block:'center'});
+                }
+            }, true);
+        }
+
+        recalc();
+    })();
+</script>
+@endpush

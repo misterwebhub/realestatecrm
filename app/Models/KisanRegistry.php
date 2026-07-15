@@ -47,6 +47,11 @@ class KisanRegistry extends Model
         return $this->belongsTo(\App\Models\Arazi::class, 'arazi_code', 'legacy_arazi_code');
     }
 
+    public function buyers()
+    {
+        return $this->hasMany(\App\Models\KisanRegistryBuyer::class);
+    }
+
     public function getTotalExpensesAttribute(): float
     {
         return (float) $this->stamp

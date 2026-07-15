@@ -137,6 +137,21 @@
                     </select>
                     <div class="form-text" id="arazi_group_hint" style="display:none;">Grouped arazis available — you can pick a merged one.</div>
                 </div>
+                <div class="col-md-3">
+                    <label class="form-label small fw-semibold">Partner <span class="text-danger">*</span></label>
+                    @php $presetPartnerId = old('partner_id', $item->partner_id ?? ''); @endphp
+                    <select name="partner_id" id="partner_id_select" required
+                        class="form-select form-select-sm @error('partner_id') is-invalid @enderror"
+                        data-preset="{{ $presetPartnerId }}"
+                        data-placeholder="Select partner">
+                        <option value="">-- select partner --</option>
+                        @if($isEdit && $item->partner)
+                            <option value="{{ $item->partner->id }}" selected>{{ $item->partner->name }}</option>
+                        @endif
+                    </select>
+                    <div class="form-text" id="partner_hint" style="display:none;"></div>
+                    @error('partner_id')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                </div>
                 <div class="col-md-4">
                     <label class="form-label small fw-semibold">Plots in Bond</label>
                     <div id="d_plots_info" class="form-control form-control-sm bg-light" style="min-height:31px; height:auto; white-space:normal;">
@@ -286,6 +301,7 @@
     const LOOKUP_URL = @json(route('registries.bond-lookup'));
     const DEEDS_URL  = @json(route('registries.deeds-by-arazi'));
     const AGROUP_URL = @json(route('registries.arazi-group-options'));
+    const PARTNERS_URL = @json(route('registries.partners-by-arazi'));
     const CSRF       = document.querySelector('meta[name="csrf-token"]')?.content ?? '';
 
     /* ── helpers ── */
@@ -378,11 +394,51 @@
         } catch(e) { /* keep the default option on failure */ }
     }
 
+    /* ── Partner dropdown (only partners associated with the selected arazi) ── */
+    const partnerSelect = $('partner_id_select');
+    const partnerHint   = $('partner_hint');
+
+    async function loadPartners(code, presetId){
+        if (!partnerSelect) return;
+        code = (code || '').trim();
+        presetId = presetId || partnerSelect.dataset.preset || '';
+
+        if (!code) {
+            partnerSelect.innerHTML = '<option value="">-- select partner --</option>';
+            if (partnerHint) partnerHint.style.display = 'none';
+            return;
+        }
+
+        try {
+            const res  = await fetch(PARTNERS_URL + '?arazi_code=' + encodeURIComponent(code), {headers:{Accept:'application/json'}});
+            const data = await res.json();
+            const partners = data.partners || [];
+
+            let html = '<option value="">-- select partner --</option>';
+            html += partners.map(p => {
+                const sel = String(p.id) === String(presetId) ? 'selected' : '';
+                return `<option value="${p.id}" ${sel}>${p.name}</option>`;
+            }).join('');
+            partnerSelect.innerHTML = html;
+
+            if (partnerHint) {
+                if (!partners.length) {
+                    partnerHint.textContent = 'No partners associated with this arazi.';
+                    partnerHint.className = 'form-text text-danger';
+                    partnerHint.style.display = '';
+                } else {
+                    partnerHint.style.display = 'none';
+                }
+            }
+        } catch(e) { /* leave existing options on failure */ }
+    }
+
     // When the user picks a merged arazi, reload the matching deeds and sync the holder.
     araziSelect?.addEventListener('change', function(){
         const code = this.value || '';
         $('h_arazi_code').value = code;
         loadDeeds(code);
+        loadPartners(code);
     });
 
     function applyBond(b){
@@ -419,6 +475,8 @@
         $('d_alt_mobile').value    = b.secondary_mobile || '';
         // Populate the Arazi No dropdown (default = bond arazi, plus any grouped/merged options)
         populateAraziOptions(b.arazi_code || '');
+        // Load partners associated with the bond's arazi
+        loadPartners(b.arazi_code || '');
         $('d_bond_amount').value   = b.bond_amount   ? fmt(b.bond_amount)   : '';
         $('d_pending').value       = b.pending_amount !== undefined ? fmt(b.pending_amount) : '';
 
@@ -540,6 +598,7 @@
         });
         populateAraziOptions('');
         loadDeeds('');
+        loadPartners('');
         $('bondAppliedBanner').classList.add('d-none');
     });
 
@@ -591,6 +650,7 @@
     if (presetArazi) {
         loadDeeds(presetArazi);
         populateAraziOptions(presetArazi);
+        loadPartners(presetArazi);
     }
 })();
 </script>

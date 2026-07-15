@@ -126,6 +126,64 @@ class RegistryController extends Controller
             'arazi_code'       => [
                 'required', 'string', 'exists:arazis,legacy_arazi_code',
             ],
+            'partner_id'       => [
+                'required', 'exists:partners,id',
+                function ($attribute, $value, $fail) use ($item) {
+                    $partnerId = (int) $value;
+                    $araziCode = trim((string) request()->input('arazi_code', ''));
+
+                    if ($partnerId <= 0 || $araziCode === '') {
+                        return;
+                    }
+
+                    // Assigned area = total area this partner bought (as a Kisan Registry
+                    // buyer) for this arazi and any arazi merged with it.
+                    $codes = $this->relatedAraziCodes($araziCode);
+                    $registryIds = \App\Models\KisanRegistry::whereIn('arazi_code', $codes)->pluck('id');
+
+                    $assigned = (float) \App\Models\KisanRegistryBuyer::whereIn('kisan_registry_id', $registryIds)
+                        ->where('partner_id', $partnerId)
+                        ->sum('area');
+
+                    // No allocation recorded → nothing to cap against.
+                    if ($assigned <= 0) {
+                        return;
+                    }
+
+                    // Area of the registry being saved (plot area, else land_size).
+                    $plotId  = request()->input('plot_id');
+                    $newArea = 0.0;
+                    if ($plotId) {
+                        $newArea = (float) (\App\Models\Plot::whereKey($plotId)->value('area') ?? 0);
+                    }
+                    if ($newArea <= 0) {
+                        $newArea = (float) request()->input('land_size', 0);
+                    }
+
+                    // Area already registered for this partner across these arazi codes
+                    // (excluding this record when editing).
+                    $existing = (float) Registry::query()
+                        ->where('registries.partner_id', $partnerId)
+                        ->whereIn('registries.arazi_code', $codes)
+                        ->when($item?->id, fn ($q) => $q->where('registries.id', '!=', $item->id))
+                        ->leftJoin('plots', 'plots.id', '=', 'registries.plot_id')
+                        ->sum(\Illuminate\Support\Facades\DB::raw('COALESCE(plots.area, registries.land_size, 0)'));
+
+                    $total = $existing + $newArea;
+
+                    if ($total > $assigned + 0.001) {
+                        $remaining = max($assigned - $existing, 0);
+                        $fail(sprintf(
+                            'This partner is assigned %s gaz for this Arazi. Already registered: %s gaz, this registry: %s gaz — total %s exceeds the assigned area. Remaining allowed: %s gaz.',
+                            rtrim(rtrim(number_format($assigned, 2), '0'), '.'),
+                            rtrim(rtrim(number_format($existing, 2), '0'), '.'),
+                            rtrim(rtrim(number_format($newArea, 2), '0'), '.'),
+                            rtrim(rtrim(number_format($total, 2), '0'), '.'),
+                            rtrim(rtrim(number_format($remaining, 2), '0'), '.')
+                        ));
+                    }
+                },
+            ],
             'plot_id'          => ['nullable', 'exists:plots,id'],
             'registry_date'    => ['required', 'date'],
             'deed_no'          => [
@@ -653,6 +711,69 @@ class RegistryController extends Controller
             'grouped' => count($options) > 1,
             'options' => $options,
         ]);
+    }
+
+    /**
+     * Return the partners associated with a given arazi code. A partner is
+     * "associated" with an arazi when they appear as a buyer in a Kisan
+     * Registry recorded for that arazi (kisan_registry_buyers). Used to
+     * populate the required Partner dropdown on the customer registry form.
+     */
+    public function partnersByArazi(Request $request)
+    {
+        $code = trim((string) $request->query('arazi_code', ''));
+
+        if ($code === '') {
+            return response()->json(['partners' => []]);
+        }
+
+        // Include grouped/merged arazi codes so partners from any merged arazi appear too.
+        $codes = $this->relatedAraziCodes($code);
+
+        $registryIds = \App\Models\KisanRegistry::whereIn('arazi_code', $codes)->pluck('id');
+
+        $partners = \App\Models\Partner::whereIn(
+                'id',
+                \App\Models\KisanRegistryBuyer::whereIn('kisan_registry_id', $registryIds)
+                    ->whereNotNull('partner_id')
+                    ->pluck('partner_id')
+                    ->unique()
+            )
+            ->orderBy('name')
+            ->get(['id', 'name'])
+            ->map(fn ($p) => ['id' => $p->id, 'name' => $p->name])
+            ->values();
+
+        return response()->json([
+            'partners' => $partners,
+        ]);
+    }
+
+    /**
+     * Given an arazi code, return that code plus any arazi codes merged with it
+     * through an Arazi Group.
+     */
+    private function relatedAraziCodes(string $code): array
+    {
+        $codes = [$code];
+        $ids = Arazi::idsForCode($code);
+
+        if (! empty($ids)) {
+            $groupIds = \App\Models\AraziGroupItem::whereIn('arazi_id', $ids)
+                ->pluck('arazi_group_id')->unique()->all();
+
+            if (! empty($groupIds)) {
+                $memberIds = \App\Models\AraziGroupItem::whereIn('arazi_group_id', $groupIds)
+                    ->pluck('arazi_id')->unique()->all();
+
+                $codes = array_merge(
+                    $codes,
+                    Arazi::whereIn('id', $memberIds)->pluck('legacy_arazi_code')->filter()->all()
+                );
+            }
+        }
+
+        return array_values(array_unique(array_filter($codes, fn ($c) => trim((string) $c) !== '')));
     }
 
     private function nextRegistryNumber(): string
