@@ -142,6 +142,28 @@ class ReportsController extends Controller
     }
 
     /**
+     * AJAX: distinct deed numbers for a given arazi code (for dependent filter).
+     */
+    public function deedsByArazi(Request $request)
+    {
+        $code = trim((string) $request->query('arazi_code', ''));
+
+        if ($code === '') {
+            return response()->json(['deeds' => []]);
+        }
+
+        $deeds = Registry::where('arazi_code', $code)
+            ->whereNotNull('deed_no')
+            ->where('deed_no', '!=', '')
+            ->distinct()
+            ->orderBy('deed_no')
+            ->pluck('deed_no')
+            ->values();
+
+        return response()->json(['deeds' => $deeds]);
+    }
+
+    /**
      * Resolve the sold area for a registry: prefer the linked plot's area, fall back to land_size.
      */
     protected function registrySoldArea(Registry $r): float

@@ -172,6 +172,7 @@ Route::middleware('auth')->group(function () {
     Route::get('reports', [\App\Http\Controllers\ReportsController::class, 'index'])->name('reports.index');
     Route::get('reports/plot-details', [\App\Http\Controllers\ReportsController::class, 'plotDetails'])->name('reports.plot.details');
     Route::get('reports/customer-payments-by-user', [\App\Http\Controllers\ReportsController::class, 'customerPaymentsByUser'])->name('reports.customer-payments.by-user');
+    Route::get('reports/deeds-by-arazi', [\App\Http\Controllers\ReportsController::class, 'deedsByArazi'])->name('reports.deeds-by-arazi');
     Route::get('reports/partners', [\App\Http\Controllers\ReportsController::class, 'partners'])->name('reports.partners');
     Route::get('reports/arazis', [\App\Http\Controllers\ReportsController::class, 'arazis'])->name('reports.arazis');
     Route::get('reports/brokers', [\App\Http\Controllers\ReportsController::class, 'brokers'])->name('reports.brokers');

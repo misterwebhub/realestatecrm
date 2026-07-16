@@ -49,10 +49,20 @@
             </div>
             <div class="col-md-2 col-sm-4">
                 <label class="form-label small fw-semibold mb-1">Arazi</label>
-                <select name="arazi_code" class="form-select form-select-sm js-select2">
+                <select name="arazi_code" id="cpu-arazi" class="form-select form-select-sm js-select2">
                     <option value="">All Arazi</option>
                     @foreach($araziCodes as $code)
                         <option value="{{ $code }}" @selected((string) $araziCode === (string) $code)>{{ $code }}</option>
+                    @endforeach
+                </select>
+            </div>
+            <div class="col-md-2 col-sm-4">
+                <label class="form-label small fw-semibold mb-1">Deed No</label>
+                <select name="deed_no" id="cpu-deed" class="form-select form-select-sm js-select2"
+                        data-current="{{ $deedNo }}" data-url="{{ route('reports.deeds-by-arazi') }}">
+                    <option value="">All Deeds</option>
+                    @foreach($deedNos as $d)
+                        <option value="{{ $d }}" @selected((string) $deedNo === (string) $d)>{{ $d }}</option>
                     @endforeach
                 </select>
             </div>
@@ -89,15 +99,6 @@
                     <option value="">All Partners</option>
                     @foreach($partners as $pn)
                         <option value="{{ $pn->id }}" @selected((string) $partnerId === (string) $pn->id)>{{ $pn->name }}</option>
-                    @endforeach
-                </select>
-            </div>
-            <div class="col-md-2 col-sm-4">
-                <label class="form-label small fw-semibold mb-1">Deed No</label>
-                <select name="deed_no" class="form-select form-select-sm js-select2">
-                    <option value="">All Deeds</option>
-                    @foreach($deedNos as $d)
-                        <option value="{{ $d }}" @selected((string) $deedNo === (string) $d)>{{ $d }}</option>
                     @endforeach
                 </select>
             </div>
@@ -260,6 +261,52 @@
     .card { box-shadow: none !important; border: 1px solid #ddd !important; }
 }
 </style>
+@endpush
+
+@push('scripts')
+<script>
+(function(){
+    function ready(cb){ if(window.jQuery){ jQuery(cb); } else { setTimeout(function(){ ready(cb); }, 100); } }
+    ready(function($){
+        var $arazi = $('#cpu-arazi');
+        var $deed  = $('#cpu-deed');
+        if(!$arazi.length || !$deed.length) return;
+
+        var url = $deed.data('url');
+        var allOptions = $deed.find('option').clone(); // full deed list (fallback)
+
+        function refreshSelect2(){
+            if($deed.hasClass('select2-hidden-accessible')){ $deed.trigger('change.select2'); }
+        }
+
+        $arazi.on('change', function(){
+            var code = $(this).val();
+
+            // No arazi selected → restore full deed list.
+            if(!code){
+                $deed.empty().append(allOptions.clone());
+                refreshSelect2();
+                return;
+            }
+
+            // Fetch deeds related to the selected arazi.
+            $.getJSON(url, { arazi_code: code })
+                .done(function(res){
+                    var deeds = (res && res.deeds) ? res.deeds : [];
+                    $deed.empty().append($('<option>').val('').text('All Deeds'));
+                    $.each(deeds, function(i, d){
+                        $deed.append($('<option>').val(d).text(d));
+                    });
+                    refreshSelect2();
+                })
+                .fail(function(){
+                    $deed.empty().append($('<option>').val('').text('All Deeds'));
+                    refreshSelect2();
+                });
+        });
+    });
+})();
+</script>
 @endpush
 
 @endsection
