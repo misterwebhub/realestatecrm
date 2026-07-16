@@ -142,6 +142,191 @@ class ReportsController extends Controller
     }
 
     /**
+     * Cumulative bond report: one row per bond with totals for amount, paid,
+     * balance and cheque figures. Date filter narrows paid/cheque-paid to the
+     * selected period; the final column always shows lifetime paid (unfiltered).
+     */
+    public function bondsCumulative(Request $request)
+    {
+        $userId        = $request->query('user_id', '');
+        $customerId    = $request->query('customer_id', '');
+        $bondId        = $request->query('bond_id', '');
+        $araziCode     = $request->query('arazi_code', '');
+        $entryType     = $request->query('entry_type', '');
+        $paymentMethod = $request->query('payment_method', '');
+        $brokerId      = $request->query('broker_id', '');
+        $partnerId     = $request->query('partner_id', '');
+        $deedNo        = $request->query('deed_no', '');
+        $dateFrom      = $request->query('date_from', '');
+        $dateTo        = $request->query('date_to', '');
+
+        $bonds = CustomerBond::with(['customer', 'arazi', 'plots', 'broker', 'payments', 'cheques'])
+            ->when($customerId,    fn ($q) => $q->where('customer_id', $customerId))
+            ->when($bondId,        fn ($q) => $q->where('id', $bondId))
+            ->when($araziCode,     fn ($q) => $q->where('arazi_code', $araziCode))
+            ->when($brokerId,      fn ($q) => $q->where('broker_id', $brokerId))
+            ->when($userId,        fn ($q) => $q->whereHas('payments', fn ($p) => $p->where('taken_by_user_id', $userId)))
+            ->when($entryType,     fn ($q) => $q->whereHas('payments', fn ($p) => $p->where('entry_type', $entryType)))
+            ->when($paymentMethod, fn ($q) => $q->whereHas('payments', fn ($p) => $p->where('payment_method', $paymentMethod)))
+            ->orderBy('bond_no')
+            ->get();
+
+        // Registry lookup keyed by customer + arazi (deed/partner/status).
+        $regMap = [];
+        foreach (Registry::with('partner:id,name')->get(['id', 'customer_id', 'arazi_code', 'deed_no', 'partner_id', 'status']) as $reg) {
+            $key = $reg->customer_id . '|' . $reg->arazi_code;
+            if (! isset($regMap[$key])) {
+                $regMap[$key] = $reg;
+            }
+        }
+
+        $inRange = function ($date) use ($dateFrom, $dateTo) {
+            if (! $date) return false;
+            $d = $date instanceof \Carbon\Carbon ? $date->format('Y-m-d') : (string) $date;
+            if ($dateFrom !== '' && $d < $dateFrom) return false;
+            if ($dateTo !== '' && $d > $dateTo) return false;
+            return true;
+        };
+
+        $debitTypes = ['return', 'discount'];
+        $rows = [];
+        $gTotal = $gPaid = $gBalance = $gChequePaid = $gChequeBal = $gPaidAll = $gChequeTotal = 0;
+
+        foreach ($bonds as $bond) {
+            $code = $bond->arazi_code ?: ($bond->arazi?->legacy_arazi_code ?? '-');
+            $reg  = $regMap[$bond->customer_id . '|' . $code] ?? null;
+
+            // Registry-derived filters.
+            if ($partnerId !== '' && (! $reg || (string) $reg->partner_id !== (string) $partnerId)) continue;
+            if ($deedNo !== '' && (! $reg || stripos((string) $reg->deed_no, $deedNo) === false)) continue;
+
+            // Payments: lifetime and within-period net paid.
+            $paidAll = (float) $bond->payments->whereNotIn('entry_type', $debitTypes)->sum('amount')
+                     - (float) $bond->payments->whereIn('entry_type', $debitTypes)->sum('amount');
+
+            $periodPayments = ($dateFrom === '' && $dateTo === '')
+                ? $bond->payments
+                : $bond->payments->filter(fn ($p) => $inRange($p->entry_date));
+            $paidPeriod = (float) $periodPayments->whereNotIn('entry_type', $debitTypes)->sum('amount')
+                        - (float) $periodPayments->whereIn('entry_type', $debitTypes)->sum('amount');
+
+            $total   = (float) ($bond->total_amount ?? $bond->bond_amount ?? 0);
+            $balance = round($total - $paidAll, 2);
+
+            // Cheques: cleared (paid) within period, and outstanding (pending).
+            $clearedCheques = $bond->cheques->where('status', 'cleared');
+            $chequePaid = (float) (($dateFrom === '' && $dateTo === '')
+                ? $clearedCheques->sum('amount')
+                : $clearedCheques->filter(fn ($c) => $inRange($c->cheque_date))->sum('amount'));
+            $chequeBalance = (float) $bond->cheques->where('status', 'pending')->sum('amount');
+
+            // Registry found = registry done (no pending state).
+            $regDone = (bool) $reg;
+
+            $rows[] = [
+                'bond_id'        => $bond->id,
+                'bond_no'        => $bond->bond_no ?? ('BOND-' . $bond->id),
+                'customer'       => $bond->customer?->name ?? '—',
+                'arazi'          => $code,
+                'plots'          => $bond->plots->map(fn ($pl) => [
+                                        'label' => $pl->plot_number ?: $pl->title,
+                                        'gaz'   => (float) ($pl->area ?? 0),
+                                    ])->values()->all(),
+                'broker'         => $bond->broker?->name ?? '—',
+                'total'          => round($total, 2),
+                'paid'           => round($paidPeriod, 2),
+                'balance'        => $balance,
+                'cheque_paid'    => round($chequePaid, 2),
+                'cheque_balance' => round($chequeBalance, 2),
+                'reg_status'     => $reg ? ($regDone ? 'Done' : 'Pending') : null,
+                'paid_all'       => round($paidAll, 2),
+                'cheque_count'   => $bond->cheques->count(),
+                'cheque_total'   => round((float) $bond->cheques->sum('amount'), 2),
+            ];
+
+            $gTotal += $total;
+            $gPaid += $paidPeriod;
+            $gBalance += $balance;
+            $gChequePaid += $chequePaid;
+            $gChequeBal += $chequeBalance;
+            $gPaidAll += $paidAll;
+            $gChequeTotal += (float) $bond->cheques->sum('amount');
+        }
+
+        return view('reports.bonds_cumulative', [
+            'title'       => 'Bond Cumulative Report',
+            'rows'        => $rows,
+            'users'         => User::orderBy('name')->get(['id', 'name']),
+            'customers'     => \App\Models\Customer::orderBy('name')->get(['id', 'name']),
+            'bondsList'     => CustomerBond::orderBy('bond_no')->get(['id', 'bond_no']),
+            'araziCodes'    => CustomerBond::whereNotNull('arazi_code')->where('arazi_code', '!=', '')->distinct()->orderBy('arazi_code')->pluck('arazi_code'),
+            'entryTypes'    => CustomerBondPayment::whereNotNull('entry_type')->distinct()->orderBy('entry_type')->pluck('entry_type'),
+            'paymentMethods'=> CustomerBondPayment::whereNotNull('payment_method')->where('payment_method', '!=', '')->distinct()->orderBy('payment_method')->pluck('payment_method'),
+            'brokers'       => Agent::orderBy('name')->get(['id', 'name']),
+            'partners'      => Partner::orderBy('name')->get(['id', 'name']),
+            'deedNos'       => Registry::whereNotNull('deed_no')->where('deed_no', '!=', '')->distinct()->orderBy('deed_no')->pluck('deed_no'),
+            'userId'        => $userId,
+            'customerId'    => $customerId,
+            'bondId'        => $bondId,
+            'araziCode'     => $araziCode,
+            'entryType'     => $entryType,
+            'paymentMethod' => $paymentMethod,
+            'brokerId'      => $brokerId,
+            'partnerId'     => $partnerId,
+            'deedNo'        => $deedNo,
+            'dateFrom'      => $dateFrom,
+            'dateTo'        => $dateTo,
+            'g_total'         => round($gTotal, 2),
+            'g_paid'          => round($gPaid, 2),
+            'g_balance'       => round($gBalance, 2),
+            'g_cheque_paid'   => round($gChequePaid, 2),
+            'g_cheque_balance'=> round($gChequeBal, 2),
+            'g_cheque_total'  => round($gChequeTotal, 2),
+            'g_paid_all'      => round($gPaidAll, 2),
+        ]);
+    }
+
+    /**
+     * AJAX: all cheque entries for a bond with summary.
+     * The cheque list/summary always shows every cheque for the bond and is
+     * intentionally NOT affected by the report's date filters.
+     */
+    public function bondCheques(Request $request)
+    {
+        $bondId = $request->query('bond_id', '');
+
+        $bond = CustomerBond::with(['cheques' => function ($q) {
+            $q->orderBy('cheque_date');
+        }])->find($bondId);
+
+        if (! $bond) {
+            return response()->json(['found' => false, 'cheques' => []]);
+        }
+
+        $cheques = $bond->cheques->values();
+
+        $list = $cheques->map(fn ($c) => [
+            'cheque_number' => $c->cheque_number ?: '—',
+            'bank_name'     => $c->bank_name ?: '—',
+            'cheque_date'   => optional($c->cheque_date)->format('d-m-Y') ?? '—',
+            'amount'        => (float) $c->amount,
+            'status'        => ucfirst((string) $c->status),
+        ])->all();
+
+        return response()->json([
+            'found'   => true,
+            'bond_no' => $bond->bond_no,
+            'cheques' => $list,
+            'summary' => [
+                'count'   => $cheques->count(),
+                'total'   => round((float) $cheques->sum('amount'), 2),
+                'cleared' => round((float) $cheques->where('status', 'cleared')->sum('amount'), 2),
+                'pending' => round((float) $cheques->where('status', 'pending')->sum('amount'), 2),
+            ],
+        ]);
+    }
+
+    /**
      * AJAX: distinct deed numbers for a given arazi code (for dependent filter).
      */
     public function deedsByArazi(Request $request)

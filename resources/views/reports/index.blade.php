@@ -32,6 +32,13 @@
             'color' => '#9333ea',
         ],
         [
+            'title' => 'Bond Cumulative Report',
+            'desc'  => 'Cumulative per-bond totals: amount, paid, balance, cheque paid/balance, registry status &amp; all cheques.',
+            'url'   => route('reports.bonds-cumulative'),
+            'icon'  => 'bi-collection',
+            'color' => '#0891b2',
+        ],
+        [
             'title' => 'Partner-wise Report',
             'desc'  => 'Area purchased &amp; sold by each partner, per arazi, with remaining area and registry status.',
             'url'   => route('reports.partners'),

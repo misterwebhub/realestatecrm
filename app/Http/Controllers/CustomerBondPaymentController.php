@@ -425,7 +425,7 @@ class CustomerBondPaymentController extends Controller
 
     protected function resourceColumns(): array
     {
-        return ['Entry No', 'Bond', 'Customer', 'Arazi', 'Plot', 'Land Size', 'Entry Date', 'Type', 'Credit', 'Debit', 'Method', 'MTR No', 'Payee Name', 'Taken By', 'Created'];
+        return ['Entry No', 'Bond', 'Customer', 'Arazi', 'Plot', 'Land Size', 'Entry Date', 'Type', 'Credit', 'Debit', 'Method', 'MTR / Cheque No', 'Payee Name', 'Taken By', 'Created'];
     }
 
     protected function resourceFields(?Model $item = null): array
@@ -656,7 +656,7 @@ class CustomerBondPaymentController extends Controller
 
     protected function resourceQuery()
     {
-        return CustomerBondPayment::with(['customerBond.customer', 'customer', 'arazi', 'plot', 'takenByUser'])
+        return CustomerBondPayment::with(['customerBond.customer', 'customer', 'arazi', 'plot', 'takenByUser', 'cheque'])
             ->whereNotNull('customer_bond_id')
             ->latest();
     }
@@ -677,7 +677,9 @@ class CustomerBondPaymentController extends Controller
                 in_array($item->entry_type, ['return', 'discount']) ? '—' : number_format((float) $item->amount, 2),
                 in_array($item->entry_type, ['return', 'discount']) ? number_format((float) $item->amount, 2) : '—',
                 $item->payment_method ? strtoupper($item->payment_method) : '—',
-                $item->mtr_transaction_no ?: '—',
+                strtolower((string) $item->payment_method) === 'cheque'
+                    ? ($item->cheque?->cheque_number ?: ($item->mtr_transaction_no ?: '—'))
+                    : ($item->mtr_transaction_no ?: '—'),
                 $item->account_payee_name ?: '—',
                 $item->takenByUser?->name ?? '—',
                 optional($item->created_at)->format('d-m-Y H:i') ?? '—',

@@ -46,6 +46,11 @@ class CustomerBondPayment extends Model
         return $this->belongsTo(CustomerBond::class);
     }
 
+    public function cheque()
+    {
+        return $this->belongsTo(CustomerBondCheque::class, 'customer_bond_cheque_id');
+    }
+
     public function arazi()
     {
         return $this->belongsTo(Arazi::class, 'arazi_code', 'legacy_arazi_code');

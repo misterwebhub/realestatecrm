@@ -219,6 +219,7 @@
                                 <li class="nav-item"><a href="{{ route('reports.payments') }}" class="nav-link {{ request()->routeIs('reports.payments') ? 'active' : '' }}"><i class="nav-icon bi bi-cash-stack"></i><p>Payment Collection</p></a></li>
                                 <li class="nav-item"><a href="{{ route('reports.sales') }}" class="nav-link {{ request()->routeIs('reports.sales') ? 'active' : '' }}"><i class="nav-icon bi bi-graph-up-arrow"></i><p>Sales Summary</p></a></li>
                                 <li class="nav-item"><a href="{{ route('reports.customer-payments.by-user') }}" class="nav-link {{ request()->routeIs('reports.customer-payments.by-user') ? 'active' : '' }}"><i class="nav-icon bi bi-receipt"></i><p>Payments by User</p></a></li>
+                                <li class="nav-item"><a href="{{ route('reports.bonds-cumulative') }}" class="nav-link {{ request()->routeIs('reports.bonds-cumulative') ? 'active' : '' }}"><i class="nav-icon bi bi-collection"></i><p>Bond Cumulative</p></a></li>
                                 <li class="nav-item"><a href="{{ route('reports.plot.details') }}" class="nav-link {{ request()->routeIs('reports.plot.details') ? 'active' : '' }}"><i class="nav-icon bi bi-grid-3x3-gap"></i><p>Plot Details</p></a></li>
                             </ul>
                         </li>
