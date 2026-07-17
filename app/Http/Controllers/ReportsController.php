@@ -228,6 +228,7 @@ class ReportsController extends Controller
             $rows[] = [
                 'bond_id'        => $bond->id,
                 'bond_no'        => $bond->bond_no ?? ('BOND-' . $bond->id),
+                'bond_date'      => optional($bond->bond_date)->format('d-m-Y'),
                 'customer'       => $bond->customer?->name ?? '—',
                 'arazi'          => $code,
                 'plots'          => $bond->plots->map(fn ($pl) => [
@@ -254,6 +255,83 @@ class ReportsController extends Controller
             $gChequeBal += $chequeBalance;
             $gPaidAll += $paidAll;
             $gChequeTotal += (float) $bond->cheques->sum('amount');
+        }
+
+        if (strtolower((string) $request->query('export')) === 'csv') {
+            // Human-readable filter summary for the top of the sheet.
+            $filters = [
+                'User'      => $userId ? optional(User::find($userId))->name : 'All',
+                'Customer'  => $customerId ? optional(\App\Models\Customer::find($customerId))->name : 'All',
+                'Bond'      => $bondId ? optional(CustomerBond::find($bondId))->bond_no : 'All',
+                'Arazi'     => $araziCode !== '' ? $araziCode : 'All',
+                'Deed No'   => $deedNo !== '' ? $deedNo : 'All',
+                'Type'      => $entryType !== '' ? ucfirst($entryType) : 'All',
+                'Method'    => $paymentMethod !== '' ? ucfirst($paymentMethod) : 'All',
+                'Broker'    => $brokerId ? optional(Agent::find($brokerId))->name : 'All',
+                'Partner'   => $partnerId ? optional(Partner::find($partnerId))->name : 'All',
+                'Date From' => $dateFrom !== '' ? $dateFrom : 'All',
+                'Date To'   => $dateTo !== '' ? $dateTo : 'All',
+            ];
+
+            $filename = 'bond-cumulative-' . now()->format('Ymd-His') . '.csv';
+
+            return response()->streamDownload(function () use ($rows, $filters, $gTotal, $gPaid, $gChequePaid, $gChequeBal, $gChequeTotal, $gPaidAll, $gBalance) {
+                $out = fopen('php://output', 'w');
+                // UTF-8 BOM for Excel.
+                fwrite($out, "\xEF\xBB\xBF");
+
+                fputcsv($out, ['Bond Cumulative Report']);
+                fputcsv($out, ['Generated', now()->format('d-m-Y H:i')]);
+                fputcsv($out, []);
+                fputcsv($out, ['Filters Applied']);
+                foreach ($filters as $label => $value) {
+                    fputcsv($out, [$label, $value ?: 'All']);
+                }
+                fputcsv($out, []);
+
+                fputcsv($out, [
+                    '#', 'Bond Date', 'Bond', 'Customer', 'Arazi', 'Plots (gaz)', 'Broker',
+                    'Bond Amount', 'Paid (cash)', 'Cheque Paid', 'Cheque Balance', 'Registry',
+                    'Account', 'Cheque Total', 'Total Paid (all)', 'Total Balance (all)',
+                ]);
+
+                foreach ($rows as $i => $r) {
+                    $plots = collect($r['plots'])->map(fn ($pl) => ($pl['label'] ?: '-') . ' (' . rtrim(rtrim(number_format($pl['gaz'], 2), '0'), '.') . ' gaz)')->implode('; ');
+                    fputcsv($out, [
+                        $i + 1,
+                        $r['bond_date'] ?: '-',
+                        $r['bond_no'],
+                        $r['customer'],
+                        $r['arazi'],
+                        $plots,
+                        $r['broker'],
+                        number_format($r['total'], 2, '.', ''),
+                        number_format($r['paid'], 2, '.', ''),
+                        number_format($r['cheque_paid'], 2, '.', ''),
+                        number_format($r['cheque_balance'], 2, '.', ''),
+                        $r['reg_status'] ?? '-',
+                        $r['account_name'] ?? '',
+                        number_format($r['cheque_total'], 2, '.', ''),
+                        number_format($r['paid_all'], 2, '.', ''),
+                        number_format($r['balance'], 2, '.', ''),
+                    ]);
+                }
+
+                fputcsv($out, []);
+                fputcsv($out, [
+                    'GRAND TOTAL', '', '', '', '', '', '',
+                    number_format($gTotal, 2, '.', ''),
+                    number_format($gPaid, 2, '.', ''),
+                    number_format($gChequePaid, 2, '.', ''),
+                    number_format($gChequeBal, 2, '.', ''),
+                    '', '',
+                    number_format($gChequeTotal, 2, '.', ''),
+                    number_format($gPaidAll, 2, '.', ''),
+                    number_format($gBalance, 2, '.', ''),
+                ]);
+
+                fclose($out);
+            }, $filename, ['Content-Type' => 'text/csv; charset=UTF-8']);
         }
 
         return view('reports.bonds_cumulative', [

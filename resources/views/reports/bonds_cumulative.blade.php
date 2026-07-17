@@ -6,6 +6,7 @@
         <h5 class="mb-0">{{ $title }}</h5>
         <div class="ms-auto d-flex gap-2 no-print">
             <a href="{{ route('reports.index') }}" class="btn btn-outline-secondary btn-sm">Back</a>
+            <a href="{{ route('reports.bonds-cumulative', array_merge(request()->query(), ['export' => 'csv'])) }}" class="btn btn-outline-success btn-sm"><i class="bi bi-filetype-csv"></i> Export CSV</a>
             <button onclick="window.print()" class="btn btn-outline-primary btn-sm"><i class="bi bi-printer"></i></button>
         </div>
     </div>
@@ -113,6 +114,7 @@
                 <thead class="table-light">
                     <tr>
                         <th>#</th>
+                        <th>Bond Date</th>
                         <th>Bond</th>
                         <th>Customer</th>
                         <th>Arazi</th>
@@ -132,6 +134,7 @@
                     @forelse($rows as $i => $r)
                         <tr>
                             <td>{{ $i + 1 }}</td>
+                            <td class="text-muted" style="white-space:nowrap;">{{ $r['bond_date'] ?: '—' }}</td>
                             <td class="fw-semibold">{{ $r['bond_no'] }}</td>
                             <td>{{ $r['customer'] }}</td>
                             <td><span class="badge bg-primary-subtle text-primary-emphasis">{{ $r['arazi'] }}</span></td>
@@ -192,13 +195,13 @@
                             <td class="text-end fw-bold {{ $r['balance'] > 0 ? 'text-danger' : '' }}">{{ number_format($r['balance'],2) }}</td>
                         </tr>
                     @empty
-                        <tr><td colspan="14" class="text-center text-muted py-4">No bonds found.</td></tr>
+                        <tr><td colspan="15" class="text-center text-muted py-4">No bonds found.</td></tr>
                     @endforelse
                 </tbody>
                 @if(count($rows))
                 <tfoot class="table-light">
                     <tr class="fw-bold">
-                        <td colspan="6" class="text-end">GRAND TOTAL</td>
+                        <td colspan="7" class="text-end">GRAND TOTAL</td>
                         <td class="text-end">{{ number_format($g_total,2) }}</td>
                         <td class="text-end text-success">{{ number_format($g_paid,2) }}</td>
                         <td class="text-end text-success">{{ number_format($g_cheque_paid,2) }}</td>
