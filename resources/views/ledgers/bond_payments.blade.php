@@ -297,9 +297,17 @@
                             @endif
                         </span>
                     </div>
+                    <div class="d-flex justify-content-between align-items-center p-2 rounded" style="background:#f1f5f9;">
+                        <span class="text-secondary small fw-semibold"><i class="bi bi-bank me-1"></i>Total Cheque Amount</span>
+                        <span class="fw-bold text-secondary">₹{{ number_format((float)($chequeSummary['total'] ?? 0), 2) }}</span>
+                    </div>
                     <div class="d-flex justify-content-between align-items-center p-2 rounded" style="background:#eff6ff;">
                         <span class="text-primary small fw-semibold"><i class="bi bi-bank me-1"></i>Paid Cheque Amount</span>
                         <span class="fw-bold text-primary">₹{{ number_format((float)($chequeSummary['cleared'] ?? 0), 2) }}</span>
+                    </div>
+                    <div class="d-flex justify-content-between align-items-center p-2 rounded" style="background:#fef3c7;">
+                        <span class="small fw-semibold" style="color:#92400e;"><i class="bi bi-bank me-1"></i>Balance Cheque Amount</span>
+                        <span class="fw-bold" style="color:#92400e;">₹{{ number_format((float)($chequeSummary['balance'] ?? 0), 2) }}</span>
                     </div>
                     {{-- Progress bar --}}
                     <div class="mt-1">
@@ -598,7 +606,8 @@
             <table class="table mb-0 align-middle" style="font-size:13px;">
                 <thead>
                     <tr style="background:#f8fafc;">
-                        <th class="ps-3 py-2" style="font-size:11px;font-weight:600;text-transform:uppercase;color:#64748b;letter-spacing:.4px;">Bond No</th>
+                        <th class="ps-3 py-2" style="font-size:11px;font-weight:600;text-transform:uppercase;color:#64748b;letter-spacing:.4px;">Bond Date</th>
+                        <th class="py-2" style="font-size:11px;font-weight:600;text-transform:uppercase;color:#64748b;letter-spacing:.4px;">Bond No</th>
                         <th style="font-size:11px;font-weight:600;text-transform:uppercase;color:#64748b;letter-spacing:.4px;">{{ $partyLabel }}</th>
                         @if($isCustomerLedger)
                             <th style="font-size:11px;font-weight:600;text-transform:uppercase;color:#64748b;letter-spacing:.4px;">Mobile</th>
@@ -619,10 +628,11 @@
                     @php
                         $pct     = $bond['pct'] ?? ($bond['total'] > 0 ? min(round(($bond['paid'] / $bond['total']) * 100), 100) : 0);
                         $barColor = $pct < 50 ? 'bg-danger' : 'bg-success';
-                        $colspan  = $isCustomerLedger ? 10 : 8;
+                        $colspan  = $isCustomerLedger ? 11 : 9;
                     @endphp
                     <tr class="bond-row" style="border-bottom:1px solid #f1f5f9;">
-                        <td class="ps-3 fw-semibold">{{ $bond['bond_no'] }}</td>
+                        <td class="ps-3 text-muted" style="font-size:12px;white-space:nowrap;">{{ $bond['bond_date'] ?? '-' }}</td>
+                        <td class="fw-semibold">{{ $bond['bond_no'] }}</td>
                         <td>{{ $bond['party'] }}</td>
                         @if($isCustomerLedger)
                             <td class="text-muted" style="font-size:12px;">{{ $bond['mobile'] ?? '' }}</td>
@@ -707,15 +717,15 @@
                     <tr>
                         <th class="ps-3 py-3">#</th>
                         <th>Entry No</th>
-                        @if(!$selectedBondId)<th>Bond</th><th>Customer</th>@endif
+                        @if(!$selectedBondId)<th>Bond Date</th><th>Bond</th><th>Customer</th>@endif
                         <th>Date</th>
                         <th>Type</th>
                         <th class="text-end text-success">Credit</th>
                         <th class="text-end text-danger">Debit</th>
                         <th class="text-end">Balance</th>
                         <th>Method</th>
-                        <th>MTR No</th>
-                        <th>Payee Name</th>
+                        <th>MTR / Cheque No</th>
+                        <th>Payee Name / Account Name</th>
                         <th>Taken By</th>
                         <th>Remarks</th>
                     </tr>
@@ -726,6 +736,7 @@
                         <td class="ps-3 text-muted" style="font-size:11px;">{{ $i + 1 }}</td>
                         <td><span class="fw-semibold" style="font-size:12px;">{{ $entry['entry_no'] }}</span></td>
                         @if(!$selectedBondId)
+                            <td style="font-size:12px;white-space:nowrap;">{{ $entry['bond_date'] ?? '-' }}</td>
                             <td style="font-size:12px;">{{ $entry['bond_no'] }}</td>
                             <td>{{ $entry['party'] }}</td>
                         @endif
@@ -759,7 +770,7 @@
                     </tr>
                     @empty
                     <tr>
-                        <td colspan="14" class="text-center py-5 text-muted">
+                        <td colspan="15" class="text-center py-5 text-muted">
                             <div style="font-size:32px;">📋</div>
                             <div class="mt-2">No payment entries found.</div>
                             @if($selectedBondId)
@@ -772,7 +783,7 @@
                 @if(count($entries) > 0)
                 <tfoot>
                     <tr style="background:#f8fafc; font-weight:600; font-size:12px; border-top:2px solid #e2e8f0;">
-                        <td colspan="{{ $selectedBondId ? 4 : 6 }}" class="ps-3 py-2 text-end text-muted">TOTAL</td>
+                        <td colspan="{{ $selectedBondId ? 4 : 7 }}" class="ps-3 py-2 text-end text-muted">TOTAL</td>
                         <td class="text-end text-success">₹{{ number_format($totalCredit, 2) }}</td>
                         <td class="text-end text-danger">₹{{ number_format($totalDebit, 2) }}</td>
                         <td class="text-end text-primary">₹{{ number_format($totalCredit - $totalDebit, 2) }}</td>

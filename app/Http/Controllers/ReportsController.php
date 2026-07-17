@@ -160,7 +160,7 @@ class ReportsController extends Controller
         $dateFrom      = $request->query('date_from', '');
         $dateTo        = $request->query('date_to', '');
 
-        $bonds = CustomerBond::with(['customer', 'arazi', 'plots', 'broker', 'payments', 'cheques'])
+        $bonds = CustomerBond::with(['customer', 'arazi', 'plots', 'broker', 'payments', 'cheques.connectedAccount'])
             ->when($customerId,    fn ($q) => $q->where('customer_id', $customerId))
             ->when($bondId,        fn ($q) => $q->where('id', $bondId))
             ->when($araziCode,     fn ($q) => $q->where('arazi_code', $araziCode))
@@ -204,11 +204,13 @@ class ReportsController extends Controller
             $paidAll = (float) $bond->payments->whereNotIn('entry_type', $debitTypes)->sum('amount')
                      - (float) $bond->payments->whereIn('entry_type', $debitTypes)->sum('amount');
 
+            // Paid column = CASH payments only (within selected period).
             $periodPayments = ($dateFrom === '' && $dateTo === '')
                 ? $bond->payments
                 : $bond->payments->filter(fn ($p) => $inRange($p->entry_date));
-            $paidPeriod = (float) $periodPayments->whereNotIn('entry_type', $debitTypes)->sum('amount')
-                        - (float) $periodPayments->whereIn('entry_type', $debitTypes)->sum('amount');
+            $cashPayments = $periodPayments->filter(fn ($p) => strtolower((string) $p->payment_method) === 'cash');
+            $paidPeriod = (float) $cashPayments->whereNotIn('entry_type', $debitTypes)->sum('amount')
+                        - (float) $cashPayments->whereIn('entry_type', $debitTypes)->sum('amount');
 
             $total   = (float) ($bond->total_amount ?? $bond->bond_amount ?? 0);
             $balance = round($total - $paidAll, 2);
@@ -242,6 +244,7 @@ class ReportsController extends Controller
                 'paid_all'       => round($paidAll, 2),
                 'cheque_count'   => $bond->cheques->count(),
                 'cheque_total'   => round((float) $bond->cheques->sum('amount'), 2),
+                'account_name'   => optional($bond->cheques->first(fn ($c) => $c->connectedAccount)?->connectedAccount)->name,
             ];
 
             $gTotal += $total;

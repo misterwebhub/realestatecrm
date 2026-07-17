@@ -119,13 +119,13 @@
                         <th>Plot (gaz)</th>
                         <th>Broker</th>
                         <th class="text-end">Bond Amount</th>
-                        <th class="text-end">Paid</th>
-                        <th class="text-end">Balance</th>
+                        <th class="text-end">Paid <span class="text-muted">(cash)</span></th>
                         <th class="text-end">Cheque Paid</th>
                         <th class="text-end">Cheque Balance</th>
                         <th class="text-center">Registry</th>
-                        <th class="text-center">Cheques</th>
+                        <th class="text-center">Cheque / Account</th>
                         <th class="text-end">Total Paid <span class="text-muted">(all)</span></th>
+                        <th class="text-end">Total Balance <span class="text-muted">(all)</span></th>
                     </tr>
                 </thead>
                 <tbody>
@@ -167,7 +167,6 @@
                             <td>{{ $r['broker'] }}</td>
                             <td class="text-end">{{ number_format($r['total'],2) }}</td>
                             <td class="text-end text-success">{{ number_format($r['paid'],2) }}</td>
-                            <td class="text-end {{ $r['balance'] > 0 ? 'text-danger fw-semibold' : '' }}">{{ number_format($r['balance'],2) }}</td>
                             <td class="text-end text-success">{{ number_format($r['cheque_paid'],2) }}</td>
                             <td class="text-end {{ $r['cheque_balance'] > 0 ? 'text-warning-emphasis' : '' }}">{{ number_format($r['cheque_balance'],2) }}</td>
                             <td class="text-center">
@@ -180,6 +179,9 @@
                                 @endif
                             </td>
                             <td class="text-center">
+                                @if(!empty($r['account_name']))
+                                    <div class="small text-muted">{{ $r['account_name'] }}</div>
+                                @endif
                                 <div class="fw-semibold">{{ number_format($r['cheque_total'],2) }}</div>
                                 <button type="button" class="btn btn-outline-primary btn-sm py-0 px-2 mt-1 no-print js-see-cheque"
                                         data-bond="{{ $r['bond_id'] }}" data-bondno="{{ $r['bond_no'] }}">
@@ -187,6 +189,7 @@
                                 </button>
                             </td>
                             <td class="text-end fw-bold">{{ number_format($r['paid_all'],2) }}</td>
+                            <td class="text-end fw-bold {{ $r['balance'] > 0 ? 'text-danger' : '' }}">{{ number_format($r['balance'],2) }}</td>
                         </tr>
                     @empty
                         <tr><td colspan="14" class="text-center text-muted py-4">No bonds found.</td></tr>
@@ -198,12 +201,12 @@
                         <td colspan="6" class="text-end">GRAND TOTAL</td>
                         <td class="text-end">{{ number_format($g_total,2) }}</td>
                         <td class="text-end text-success">{{ number_format($g_paid,2) }}</td>
-                        <td class="text-end text-danger">{{ number_format($g_balance,2) }}</td>
                         <td class="text-end text-success">{{ number_format($g_cheque_paid,2) }}</td>
                         <td class="text-end">{{ number_format($g_cheque_balance,2) }}</td>
                         <td></td>
                         <td class="text-center">{{ number_format($g_cheque_total,2) }}</td>
                         <td class="text-end">{{ number_format($g_paid_all,2) }}</td>
+                        <td class="text-end text-danger">{{ number_format($g_balance,2) }}</td>
                     </tr>
                 </tfoot>
                 @endif

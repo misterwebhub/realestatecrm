@@ -207,9 +207,10 @@ class CustomerBondPaymentController extends Controller
             $plotTitles = $bond->plots->pluck('title')->filter()->implode(', ') ?: '-';
 
             return [
-                'id'      => $bond->id,
-                'bond_no' => $bond->bond_no,
-                'party'   => $bond->customer?->name ?? '-',
+                'id'        => $bond->id,
+                'bond_no'   => $bond->bond_no,
+                'bond_date' => optional($bond->bond_date)->format('d-m-Y') ?? '-',
+                'party'     => $bond->customer?->name ?? '-',
                 'mobile'  => $bond->customer?->mobile ?? '',
                 'arazi'   => $araziCode,
                 'plots'   => $plotTitles,
@@ -236,22 +237,28 @@ class CustomerBondPaymentController extends Controller
                 ->find($selectedBondId);
 
             if ($selectedBond) {
-                $entries = \App\Models\CustomerBondPayment::with(['customerBond.customer', 'takenByUser'])
+                $entries = \App\Models\CustomerBondPayment::with(['customerBond.customer', 'takenByUser', 'cheque.connectedAccount'])
                     ->where('customer_bond_id', $selectedBondId)
                     ->orderBy('entry_date')
                     ->orderBy('id')
                     ->get()
                     ->map(function (\App\Models\CustomerBondPayment $payment) {
+                        $isCheque = strtolower((string) $payment->payment_method) === 'cheque';
                         return [
                             'entry_no'  => $payment->entry_no ?? '-',
                             'bond_no'   => $payment->customerBond?->bond_no ?? '-',
+                            'bond_date' => optional($payment->customerBond?->bond_date)->format('d-m-Y') ?? '-',
                             'party'     => $payment->customerBond?->customer?->name ?? '-',
                             'date'      => optional($payment->entry_date)->format('d-m-Y') ?? '-',
                             'type'      => ucfirst($payment->entry_type ?? 'payment'),
                             'amount'    => (float) $payment->amount,
                             'method'    => $payment->payment_method ?? '-',
-                            'mtr_no'    => $payment->mtr_transaction_no ?? '-',
-                            'payee'     => $payment->account_payee_name ?? '-',
+                            'mtr_no'    => $isCheque
+                                ? ($payment->cheque?->cheque_number ?: ($payment->mtr_transaction_no ?: '-'))
+                                : ($payment->mtr_transaction_no ?? '-'),
+                            'payee'     => $isCheque
+                                ? ($payment->cheque?->connectedAccount?->name ?: ($payment->account_payee_name ?: '-'))
+                                : ($payment->account_payee_name ?? '-'),
                             'taken_by'  => $payment->takenByUser->name ?? '-',
                             'remarks'   => $payment->remarks ?? '-',
                             'is_debit'  => in_array($payment->entry_type, ['return', 'discount']),
@@ -425,7 +432,7 @@ class CustomerBondPaymentController extends Controller
 
     protected function resourceColumns(): array
     {
-        return ['Entry No', 'Bond', 'Customer', 'Arazi', 'Plot', 'Land Size', 'Entry Date', 'Type', 'Credit', 'Debit', 'Method', 'MTR / Cheque No', 'Payee Name', 'Taken By', 'Created'];
+        return ['Entry No', 'Bond Date', 'Bond', 'Customer', 'Arazi', 'Plot', 'Land Size', 'Entry Date', 'Type', 'Credit', 'Debit', 'Method', 'MTR / Cheque No', 'Payee Name / Account Name', 'Taken By', 'Created'];
     }
 
     protected function resourceFields(?Model $item = null): array
@@ -656,7 +663,7 @@ class CustomerBondPaymentController extends Controller
 
     protected function resourceQuery()
     {
-        return CustomerBondPayment::with(['customerBond.customer', 'customer', 'arazi', 'plot', 'takenByUser', 'cheque'])
+        return CustomerBondPayment::with(['customerBond.customer', 'customer', 'arazi', 'plot', 'takenByUser', 'cheque.connectedAccount'])
             ->whereNotNull('customer_bond_id')
             ->latest();
     }
@@ -667,6 +674,7 @@ class CustomerBondPaymentController extends Controller
         return [
             'cells' => [
                 $item->entry_no,
+                optional($item->customerBond?->bond_date)->format('d-m-Y') ?? '-',
                 $item->customerBond?->bond_no ?? '-',
                 $item->customer?->name ?? $item->customerBond?->customer?->name ?? '-',
                 $item->arazi?->legacy_arazi_code ?? ($item->arazi?->plot_number ?? '-'),
@@ -680,7 +688,9 @@ class CustomerBondPaymentController extends Controller
                 strtolower((string) $item->payment_method) === 'cheque'
                     ? ($item->cheque?->cheque_number ?: ($item->mtr_transaction_no ?: '—'))
                     : ($item->mtr_transaction_no ?: '—'),
-                $item->account_payee_name ?: '—',
+                strtolower((string) $item->payment_method) === 'cheque'
+                    ? ($item->cheque?->connectedAccount?->name ?: ($item->account_payee_name ?: '—'))
+                    : ($item->account_payee_name ?: '—'),
                 $item->takenByUser?->name ?? '—',
                 optional($item->created_at)->format('d-m-Y H:i') ?? '—',
             ],
