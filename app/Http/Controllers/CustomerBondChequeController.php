@@ -299,6 +299,367 @@ class CustomerBondChequeController extends Controller
         }
     }
 
+    /**
+     * Show the standalone "Create manual cheque entries" page.
+     * Each cheque row can be assigned to one bond (individual) or to
+     * several bonds at once (checkboxes) — a copy is created per bond.
+     */
+    public function manualCreate()
+    {
+        $bonds = CustomerBond::with(['customer', 'arazi'])
+            ->orderByDesc('id')
+            ->get()
+            ->map(function ($b) {
+                $code = $b->arazi->legacy_arazi_code ?? null;
+                $label = ($b->bond_no ?: ('BOND-' . $b->id))
+                    . ($b->customer?->name ? ' — ' . $b->customer->name : '')
+                    . ($code ? ' — Arazi ' . $code : '');
+                return ['id' => $b->id, 'label' => $label];
+            })
+            ->values();
+
+        $accounts = \App\Models\ConnectedAccount::orderBy('name')->get();
+
+        return view('customer_bond_cheques.manual', [
+            'title'    => 'Create Manual Cheque Entries',
+            'bonds'    => $bonds,
+            'accounts' => $accounts,
+        ]);
+    }
+
+    /**
+     * Persist manual cheque entries. For every selected bond of an entry a
+     * separate cheque row is created. Duplicate (bond + cheque number)
+     * combinations are skipped and reported back to the user.
+     */
+    public function manualStore(Request $request)
+    {
+        $data = $request->validate([
+            'entries'                      => ['required', 'array', 'min:1'],
+            'entries.*.bond_ids'           => ['nullable', 'array'],
+            'entries.*.bond_ids.*'         => ['integer', 'exists:customer_bonds,id'],
+            'entries.*.connected_account_id' => ['nullable', 'exists:connected_accounts,id'],
+            'entries.*.cheque_number'      => ['required', 'string', 'max:100'],
+            'entries.*.cheque_date'        => ['nullable', 'date'],
+            'entries.*.action_due_date'    => ['nullable', 'date'],
+            'entries.*.frequency_type'     => ['nullable', 'string', 'max:30'],
+            'entries.*.amount'             => ['required', 'numeric', 'min:0'],
+            'entries.*.status'             => ['nullable', 'in:pending,cleared,bounced,cancelled'],
+            'entries.*.type'               => ['nullable', 'in:mentioned,not_mentioned'],
+            'entries.*.notes'              => ['nullable', 'string'],
+        ]);
+
+        $created = 0;
+        $skipped = [];
+
+        DB::transaction(function () use ($data, &$created, &$skipped) {
+            foreach ($data['entries'] as $entry) {
+                $bondIds = $entry['bond_ids'] ?? [];
+
+                // No bond selected -> store as an unassigned cheque (bond null).
+                if (empty($bondIds)) {
+                    CustomerBondCheque::create([
+                        'customer_bond_id'     => null,
+                        'customer_id'          => null,
+                        'connected_account_id' => $entry['connected_account_id'] ?? null,
+                        'cheque_number'        => $entry['cheque_number'],
+                        'cheque_date'          => $entry['cheque_date'] ?? null,
+                        'action_due_date'      => $entry['action_due_date'] ?? null,
+                        'frequency_type'       => $entry['frequency_type'] ?? null,
+                        'amount'               => $entry['amount'],
+                        'status'               => $entry['status'] ?? 'pending',
+                        'type'                 => $entry['type'] ?? 'mentioned',
+                        'notes'                => $entry['notes'] ?? null,
+                        'created_by'           => auth()->id() ?? null,
+                    ]);
+                    $created++;
+                    continue;
+                }
+
+                foreach ($bondIds as $bondId) {
+                    $exists = CustomerBondCheque::where('customer_bond_id', $bondId)
+                        ->where('cheque_number', $entry['cheque_number'])
+                        ->exists();
+
+                    if ($exists) {
+                        $skipped[] = $entry['cheque_number'] . ' (bond #' . $bondId . ')';
+                        continue;
+                    }
+
+                    CustomerBondCheque::create([
+                        'customer_bond_id'     => $bondId,
+                        'customer_id'          => CustomerBond::find($bondId)?->customer_id ?? null,
+                        'connected_account_id' => $entry['connected_account_id'] ?? null,
+                        'cheque_number'        => $entry['cheque_number'],
+                        'cheque_date'          => $entry['cheque_date'] ?? null,
+                        'action_due_date'      => $entry['action_due_date'] ?? null,
+                        'frequency_type'       => $entry['frequency_type'] ?? null,
+                        'amount'               => $entry['amount'],
+                        'status'               => $entry['status'] ?? 'pending',
+                        'type'                 => $entry['type'] ?? 'mentioned',
+                        'notes'                => $entry['notes'] ?? null,
+                        'created_by'           => auth()->id() ?? null,
+                    ]);
+                    $created++;
+                }
+            }
+        });
+
+        $msg = $created . ' cheque entr' . ($created === 1 ? 'y' : 'ies') . ' created.';
+        if (! empty($skipped)) {
+            $msg .= ' Skipped ' . count($skipped) . ' duplicate(s): ' . implode(', ', $skipped);
+        }
+
+        return redirect()->route('customer-bond-cheques.manual')->with('success', $msg);
+    }
+
+    /**
+     * Stream a sample CSV template for the manual cheque import.
+     */
+    public function manualTemplate()
+    {
+        $headers = ['bond_no', 'account', 'cheque_number', 'amount', 'cheque_date', 'action_due_date', 'frequency_type', 'status', 'type', 'notes'];
+        $sample  = ['REGC0001', '', 'CHQ-1001', '50000', '2026-07-20', '2026-08-20', 'every_month', 'pending', 'mentioned', 'Sample note'];
+
+        $callback = function () use ($headers, $sample) {
+            $out = fopen('php://output', 'w');
+            // UTF-8 BOM for Excel
+            fprintf($out, chr(0xEF) . chr(0xBB) . chr(0xBF));
+            fputcsv($out, $headers);
+            fputcsv($out, $sample);
+            fclose($out);
+        };
+
+        return response()->streamDownload($callback, 'manual_cheques_template.csv', [
+            'Content-Type' => 'text/csv',
+        ]);
+    }
+
+    /**
+     * Import cheques from an uploaded CSV file. Bonds are resolved by bond_no
+     * and accounts by name. Rows without a resolvable bond, or that duplicate
+     * an existing (bond + cheque number) pair, are skipped and reported.
+     */
+    public function manualImport(Request $request)
+    {
+        $request->validate([
+            'csv_file' => ['required', 'file', 'mimes:csv,txt'],
+        ]);
+
+        $path = $request->file('csv_file')->getRealPath();
+        $handle = fopen($path, 'r');
+        if ($handle === false) {
+            return redirect()->route('customer-bond-cheques.manual')->withErrors(['csv_file' => 'Unable to read the uploaded file.']);
+        }
+
+        $created = 0;
+        $skipped = [];
+        $rowNum  = 0;
+
+        // Cache lookups
+        $bondsByNo   = CustomerBond::pluck('id', 'bond_no');
+        $accountsByName = \App\Models\ConnectedAccount::pluck('id', 'name');
+
+        DB::beginTransaction();
+        try {
+            while (($row = fgetcsv($handle)) !== false) {
+                $rowNum++;
+                // strip BOM on first cell
+                if ($rowNum === 1) {
+                    $row[0] = preg_replace('/^\xEF\xBB\xBF/', '', $row[0] ?? '');
+                    // Skip header row
+                    if (strtolower(trim($row[0])) === 'bond_no') {
+                        continue;
+                    }
+                }
+
+                if (count(array_filter($row, fn ($v) => trim((string) $v) !== '')) === 0) {
+                    continue; // blank line
+                }
+
+                [$bondNo, $account, $chequeNumber, $amount, $chequeDate, $actionDue, $freq, $status, $type, $notes] = array_pad($row, 10, null);
+
+                $bondNo = trim((string) $bondNo);
+                $chequeNumber = trim((string) $chequeNumber);
+
+                $bondId = null;
+                if ($bondNo !== '') {
+                    $bondId = $bondsByNo[$bondNo] ?? null;
+                    if (! $bondId) {
+                        // A bond number was given but doesn't exist — skip.
+                        $skipped[] = "row {$rowNum}: bond '{$bondNo}' not found";
+                        continue;
+                    }
+                }
+                if ($chequeNumber === '') {
+                    $skipped[] = "row {$rowNum}: missing cheque number";
+                    continue;
+                }
+
+                if ($bondId) {
+                    $exists = CustomerBondCheque::where('customer_bond_id', $bondId)
+                        ->where('cheque_number', $chequeNumber)
+                        ->exists();
+                    if ($exists) {
+                        $skipped[] = "row {$rowNum}: duplicate {$chequeNumber} (bond {$bondNo})";
+                        continue;
+                    }
+                }
+
+                $accountId = null;
+                if (trim((string) $account) !== '') {
+                    $accountId = $accountsByName[trim((string) $account)] ?? null;
+                }
+
+                $statusVal = in_array($status, ['pending', 'cleared', 'bounced', 'cancelled'], true) ? $status : 'pending';
+                $typeVal   = in_array($type, ['mentioned', 'not_mentioned'], true) ? $type : 'mentioned';
+
+                CustomerBondCheque::create([
+                    'customer_bond_id'     => $bondId,
+                    'customer_id'          => $bondId ? (CustomerBond::find($bondId)?->customer_id ?? null) : null,
+                    'connected_account_id' => $accountId,
+                    'cheque_number'        => $chequeNumber,
+                    'cheque_date'          => $chequeDate ?: null,
+                    'action_due_date'      => $actionDue ?: null,
+                    'frequency_type'       => $freq ?: null,
+                    'amount'               => is_numeric($amount) ? $amount : 0,
+                    'status'               => $statusVal,
+                    'type'                 => $typeVal,
+                    'notes'                => $notes ?: null,
+                    'created_by'           => auth()->id() ?? null,
+                ]);
+                $created++;
+            }
+            DB::commit();
+        } catch (\Throwable $e) {
+            DB::rollBack();
+            fclose($handle);
+            return redirect()->route('customer-bond-cheques.manual')->withErrors(['csv_file' => 'Import failed: ' . $e->getMessage()]);
+        }
+        fclose($handle);
+
+        $msg = $created . ' cheque(s) imported.';
+        if (! empty($skipped)) {
+            $msg .= ' Skipped ' . count($skipped) . ': ' . implode('; ', array_slice($skipped, 0, 15));
+        }
+
+        return redirect()->route('customer-bond-cheques.manual')->with('success', $msg);
+    }
+
+    /**
+     * Show the "Assign cheques to a bond" page — a filterable pool of all
+     * cheques with checkboxes and a bond selector for bulk (re)assignment.
+     */
+    public function assignForm(Request $request)
+    {
+        $filterNumber  = $request->query('cheque_number', '');
+        $filterAccount = $request->query('account_id', '');
+        $filterStatus  = $request->query('status', '');
+        $filterFrom    = $request->query('date_from', '');
+        $filterTo      = $request->query('date_to', '');
+        $filterAssign  = $request->query('assignment', '');
+
+        $cheques = CustomerBondCheque::with(['customerBond.customer', 'customerBond.arazi', 'connectedAccount'])
+            ->when($filterNumber,  fn ($q) => $q->where('cheque_number', 'like', '%' . $filterNumber . '%'))
+            ->when($filterAccount, fn ($q) => $q->where('connected_account_id', $filterAccount))
+            ->when($filterStatus,  fn ($q) => $q->where('status', $filterStatus))
+            ->when($filterAssign === 'assigned',   fn ($q) => $q->whereNotNull('customer_bond_id'))
+            ->when($filterAssign === 'unassigned', fn ($q) => $q->whereNull('customer_bond_id'))
+            ->when($filterFrom,    fn ($q) => $q->whereDate('cheque_date', '>=', $filterFrom))
+            ->when($filterTo,      fn ($q) => $q->whereDate('cheque_date', '<=', $filterTo))
+            ->latest('cheque_date')
+            ->latest('id')
+            ->limit(500)
+            ->get();
+
+        $bonds = CustomerBond::with(['customer', 'arazi'])
+            ->orderByDesc('id')
+            ->get()
+            ->map(function ($b) {
+                $code = $b->arazi->legacy_arazi_code ?? null;
+                $label = ($b->bond_no ?: ('BOND-' . $b->id))
+                    . ($b->customer?->name ? ' — ' . $b->customer->name : '')
+                    . ($code ? ' — Arazi ' . $code : '');
+                return ['id' => $b->id, 'label' => $label];
+            })
+            ->values();
+
+        $accounts = \App\Models\ConnectedAccount::orderBy('name')->get();
+
+        return view('customer_bond_cheques.assign', [
+            'title'         => 'Assign Cheques to Bond',
+            'cheques'       => $cheques,
+            'bonds'         => $bonds,
+            'accounts'      => $accounts,
+            'filterNumber'  => $filterNumber,
+            'filterAccount' => $filterAccount,
+            'filterStatus'  => $filterStatus,
+            'filterFrom'    => $filterFrom,
+            'filterTo'      => $filterTo,
+            'filterAssign'  => $filterAssign,
+        ]);
+    }
+
+    /**
+     * (Re)assign the selected cheques to a target bond. Cheques whose number
+     * already exists on the target bond are skipped and reported.
+     */
+    public function assignStore(Request $request)
+    {
+        $data = $request->validate([
+            'cheque_ids'       => ['required', 'array', 'min:1'],
+            'cheque_ids.*'     => ['integer', 'exists:customer_bond_cheques,id'],
+            'customer_bond_id' => ['required', 'exists:customer_bonds,id'],
+        ]);
+
+        $bond = CustomerBond::find($data['customer_bond_id']);
+        $moved = 0;
+        $skipped = [];
+
+        DB::transaction(function () use ($data, $bond, &$moved, &$skipped) {
+            $cheques = CustomerBondCheque::whereIn('id', $data['cheque_ids'])->get();
+            foreach ($cheques as $cheque) {
+                if ((int) $cheque->customer_bond_id === (int) $bond->id) {
+                    continue; // already on target
+                }
+                $dup = CustomerBondCheque::where('customer_bond_id', $bond->id)
+                    ->where('cheque_number', $cheque->cheque_number)
+                    ->exists();
+                if ($dup) {
+                    $skipped[] = $cheque->cheque_number;
+                    continue;
+                }
+                $cheque->update([
+                    'customer_bond_id' => $bond->id,
+                    'customer_id'      => $bond->customer_id,
+                ]);
+                $moved++;
+            }
+        });
+
+        $msg = $moved . ' cheque(s) assigned to ' . ($bond->bond_no ?: ('BOND-' . $bond->id)) . '.';
+        if (! empty($skipped)) {
+            $msg .= ' Skipped ' . count($skipped) . ' duplicate(s): ' . implode(', ', $skipped);
+        }
+
+        return redirect()->route('customer-bond-cheques.assign')->with('success', $msg);
+    }
+
+    /**
+     * Delete the selected cheques in bulk.
+     */
+    public function bulkDelete(Request $request)
+    {
+        $data = $request->validate([
+            'cheque_ids'   => ['required', 'array', 'min:1'],
+            'cheque_ids.*' => ['integer', 'exists:customer_bond_cheques,id'],
+        ]);
+
+        $deleted = CustomerBondCheque::whereIn('id', $data['cheque_ids'])->delete();
+
+        return redirect()->back()->with('success', $deleted . ' cheque(s) deleted.');
+    }
+
     public function destroy(CustomerBondCheque $customerBondCheque)
     {
         $customerBondCheque->delete();

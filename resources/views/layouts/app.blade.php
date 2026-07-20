@@ -271,8 +271,8 @@
                     @endcan
 
                     @canany(['cheques.view', 'connected_accounts.view'])
-                    <li class="nav-item {{ request()->routeIs('customer-bond-cheques.index') || request()->routeIs('connected-accounts.*') ? 'menu-open' : '' }}">
-                        <a href="#" class="nav-link {{ request()->routeIs('customer-bond-cheques.index') || request()->routeIs('connected-accounts.*') ? 'active' : '' }}">
+                    <li class="nav-item {{ request()->routeIs('customer-bond-cheques.index') || request()->routeIs('customer-bond-cheques.manual') || request()->routeIs('customer-bond-cheques.assign') || request()->routeIs('connected-accounts.*') ? 'menu-open' : '' }}">
+                        <a href="#" class="nav-link {{ request()->routeIs('customer-bond-cheques.index') || request()->routeIs('customer-bond-cheques.manual') || request()->routeIs('customer-bond-cheques.assign') || request()->routeIs('connected-accounts.*') ? 'active' : '' }}">
                             <i class="nav-icon bi bi-credit-card-2-front"></i>
                             <p>
                                 Cheques
@@ -284,6 +284,16 @@
                             <li class="nav-item">
                                 <a href="{{ route('customer-bond-cheques.index') }}" class="nav-link {{ request()->routeIs('customer-bond-cheques.index') ? 'active' : '' }}">
                                     <i class="nav-icon bi bi-circle"></i><p>Account Cheques</p>
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a href="{{ route('customer-bond-cheques.manual') }}" class="nav-link {{ request()->routeIs('customer-bond-cheques.manual') ? 'active' : '' }}">
+                                    <i class="nav-icon bi bi-pencil-square"></i><p>Create Manual Cheque Entries</p>
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a href="{{ route('customer-bond-cheques.assign') }}" class="nav-link {{ request()->routeIs('customer-bond-cheques.assign') ? 'active' : '' }}">
+                                    <i class="nav-icon bi bi-link-45deg"></i><p>Assign Cheques to Bond</p>
                                 </a>
                             </li>
                             @endcan

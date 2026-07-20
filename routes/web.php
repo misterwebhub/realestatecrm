@@ -103,6 +103,13 @@ Route::middleware('auth')->group(function () {
     Route::get('customer-bond-cheques/by-bond/{customer_bond}', [CustomerBondChequeController::class, 'forBond'])->name('customer-bond-cheques.for-bond');
     Route::get('customer-bond-cheques/manage/{customer_bond}', [CustomerBondChequeController::class, 'manage'])->name('customer-bond-cheques.manage');
     Route::post('customer-bond-cheques/bulk-save', [CustomerBondChequeController::class, 'storeBulk'])->name('customer-bond-cheques.bulk-save');
+    Route::get('customer-bond-cheques/manual', [CustomerBondChequeController::class, 'manualCreate'])->name('customer-bond-cheques.manual');
+    Route::post('customer-bond-cheques/manual', [CustomerBondChequeController::class, 'manualStore'])->name('customer-bond-cheques.manual-store');
+    Route::get('customer-bond-cheques/manual/template', [CustomerBondChequeController::class, 'manualTemplate'])->name('customer-bond-cheques.manual-template');
+    Route::post('customer-bond-cheques/manual/import', [CustomerBondChequeController::class, 'manualImport'])->name('customer-bond-cheques.manual-import');
+    Route::get('customer-bond-cheques/assign', [CustomerBondChequeController::class, 'assignForm'])->name('customer-bond-cheques.assign');
+    Route::post('customer-bond-cheques/assign', [CustomerBondChequeController::class, 'assignStore'])->name('customer-bond-cheques.assign-store');
+    Route::post('customer-bond-cheques/bulk-delete', [CustomerBondChequeController::class, 'bulkDelete'])->name('customer-bond-cheques.bulk-delete');
     Route::get('connected-accounts/list', [\App\Http\Controllers\ConnectedAccountController::class, 'list'])->name('connected-accounts.list');
     Route::resource('connected-accounts', \App\Http\Controllers\ConnectedAccountController::class)->except(['show']);
     Route::resource('investors', InvestorController::class)->except(['show']);

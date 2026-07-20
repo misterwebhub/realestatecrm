@@ -137,6 +137,17 @@ class CustomerBondPaymentController extends Controller
         $records   = $query->get();
         $routeName = $this->resourceRouteName();
 
+        // ── Cumulative summary of the filtered result set ─────────────────────
+        $debitTypes  = ['return', 'discount'];
+        $sumCredit   = (float) $records->whereNotIn('entry_type', $debitTypes)->sum('amount');
+        $sumDebit    = (float) $records->whereIn('entry_type', $debitTypes)->sum('amount');
+        $summary = [
+            'count'   => $records->count(),
+            'credit'  => round($sumCredit, 2),
+            'debit'   => round($sumDebit, 2),
+            'net'     => round($sumCredit - $sumDebit, 2),
+        ];
+
         $rows = $records->map(function (Model $record) use ($routeName) {
             $entry = $record->entry_no;
             return array_merge($this->resourceRow($record), [
@@ -154,6 +165,7 @@ class CustomerBondPaymentController extends Controller
             'createUrl'              => route($routeName . '.create'),
             'exportCsvUrl'           => $this->allowsCsvExport() ? route($routeName.'.export.csv') : null,
             'isCustomerPaymentIndex' => true,
+            'cpSummary'              => $summary,
             'cp_q'                   => $q,
             'cp_bond'                => $bondQ,
             'cp_arazi'               => $araziCode,

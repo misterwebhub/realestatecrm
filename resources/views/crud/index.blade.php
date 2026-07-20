@@ -144,6 +144,44 @@
                 </form>
             </div>
 
+            {{-- Cumulative summary of the filtered result set --}}
+            @if(!empty($cpSummary))
+            <div class="row g-2 mb-3">
+                <div class="col-6 col-md-3">
+                    <div class="card shadow-sm border-start border-4 border-secondary h-100">
+                        <div class="card-body py-2">
+                            <div class="small text-muted text-uppercase">Entries</div>
+                            <div class="fs-6 fw-bold">{{ number_format($cpSummary['count']) }}</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-6 col-md-3">
+                    <div class="card shadow-sm border-start border-4 border-success h-100">
+                        <div class="card-body py-2">
+                            <div class="small text-muted text-uppercase">Total Credit</div>
+                            <div class="fs-6 fw-bold text-success">₹{{ number_format($cpSummary['credit'],2) }}</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-6 col-md-3">
+                    <div class="card shadow-sm border-start border-4 border-danger h-100">
+                        <div class="card-body py-2">
+                            <div class="small text-muted text-uppercase">Total Debit</div>
+                            <div class="fs-6 fw-bold text-danger">₹{{ number_format($cpSummary['debit'],2) }}</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-6 col-md-3">
+                    <div class="card shadow-sm border-start border-4 border-primary h-100">
+                        <div class="card-body py-2">
+                            <div class="small text-muted text-uppercase">Net Total</div>
+                            <div class="fs-6 fw-bold {{ $cpSummary['net'] < 0 ? 'text-danger' : 'text-primary' }}">₹{{ number_format($cpSummary['net'],2) }}</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            @endif
+
             {{-- Delete-by-entry confirmation modal --}}
             <div class="modal fade" id="deleteEntryModal" tabindex="-1" aria-hidden="true">
                 <div class="modal-dialog modal-dialog-centered">
