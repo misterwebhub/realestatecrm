@@ -18,20 +18,33 @@ class KisanRegistryController extends Controller
             $query->where('arazi_deed_no', 'like', '%' . $deed . '%');
         }
         if ($araziCode !== '') {
-            // filter records whose deed contains the selected arazi code
-            $query->where('arazi_deed_no', 'like', '%' . $araziCode . '%');
+            // filter records by their legacy arazi code
+            $query->where('arazi_code', $araziCode);
         }
 
         $records = $query->with('arazi')->latest()->get();
 
+        // Build a list of deed numbers for the dropdown (scoped to the selected arazi)
+        $deedQuery = KisanRegistry::query()
+            ->whereNotNull('arazi_deed_no')
+            ->where('arazi_deed_no', '!=', '');
+        if ($araziCode !== '') {
+            $deedQuery->where('arazi_code', $araziCode);
+        }
+        $deeds = $deedQuery->orderBy('arazi_deed_no')
+            ->pluck('arazi_deed_no')
+            ->unique()
+            ->values();
+
         // provide a unique list of arazi labels for the filter
-        $araziList = \App\Models\Arazi::orderBy('id')->get();
+        $araziList = \App\Models\Arazi::orderBy('legacy_arazi_code')->get();
         $unique = [];
         $araziMap = [];
         foreach ($araziList as $a) {
             $label = $a->araziNoCode();
-            if (! isset($unique[$label])) {
-                $unique[$label] = $label; // use label as value
+            // value must be the legacy arazi code (used for filtering)
+            if (! empty($a->legacy_arazi_code) && ! isset($unique[$a->legacy_arazi_code])) {
+                $unique[$a->legacy_arazi_code] = $label;
             }
 
             // map possible keys to label for fast lookup in view
@@ -51,6 +64,7 @@ class KisanRegistryController extends Controller
             'filter_arazi_code' => $araziCode,
             'arazis' => $unique,
             'arazi_map' => $araziMap,
+            'deeds' => $deeds,
         ]);
     }
 

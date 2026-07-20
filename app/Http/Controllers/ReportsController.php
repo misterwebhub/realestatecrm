@@ -504,7 +504,7 @@ class ReportsController extends Controller
             $araziRows = [];
             $totAssigned = $totSold = 0;
             foreach ($codes as $code) {
-                if ($araziCode && $araziCode !== $code) {
+                if ($araziCode !== '' && (string) $araziCode !== (string) $code) {
                     continue;
                 }
                 $a = (float) ($assigned[$p->id][$code] ?? 0);
@@ -596,7 +596,7 @@ class ReportsController extends Controller
         $rows = [];
         $tSize = $tSaleable = $tSold = $tRemaining = $tValue = 0;
         foreach ($grouped as $code => $group) {
-            if ($araziCode && $araziCode !== $code) {
+            if ($araziCode !== '' && (string) $araziCode !== (string) $code) {
                 continue;
             }
             $loc = $group->first()->location ?: '-';
@@ -924,7 +924,7 @@ class ReportsController extends Controller
         $totalSaleable = $totalSold = $totalValue = 0;
         $count = 0;
         foreach ($grouped as $code => $group) {
-            if ($araziCode && $araziCode !== $code) continue;
+            if ($araziCode !== '' && (string) $araziCode !== (string) $code) continue;
             $loc = $group->first()->location ?: '-';
             if ($location && $location !== $loc) continue;
 

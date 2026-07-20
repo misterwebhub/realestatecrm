@@ -507,16 +507,16 @@
                                         </table>
                                     @endif
                                 </td>
-                            @elseif(!empty($isCustomerPaymentIndex) && $colIndex === 2)
+                            @elseif(!empty($isCustomerPaymentIndex) && $colIndex === 3)
                                 <td>
                                     <span class="cbp-cust-name" tabindex="0" role="button"
                                           data-bs-toggle="popover" data-bs-trigger="hover focus"
                                           data-bs-placement="top" data-bs-content="{{ $cell }}"
                                           title="Customer">{{ \Illuminate\Support\Str::limit($cell, 15) }}</span>
                                 </td>
-                            @elseif(!empty($isCustomerPaymentIndex) && $colIndex === 8 && $cell !== '—')
-                                <td class="text-success fw-semibold">{{ $cell }}</td>
                             @elseif(!empty($isCustomerPaymentIndex) && $colIndex === 9 && $cell !== '—')
+                                <td class="text-success fw-semibold">{{ $cell }}</td>
+                            @elseif(!empty($isCustomerPaymentIndex) && $colIndex === 10 && $cell !== '—')
                                 <td class="text-danger fw-semibold">{{ $cell }}</td>
                             @else
                                 <td style="{{ $hasBondArazi ? 'padding:10px 8px;' : '' }}">{{ $cell }}</td>

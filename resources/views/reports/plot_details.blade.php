@@ -97,8 +97,8 @@
                 // found a single arazi
                 document.getElementById('arazi_label').textContent = json.arazi_label || '';
                 document.getElementById('arazi_code_hidden').value = json.arazi_code || '';
-                        if(json.arazi_id){
-                            try{ showAraziPlots(json.arazi_id); }catch(e){ }
+                        if(json.arazi_code){
+                            try{ showAraziPlots(json.arazi_code); }catch(e){ }
                         }
             }catch(e){ console.error(e); }
         });
@@ -117,18 +117,20 @@
 
         // override existing showAraziPlots to also populate the page table
         const originalShowAraziPlots = window.showAraziPlots;
-        window.showAraziPlots = async function(araziId){
-            if(!araziId) return;
+        // Drive everything by the human-readable Arazi code (not the internal id).
+        window.showAraziPlots = async function(araziCode){
+            if(!araziCode) return;
             try{
                 // call existing function to show modal as well
-                if(typeof originalShowAraziPlots === 'function') originalShowAraziPlots(araziId);
+                if(typeof originalShowAraziPlots === 'function') originalShowAraziPlots(araziCode);
             }catch(e){ }
 
             try{
-                const url = @json(route('arazis.plots', ['arazi' => '__ARAZI_ID__'])).replace('__ARAZI_ID__', encodeURIComponent(araziId));
+                const url = @json(route('arazis.plots-by-code', ['code' => '__ARAZI_CODE__'])).replace('__ARAZI_CODE__', encodeURIComponent(araziCode));
                 const res = await fetch(url);
                 if(!res.ok) throw new Error('Failed to load plots');
-                const plots = await res.json();
+                const payload = await res.json();
+                const plots = Array.isArray(payload) ? payload : (payload.plots || []);
                 plotsBody.innerHTML = '';
                 let total = 0;
                 (plots || []).forEach(function(p){
@@ -163,7 +165,7 @@
                 totalSizeEl.textContent = (total ? total.toFixed(2) : '0');
                 // fetch comprehensive arazi details (bonds, payments)
                 try{
-                    const detailsUrl = @json(route('arazis.details', ['arazi' => '__ARAZI_ID__'])).replace('__ARAZI_ID__', encodeURIComponent(araziId));
+                    const detailsUrl = @json(route('arazis.details-by-code', ['code' => '__ARAZI_CODE__'])).replace('__ARAZI_CODE__', encodeURIComponent(araziCode));
                     const dres = await fetch(detailsUrl);
                     if(dres.ok){
                         const data = await dres.json();

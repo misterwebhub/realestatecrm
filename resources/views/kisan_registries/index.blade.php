@@ -24,9 +24,14 @@
                             @endforeach
                         </select>
                     </div>
-                    <div class="col-auto">
+                    <div class="col-2">
                         <label class="form-label small">Deed No</label>
-                        <input type="text" name="deed" value="{{ $filter_deed ?? '' }}" class="form-control form-control-sm" placeholder="Enter deed number">
+                        <select id="filter-deed" name="deed" class="form-select form-select-sm" data-placeholder="All Deeds">
+                            <option value="">All</option>
+                            @foreach($deeds ?? [] as $deedNo)
+                                <option value="{{ $deedNo }}" @selected((string)($filter_deed ?? '') === (string)$deedNo)>{{ $deedNo }}</option>
+                            @endforeach
+                        </select>
                     </div>
                     <div class="col-auto">
                         <button class="btn btn-sm btn-primary">Filter</button>
@@ -63,8 +68,8 @@
                     <td>
                         @php
                             $araziLabel = $rec->arazi
-                                ? ($rec->arazi->legacy_arazi_code ?: ('Arazi-' . $rec->arazi->id))
-                                : ($arazi_map[$rec->arazi_deed_no] ?? '-');
+                                ? ($rec->arazi->araziNoCode() ?: ($rec->arazi->legacy_arazi_code ?: ('Arazi-' . $rec->arazi->id)))
+                                : ($arazi_map[$rec->arazi_code] ?? ($rec->arazi_code ?? '-'));
                         @endphp
                         {{ $araziLabel }}
                     </td>
@@ -134,6 +139,18 @@
             placeholder: 'All Arazis',
             allowClear: true,
             dropdownParent: jQuery(document.body)
+        });
+        jQuery('#filter-deed').select2({
+            theme: 'bootstrap-5',
+            width: '250px',
+            placeholder: 'All Deeds',
+            allowClear: true,
+            dropdownParent: jQuery(document.body)
+        });
+        // Re-scope the deed list to the chosen arazi by reloading with the arazi filter
+        jQuery('#filter-arazi').on('change', function(){
+            jQuery('#filter-deed').val('').trigger('change.select2');
+            jQuery(this).closest('form').submit();
         });
     });
 </script>

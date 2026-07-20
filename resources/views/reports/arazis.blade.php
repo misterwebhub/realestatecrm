@@ -18,7 +18,7 @@
                     <select name="arazi_code" class="form-select form-select-sm js-select2">
                         <option value="">All Arazis</option>
                         @foreach($araziOptions as $c)
-                            <option value="{{ $c }}" @selected($araziCode === $c)>{{ $c }}</option>
+                            <option value="{{ $c }}" @selected((string)$araziCode === (string)$c)>{{ $c }}</option>
                         @endforeach
                     </select>
                 </div>

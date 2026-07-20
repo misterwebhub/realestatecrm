@@ -791,6 +791,24 @@ class AraziController extends Controller
         ]);
     }
 
+    /**
+     * Same as details() but keyed by the human-readable Arazi code
+     * (legacy_arazi_code, falling back to plot_number) instead of the id.
+     * GET /arazi-no/{code}/details
+     */
+    public function detailsByAraziNo(string $code)
+    {
+        $arazi = Arazi::where('legacy_arazi_code', $code)
+            ->orWhere('plot_number', $code)
+            ->first();
+
+        if (! $arazi) {
+            return response()->json(['found' => false], 404);
+        }
+
+        return $this->details($arazi);
+    }
+
     protected function resourceRow(Model $item): array
     {
         /** @var Arazi $item */

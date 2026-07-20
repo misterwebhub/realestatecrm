@@ -191,7 +191,11 @@
                                     See ({{ $r['cheque_count'] }})
                                 </button>
                             </td>
-                            <td class="text-end fw-bold">{{ number_format($r['paid_all'],2) }}</td>
+                            <td class="text-end fw-bold">
+                                <a href="{{ url('/customer-bond-payments') }}?bond_id={{ $r['bond_id'] }}"
+                                   target="_blank" rel="noopener"
+                                   title="View payments for this bond">{{ number_format($r['paid_all'],2) }}</a>
+                            </td>
                             <td class="text-end fw-bold {{ $r['balance'] > 0 ? 'text-danger' : '' }}">{{ number_format($r['balance'],2) }}</td>
                         </tr>
                     @empty
