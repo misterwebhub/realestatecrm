@@ -349,6 +349,34 @@ class CustomerBondChequeController extends Controller
             'entries.*.notes'              => ['nullable', 'string'],
         ]);
 
+        // Cheque numbers must be globally unique. Validate the batch against
+        // itself and against existing records before creating anything.
+        $numbers = [];
+        foreach ($data['entries'] as $i => $entry) {
+            $num = trim((string) ($entry['cheque_number'] ?? ''));
+            if ($num === '') {
+                continue;
+            }
+            if (isset($numbers[$num])) {
+                return redirect()->back()
+                    ->withErrors(['entries' => 'Duplicate cheque number "' . $num . '" in the submitted rows. Each cheque number must be unique.'])
+                    ->withInput();
+            }
+            $numbers[$num] = true;
+        }
+
+        if (! empty($numbers)) {
+            $existing = CustomerBondCheque::whereIn('cheque_number', array_keys($numbers))
+                ->pluck('cheque_number')
+                ->unique()
+                ->all();
+            if (! empty($existing)) {
+                return redirect()->back()
+                    ->withErrors(['entries' => 'Cheque number(s) already exist: ' . implode(', ', $existing) . '. Cheque numbers must be unique.'])
+                    ->withInput();
+            }
+        }
+
         $created = 0;
         $skipped = [];
 
@@ -377,9 +405,10 @@ class CustomerBondChequeController extends Controller
                 }
 
                 foreach ($bondIds as $bondId) {
-                    $exists = CustomerBondCheque::where('customer_bond_id', $bondId)
-                        ->where('cheque_number', $entry['cheque_number'])
-                        ->exists();
+                    // Cheque numbers are globally unique, so a number can only be
+                    // attached to a single bond. If it now exists (e.g. it was
+                    // created for an earlier bond in this same entry), skip.
+                    $exists = CustomerBondCheque::where('cheque_number', $entry['cheque_number'])->exists();
 
                     if ($exists) {
                         $skipped[] = $entry['cheque_number'] . ' (bond #' . $bondId . ')';
@@ -455,6 +484,7 @@ class CustomerBondChequeController extends Controller
         $created = 0;
         $skipped = [];
         $rowNum  = 0;
+        $seen    = []; // cheque numbers already handled in this file
 
         // Cache lookups
         $bondsByNo   = CustomerBond::pluck('id', 'bond_no');
@@ -496,15 +526,16 @@ class CustomerBondChequeController extends Controller
                     continue;
                 }
 
-                if ($bondId) {
-                    $exists = CustomerBondCheque::where('customer_bond_id', $bondId)
-                        ->where('cheque_number', $chequeNumber)
-                        ->exists();
-                    if ($exists) {
-                        $skipped[] = "row {$rowNum}: duplicate {$chequeNumber} (bond {$bondNo})";
-                        continue;
-                    }
+                // Cheque numbers must be globally unique — check this file and the DB.
+                if (isset($seen[$chequeNumber])) {
+                    $skipped[] = "row {$rowNum}: duplicate {$chequeNumber} (already in file)";
+                    continue;
                 }
+                if (CustomerBondCheque::where('cheque_number', $chequeNumber)->exists()) {
+                    $skipped[] = "row {$rowNum}: duplicate {$chequeNumber} (already exists)";
+                    continue;
+                }
+                $seen[$chequeNumber] = true;
 
                 $accountId = null;
                 if (trim((string) $account) !== '') {
@@ -601,6 +632,62 @@ class CustomerBondChequeController extends Controller
     }
 
     /**
+     * Export the currently filtered cheque pool as CSV.
+     */
+    public function assignExport(Request $request)
+    {
+        $filterNumber  = $request->query('cheque_number', '');
+        $filterAccount = $request->query('account_id', '');
+        $filterStatus  = $request->query('status', '');
+        $filterFrom    = $request->query('date_from', '');
+        $filterTo      = $request->query('date_to', '');
+        $filterAssign  = $request->query('assignment', '');
+
+        $cheques = CustomerBondCheque::with(['customerBond.customer', 'customerBond.arazi', 'connectedAccount'])
+            ->when($filterNumber,  fn ($q) => $q->where('cheque_number', 'like', '%' . $filterNumber . '%'))
+            ->when($filterAccount, fn ($q) => $q->where('connected_account_id', $filterAccount))
+            ->when($filterStatus,  fn ($q) => $q->where('status', $filterStatus))
+            ->when($filterAssign === 'assigned',   fn ($q) => $q->whereNotNull('customer_bond_id'))
+            ->when($filterAssign === 'unassigned', fn ($q) => $q->whereNull('customer_bond_id'))
+            ->when($filterFrom,    fn ($q) => $q->whereDate('cheque_date', '>=', $filterFrom))
+            ->when($filterTo,      fn ($q) => $q->whereDate('cheque_date', '<=', $filterTo))
+            ->latest('cheque_date')
+            ->latest('id')
+            ->get();
+
+        $callback = function () use ($cheques) {
+            $out = fopen('php://output', 'w');
+            fprintf($out, chr(0xEF) . chr(0xBB) . chr(0xBF)); // UTF-8 BOM
+            fputcsv($out, [
+                'Cheque No', 'Amount', 'Assignment', 'Bond No', 'Customer', 'Arazi Code',
+                'Account', 'Cheque Date', 'Due Date', 'Frequency', 'Status', 'Type', 'Notes',
+            ]);
+            foreach ($cheques as $c) {
+                fputcsv($out, [
+                    $c->cheque_number,
+                    number_format((float) $c->amount, 2, '.', ''),
+                    $c->customer_bond_id ? 'Assigned' : 'Not Assigned',
+                    optional($c->customerBond)->bond_no ?: '',
+                    optional(optional($c->customerBond)->customer)->name ?: '',
+                    optional(optional($c->customerBond)->arazi)->legacy_arazi_code ?: '',
+                    optional($c->connectedAccount)->name ?: '',
+                    $c->cheque_date ? \Carbon\Carbon::parse($c->cheque_date)->format('Y-m-d') : '',
+                    $c->action_due_date ? \Carbon\Carbon::parse($c->action_due_date)->format('Y-m-d') : '',
+                    $c->frequency_type ?: '',
+                    ucfirst($c->status),
+                    $c->type ?: '',
+                    $c->notes ?: '',
+                ]);
+            }
+            fclose($out);
+        };
+
+        return response()->streamDownload($callback, 'cheque_entries_' . now()->format('Ymd_His') . '.csv', [
+            'Content-Type' => 'text/csv',
+        ]);
+    }
+
+    /**
      * (Re)assign the selected cheques to a target bond. Cheques whose number
      * already exists on the target bond are skipped and reported.
      */
@@ -658,6 +745,24 @@ class CustomerBondChequeController extends Controller
         $deleted = CustomerBondCheque::whereIn('id', $data['cheque_ids'])->delete();
 
         return redirect()->back()->with('success', $deleted . ' cheque(s) deleted.');
+    }
+
+    /**
+     * Unassign a single cheque from its bond (set bond/customer to null).
+     */
+    public function unassign(Request $request)
+    {
+        $data = $request->validate([
+            'cheque_id' => ['required', 'integer', 'exists:customer_bond_cheques,id'],
+        ]);
+
+        $cheque = CustomerBondCheque::find($data['cheque_id']);
+        $cheque->update([
+            'customer_bond_id' => null,
+            'customer_id'      => null,
+        ]);
+
+        return redirect()->back()->with('success', 'Cheque ' . $cheque->cheque_number . ' unassigned.');
     }
 
     public function destroy(CustomerBondCheque $customerBondCheque)

@@ -110,6 +110,8 @@ Route::middleware('auth')->group(function () {
     Route::get('customer-bond-cheques/assign', [CustomerBondChequeController::class, 'assignForm'])->name('customer-bond-cheques.assign');
     Route::post('customer-bond-cheques/assign', [CustomerBondChequeController::class, 'assignStore'])->name('customer-bond-cheques.assign-store');
     Route::post('customer-bond-cheques/bulk-delete', [CustomerBondChequeController::class, 'bulkDelete'])->name('customer-bond-cheques.bulk-delete');
+    Route::post('customer-bond-cheques/unassign', [CustomerBondChequeController::class, 'unassign'])->name('customer-bond-cheques.unassign');
+    Route::get('customer-bond-cheques/assign/export', [CustomerBondChequeController::class, 'assignExport'])->name('customer-bond-cheques.assign-export');
     Route::get('connected-accounts/list', [\App\Http\Controllers\ConnectedAccountController::class, 'list'])->name('connected-accounts.list');
     Route::resource('connected-accounts', \App\Http\Controllers\ConnectedAccountController::class)->except(['show']);
     Route::resource('investors', InvestorController::class)->except(['show']);

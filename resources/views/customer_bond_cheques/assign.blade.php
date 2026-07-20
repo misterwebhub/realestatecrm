@@ -5,6 +5,7 @@
     <div class="d-flex align-items-center mb-3 gap-2 flex-wrap">
         <h5 class="fw-bold mb-0"><i class="bi bi-link-45deg me-2 text-success"></i>{{ $title }}</h5>
         <div class="ms-auto d-flex gap-2 flex-wrap">
+            <a href="{{ route('customer-bond-cheques.assign-export', request()->query()) }}" class="btn btn-outline-success btn-sm"><i class="bi bi-file-earmark-spreadsheet me-1"></i>Export Entries</a>
             <a href="{{ route('customer-bond-cheques.manual') }}" class="btn btn-outline-primary btn-sm">Manual Entries</a>
             <a href="{{ route('customer-bond-cheques.index') }}" class="btn btn-secondary btn-sm">Back to Cheques</a>
         </div>
@@ -94,6 +95,22 @@
                     </div>
                 </div>
 
+                <div class="row g-2 align-items-center mb-2">
+                    <div class="col-md-5">
+                        <div class="input-group input-group-sm">
+                            <span class="input-group-text"><i class="bi bi-search"></i></span>
+                            <input type="text" id="chequeSearch" class="form-control" placeholder="Search by cheque no…" autocomplete="off">
+                            <button type="button" id="clearSearch" class="btn btn-outline-secondary">Clear</button>
+                        </div>
+                    </div>
+                    <div class="col-md-auto">
+                        <button type="button" id="selectVisible" class="btn btn-outline-primary btn-sm"><i class="bi bi-check2-all me-1"></i>Select all matching</button>
+                    </div>
+                    <div class="col-md-auto">
+                        <span class="text-muted small"><span id="visibleCount">{{ count($cheques) }}</span> shown · <span id="selectedCount">0</span> selected</span>
+                    </div>
+                </div>
+
                 <div class="table-responsive">
                     <table class="table table-sm table-bordered align-middle">
                         <thead class="table-light">
@@ -107,11 +124,12 @@
                                 <th>Account</th>
                                 <th>Cheque Date</th>
                                 <th>Status</th>
+                                <th style="width:110px">Action</th>
                             </tr>
                         </thead>
                         <tbody>
                             @forelse($cheques as $c)
-                                <tr>
+                                <tr class="cheque-row" data-cheque="{{ strtolower($c->cheque_number) }}">
                                     <td class="text-center"><input type="checkbox" class="row-check" name="cheque_ids[]" value="{{ $c->id }}"></td>
                                     <td>{{ $c->cheque_number }}</td>
                                     <td>{{ number_format((float)$c->amount, 2) }}</td>
@@ -127,9 +145,16 @@
                                     <td>{{ optional($c->connectedAccount)->name ?: '—' }}</td>
                                     <td>{{ $c->cheque_date ? \Carbon\Carbon::parse($c->cheque_date)->format('Y-m-d') : '—' }}</td>
                                     <td><span class="badge bg-secondary">{{ ucfirst($c->status) }}</span></td>
+                                    <td class="text-center">
+                                        @if($c->customer_bond_id)
+                                            <button type="button" class="btn btn-outline-warning btn-sm btn-unassign" data-id="{{ $c->id }}" data-cheque="{{ $c->cheque_number }}"><i class="bi bi-x-circle me-1"></i>Unassign</button>
+                                        @else
+                                            <span class="text-muted small">—</span>
+                                        @endif
+                                    </td>
                                 </tr>
                             @empty
-                                <tr><td colspan="9" class="text-center text-muted py-3">No cheques match the current filters.</td></tr>
+                                <tr><td colspan="10" class="text-center text-muted py-3">No cheques match the current filters.</td></tr>
                             @endforelse
                         </tbody>
                     </table>
@@ -138,18 +163,90 @@
             </div>
         </div>
     </form>
+
+    {{-- Hidden form used by the per-row Unassign buttons --}}
+    <form method="POST" action="{{ route('customer-bond-cheques.unassign') }}" id="unassignForm" class="d-none">
+        @csrf
+        <input type="hidden" name="cheque_id" id="unassignChequeId">
+    </form>
 </div>
 @endsection
 
 @push('scripts')
 <script>
 (function(){
-    var checkAll = document.getElementById('checkAll');
+    var rows          = Array.prototype.slice.call(document.querySelectorAll('tr.cheque-row'));
+    var searchInput   = document.getElementById('chequeSearch');
+    var clearBtn      = document.getElementById('clearSearch');
+    var selectVisible = document.getElementById('selectVisible');
+    var checkAll      = document.getElementById('checkAll');
+    var visibleCount  = document.getElementById('visibleCount');
+    var selectedCount = document.getElementById('selectedCount');
+
+    function updateSelectedCount(){
+        if(selectedCount){
+            selectedCount.textContent = document.querySelectorAll('.row-check:checked').length;
+        }
+    }
+
+    function visibleRows(){
+        return rows.filter(function(r){ return r.style.display !== 'none'; });
+    }
+
+    function applyFilter(){
+        var q = (searchInput ? searchInput.value : '').trim().toLowerCase();
+        var shown = 0;
+        rows.forEach(function(r){
+            var match = q === '' || (r.getAttribute('data-cheque') || '').indexOf(q) !== -1;
+            r.style.display = match ? '' : 'none';
+            if(match) shown++;
+        });
+        if(visibleCount) visibleCount.textContent = shown;
+        if(checkAll) checkAll.checked = false;
+    }
+
+    if(searchInput){ searchInput.addEventListener('input', applyFilter); }
+    if(clearBtn){ clearBtn.addEventListener('click', function(){ if(searchInput){ searchInput.value=''; applyFilter(); searchInput.focus(); } }); }
+
+    // Header checkbox: select/deselect only currently visible rows.
     if(checkAll){
         checkAll.addEventListener('change', function(){
-            document.querySelectorAll('.row-check').forEach(function(cb){ cb.checked = checkAll.checked; });
+            visibleRows().forEach(function(r){
+                var cb = r.querySelector('.row-check');
+                if(cb) cb.checked = checkAll.checked;
+            });
+            updateSelectedCount();
         });
     }
+
+    // "Select all matching" button: tick every visible (filtered) row.
+    if(selectVisible){
+        selectVisible.addEventListener('click', function(){
+            visibleRows().forEach(function(r){
+                var cb = r.querySelector('.row-check');
+                if(cb) cb.checked = true;
+            });
+            updateSelectedCount();
+        });
+    }
+
+    document.querySelectorAll('.row-check').forEach(function(cb){
+        cb.addEventListener('change', updateSelectedCount);
+    });
+
+    updateSelectedCount();
+
+    // Per-row unassign
+    var unassignForm = document.getElementById('unassignForm');
+    var unassignId   = document.getElementById('unassignChequeId');
+    document.querySelectorAll('.btn-unassign').forEach(function(btn){
+        btn.addEventListener('click', function(){
+            if(!confirm('Unassign cheque ' + btn.getAttribute('data-cheque') + ' from its bond?')) return;
+            if(unassignId){ unassignId.value = btn.getAttribute('data-id'); }
+            if(unassignForm){ unassignForm.submit(); }
+        });
+    });
+
     if(window.jQuery && jQuery.fn.select2){
         try{ jQuery('.bond-select').select2({ theme:'bootstrap-5', width:'100%', placeholder:'— Select bond —' }); }catch(e){}
     }
