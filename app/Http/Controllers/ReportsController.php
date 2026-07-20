@@ -215,12 +215,22 @@ class ReportsController extends Controller
             $total   = (float) ($bond->total_amount ?? $bond->bond_amount ?? 0);
             $balance = round($total - $paidAll, 2);
 
-            // Cheques: cleared (paid) within period, and outstanding (pending).
+            // Cheques.
             $clearedCheques = $bond->cheques->where('status', 'cleared');
-            $chequePaid = (float) (($dateFrom === '' && $dateTo === '')
+            $pendingCheques = $bond->cheques->where('status', 'pending');
+            $noDate = ($dateFrom === '' && $dateTo === '');
+
+            // Columns "Paid Cheque" / "Pending Cheque" -> respect the date filter.
+            $chequePaid = (float) ($noDate
                 ? $clearedCheques->sum('amount')
                 : $clearedCheques->filter(fn ($c) => $inRange($c->cheque_date))->sum('amount'));
-            $chequeBalance = (float) $bond->cheques->where('status', 'pending')->sum('amount');
+            $chequeBalance = (float) ($noDate
+                ? $pendingCheques->sum('amount')
+                : $pendingCheques->filter(fn ($c) => $inRange($c->cheque_date))->sum('amount'));
+
+            // Cheque/Account mini-table -> lifetime totals (ignore the date filter).
+            $chequePaidAll = (float) $clearedCheques->sum('amount');
+            $chequeBalanceAll = (float) $pendingCheques->sum('amount');
 
             // Registry found = registry done (no pending state).
             $regDone = (bool) $reg;
@@ -241,6 +251,8 @@ class ReportsController extends Controller
                 'balance'        => $balance,
                 'cheque_paid'    => round($chequePaid, 2),
                 'cheque_balance' => round($chequeBalance, 2),
+                'cheque_paid_all'    => round($chequePaidAll, 2),
+                'cheque_balance_all' => round($chequeBalanceAll, 2),
                 'reg_status'     => $reg ? ($regDone ? 'Done' : 'Pending') : null,
                 'paid_all'       => round($paidAll, 2),
                 'cheque_count'   => $bond->cheques->count(),
@@ -292,7 +304,8 @@ class ReportsController extends Controller
                 fputcsv($out, [
                     '#', 'Bond Date', 'Bond', 'Customer', 'Arazi', 'Plots (gaz)', 'Broker',
                     'Bond Amount', 'Paid (cash)', 'Cheque Paid', 'Cheque Balance', 'Registry',
-                    'Account', 'Cheque Total', 'Total Paid (all)', 'Total Balance (all)',
+                    'Cheque Name', 'Cheque Paid (all)', 'Cheque Unpaid (all)', 'Cheque Total',
+                    'Total Paid (all)', 'Total Balance (all)',
                 ]);
 
                 foreach ($rows as $i => $r) {
@@ -311,11 +324,16 @@ class ReportsController extends Controller
                         number_format($r['cheque_balance'], 2, '.', ''),
                         $r['reg_status'] ?? '-',
                         $r['account_name'] ?? '',
+                        number_format($r['cheque_paid_all'], 2, '.', ''),
+                        number_format($r['cheque_balance_all'], 2, '.', ''),
                         number_format($r['cheque_total'], 2, '.', ''),
                         number_format($r['paid_all'], 2, '.', ''),
                         number_format($r['balance'], 2, '.', ''),
                     ]);
                 }
+
+                $gChequePaidAll = (float) collect($rows)->sum('cheque_paid_all');
+                $gChequeUnpaidAll = (float) collect($rows)->sum('cheque_balance_all');
 
                 fputcsv($out, []);
                 fputcsv($out, [
@@ -325,6 +343,8 @@ class ReportsController extends Controller
                     number_format($gChequePaid, 2, '.', ''),
                     number_format($gChequeBal, 2, '.', ''),
                     '', '',
+                    number_format($gChequePaidAll, 2, '.', ''),
+                    number_format($gChequeUnpaidAll, 2, '.', ''),
                     number_format($gChequeTotal, 2, '.', ''),
                     number_format($gPaidAll, 2, '.', ''),
                     number_format($gBalance, 2, '.', ''),

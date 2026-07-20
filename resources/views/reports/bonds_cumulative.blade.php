@@ -122,8 +122,8 @@
                         <th>Broker</th>
                         <th class="text-end">Bond Amount</th>
                         <th class="text-end">Paid <span class="text-muted">(cash)</span></th>
-                        <th class="text-end">Cheque Paid</th>
-                        <th class="text-end">Cheque Balance</th>
+                        <th class="text-end">Paid Cheque <span class="text-muted">(cleared)</span></th>
+                        <th class="text-end">Pending Cheque</th>
                         <th class="text-center">Registry</th>
                         <th class="text-center">Cheque / Account</th>
                         <th class="text-end">Total Paid <span class="text-muted">(all)</span></th>
@@ -181,15 +181,41 @@
                                     <span class="text-muted">—</span>
                                 @endif
                             </td>
-                            <td class="text-center">
-                                @if(!empty($r['account_name']))
-                                    <div class="small text-muted">{{ $r['account_name'] }}</div>
+                            <td style="min-width:160px;">
+                                @if($r['cheque_count'] === 0)
+                                    <span class="text-muted">—</span>
+                                @else
+    <table style="width:100%;border-collapse:collapse;font-size:10px;border:1px solid #d0ddf0;border-radius:4px;overflow:hidden;">
+                                        <thead>
+                                            <tr style="background:#1a3a6b;">
+                                                <th style="padding:1px 5px;color:rgba(255,255,255,.8);font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:.3px;border-right:1px solid rgba(255,255,255,.12);text-align:left;">Cheque</th>
+                                                <th style="padding:1px 5px;color:rgba(255,255,255,.8);font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:.3px;text-align:right;">Amount</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <tr style="background:#fbfdff;border-bottom:1px solid #e4ecf7;">
+                                                <td style="padding:1px 5px;border-right:1px solid #e4ecf7;font-weight:600;color:#1a3a6b;white-space:nowrap;">Name</td>
+                                                <td style="padding:1px 5px;text-align:right;color:#374151;white-space:nowrap;">{{ $r['account_name'] ?: '—' }}</td>
+                                            </tr>
+                                            <tr style="background:#fff;border-bottom:1px solid #e4ecf7;">
+                                                <td style="padding:1px 5px;border-right:1px solid #e4ecf7;font-weight:600;color:#15803d;white-space:nowrap;">Total Paid</td>
+                                                <td style="padding:1px 5px;text-align:right;color:#15803d;font-weight:600;white-space:nowrap;">{{ number_format($r['cheque_paid_all'],2) }}</td>
+                                            </tr>
+                                            <tr style="background:#f6f9ff;border-bottom:1px solid #e4ecf7;">
+                                                <td style="padding:1px 5px;border-right:1px solid #e4ecf7;font-weight:600;color:#b45309;white-space:nowrap;">Total Unpaid</td>
+                                                <td style="padding:1px 5px;text-align:right;color:#b45309;font-weight:600;white-space:nowrap;">{{ number_format($r['cheque_balance_all'],2) }}</td>
+                                            </tr>
+                                            <tr style="background:#eef4ff;border-top:1px solid #d0ddf0;">
+                                                <td style="padding:1px 5px;border-right:1px solid #e4ecf7;font-weight:700;color:#1a3a6b;text-align:right;">Total</td>
+                                                <td style="padding:1px 5px;text-align:right;font-weight:700;color:#1a3a6b;white-space:nowrap;">{{ number_format($r['cheque_total'],2) }}</td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                    <button type="button" class="btn btn-outline-primary btn-sm py-0 px-2 mt-1 no-print js-see-cheque w-100"
+                                            data-bond="{{ $r['bond_id'] }}" data-bondno="{{ $r['bond_no'] }}">
+                                        See all ({{ $r['cheque_count'] }})
+                                    </button>
                                 @endif
-                                <div class="fw-semibold">{{ number_format($r['cheque_total'],2) }}</div>
-                                <button type="button" class="btn btn-outline-primary btn-sm py-0 px-2 mt-1 no-print js-see-cheque"
-                                        data-bond="{{ $r['bond_id'] }}" data-bondno="{{ $r['bond_no'] }}">
-                                    See ({{ $r['cheque_count'] }})
-                                </button>
                             </td>
                             <td class="text-end fw-bold">
                                 <a href="{{ url('/customer-bond-payments') }}?bond_id={{ $r['bond_id'] }}"
