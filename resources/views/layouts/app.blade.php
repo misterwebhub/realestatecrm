@@ -279,6 +279,24 @@
                     </li>
                     @endcan
 
+                    @can('user_master.view')
+                    <li class="nav-item">
+                        <a href="{{ route('activity-logs.index') }}" class="nav-link {{ request()->routeIs('activity-logs.*') ? 'active' : '' }}">
+                            <i class="nav-icon bi bi-activity"></i>
+                            <p>Activity Logs</p>
+                        </a>
+                    </li>
+                    @endcan
+
+                    @can('user_master.view')
+                    <li class="nav-item">
+                        <a href="{{ route('audit-logs.index') }}" class="nav-link {{ request()->routeIs('audit-logs.*') ? 'active' : '' }}">
+                            <i class="nav-icon bi bi-database-check"></i>
+                            <p>Database Log</p>
+                        </a>
+                    </li>
+                    @endcan
+
                     @canany(['cheques.view', 'connected_accounts.view'])
                     <li class="nav-item {{ request()->routeIs('customer-bond-cheques.index') || request()->routeIs('customer-bond-cheques.manual') || request()->routeIs('customer-bond-cheques.assign') || request()->routeIs('connected-accounts.*') ? 'menu-open' : '' }}">
                         <a href="#" class="nav-link {{ request()->routeIs('customer-bond-cheques.index') || request()->routeIs('customer-bond-cheques.manual') || request()->routeIs('customer-bond-cheques.assign') || request()->routeIs('connected-accounts.*') ? 'active' : '' }}">

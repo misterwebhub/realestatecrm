@@ -57,6 +57,9 @@ Route::middleware('auth')->group(function () {
     Route::get('plot-holds', [\App\Http\Controllers\PlotHoldController::class, 'index'])->name('plot-holds.index');
     Route::post('plot-holds', [\App\Http\Controllers\PlotHoldController::class, 'store'])->name('plot-holds.store');
     Route::post('plot-holds/{plotHold}/release', [\App\Http\Controllers\PlotHoldController::class, 'release'])->name('plot-holds.release');
+
+    Route::get('activity-logs', [\App\Http\Controllers\ActivityLogController::class, 'index'])->name('activity-logs.index');
+    Route::get('audit-logs', [\App\Http\Controllers\AuditLogController::class, 'index'])->name('audit-logs.index');
     Route::resource('customers', CustomerController::class)->except(['show']);
     Route::get('agents/type/{type}', [AgentController::class, 'typeIndex'])->name('agents.type.index');
     Route::post('agents/type/{type}', [AgentController::class, 'typeStore'])->name('agents.type.store');
