@@ -16,6 +16,15 @@ anywhere (labels, dropdown options, CSV import/export columns, lookups).
 4. Internally a plot is still referenced by its `id` (FK `plot_id`); `title` is
    the human-facing identifier, the same way `legacy_arazi_code` is for arazi.
 
+5. **Never `LIKE`-query a plot `title` — always match it EXACTLY.** The `title`
+   behaves like a plot number (e.g. `1`, `1A`, `12`), so `LIKE '%1%'` would
+   wrongly match `10`, `11`, `21`, etc. Resolve/search a plot by exact title,
+   scoped to its `arazi_code`:
+
+   ```php
+   Plot::where('arazi_code', $code)->where('title', $title) // exact, never LIKE
+   ```
+
 ## Arazi identification: always use the arazi CODE, never the arazi ID
 
 Whenever "arazi" is referenced anywhere in the app, use the **legacy arazi code**

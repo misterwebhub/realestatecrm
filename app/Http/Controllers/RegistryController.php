@@ -617,7 +617,7 @@ class RegistryController extends Controller
         }
         if ($plotQ) {
             $query->whereHas('plots', fn ($p) =>
-                $p->where('title', 'like', '%'.$plotQ.'%')
+                $p->where('title', $plotQ) // exact — plot title behaves like a plot number
                   ->orWhere('plot_number', 'like', '%'.$plotQ.'%')
             );
         }

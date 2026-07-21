@@ -82,7 +82,7 @@ class PlotController extends Controller
 
     protected function resourceRules(?Model $item = null): array
     {
-        return [
+        $rules = [
             'arazi_code' => ['required', 'string', 'exists:arazis,legacy_arazi_code'],
             'title' => ['required', 'string', 'max:150'],
             'block' => ['nullable', 'string', 'max:20'],
@@ -130,6 +130,8 @@ class PlotController extends Controller
             'description' => ['nullable', 'string'],
             'status' => ['required', 'in:available,booked,booked_advance,hold,registry,blacklist,not_for_sale,locked,sold'],
         ];
+
+        return $rules;
     }
 
     protected function resourcePrepareData(array $validated, \Illuminate\Http\Request $request, ?Model $item = null): array
@@ -152,6 +154,18 @@ class PlotController extends Controller
         return $validated;
     }
 
+    protected function resourceAfterSave(Model $item, \Illuminate\Http\Request $request, array $validated, ?Model $original = null): void
+    {
+        /** @var Plot $item */
+        // Holds are managed on the Plot Holds page. If a plot is moved off
+        // "hold" status here, release any active hold so the two stay in sync.
+        if ($item->status !== 'hold') {
+            \App\Models\PlotHold::where('plot_id', $item->id)
+                ->where('status', 'active')
+                ->update(['status' => 'released']);
+        }
+    }
+
     protected function resourceQuery()
     {
         return Plot::with('arazi')->latest();
@@ -166,8 +180,7 @@ class PlotController extends Controller
         $query = $this->resourceQuery();
         if ($q !== '') {
             $query->where(function($sub) use ($q) {
-                $sub->where('title', 'like', '%' . $q . '%')
-                    ->orWhere('id', $q)
+                $sub->where('title', $q) // exact — plot title behaves like a plot number
                     ->orWhereHas('arazi', function($a) use ($q) {
                         $a->where('legacy_arazi_code', 'like', '%' . $q . '%')
                           ->orWhere('plot_number', 'like', '%' . $q . '%')

@@ -107,6 +107,15 @@
                         </a>
                     </li>
 
+                    @can('plots.view')
+                    <li class="nav-item">
+                        <a href="{{ route('plot-holds.index') }}" class="nav-link {{ request()->routeIs('plot-holds.*') ? 'active' : '' }}">
+                            <i class="nav-icon bi bi-hourglass-split"></i>
+                            <p>Plot Holds</p>
+                        </a>
+                    </li>
+                    @endcan
+
                     @can('arazis.view')
                         <li class="nav-item">
                             <a href="{{ route('arazis.index') }}" class="nav-link {{ request()->routeIs('arazis.*') ? 'active' : '' }}">

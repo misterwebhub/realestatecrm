@@ -54,6 +54,9 @@ Route::middleware('auth')->group(function () {
     Route::put('arazi-groups/{araziGroup}', [\App\Http\Controllers\AraziGroupController::class, 'update'])->name('arazi-groups.update');
     Route::delete('arazi-groups/{araziGroup}', [\App\Http\Controllers\AraziGroupController::class, 'destroy'])->name('arazi-groups.destroy');
     Route::resource('plots', PlotController::class)->except(['show']);
+    Route::get('plot-holds', [\App\Http\Controllers\PlotHoldController::class, 'index'])->name('plot-holds.index');
+    Route::post('plot-holds', [\App\Http\Controllers\PlotHoldController::class, 'store'])->name('plot-holds.store');
+    Route::post('plot-holds/{plotHold}/release', [\App\Http\Controllers\PlotHoldController::class, 'release'])->name('plot-holds.release');
     Route::resource('customers', CustomerController::class)->except(['show']);
     Route::get('agents/type/{type}', [AgentController::class, 'typeIndex'])->name('agents.type.index');
     Route::post('agents/type/{type}', [AgentController::class, 'typeStore'])->name('agents.type.store');

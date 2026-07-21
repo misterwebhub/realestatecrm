@@ -89,7 +89,7 @@ class CustomerController extends Controller
         // Filter by plot number / title → bonds → customers
         if ($plotQ !== '') {
             $plotIds = Plot::where('plot_number', 'like', '%' . $plotQ . '%')
-                ->orWhere('title', 'like', '%' . $plotQ . '%')
+                ->orWhere('title', $plotQ) // exact — plot title behaves like a plot number
                 ->pluck('id')->all();
             $bondCustomerIds = CustomerBond::whereHas('plots', fn($pb) => $pb->whereIn('plots.id', $plotIds))
                 ->pluck('customer_id')->unique()->all();

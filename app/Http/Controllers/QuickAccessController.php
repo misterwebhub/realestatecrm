@@ -22,6 +22,7 @@ class QuickAccessController extends Controller
                     ['icon' => 'bi-map-fill',            'color' => 'success',   'title' => 'Arazi (Lands)',        'desc' => 'View & manage all arazi land records',       'url' => route('arazis.index'),              'add_url' => route('arazis.create')],
                     ['icon' => 'bi-geo-alt-fill',         'color' => 'teal',     'title' => 'Arazi Maps',           'desc' => 'Visual map of all arazi parcels',            'url' => route('arazis.map.index'),          'add_url' => null],
                     ['icon' => 'bi-pin-map-fill',         'color' => 'info',     'title' => 'Plots',                'desc' => 'Individual plot records under each arazi',   'url' => route('plots.index'),               'add_url' => route('plots.create')],
+                    ['icon' => 'bi-hourglass-split',      'color' => 'warning',  'title' => 'Plot Holds',           'desc' => 'Plots held by brokers with hold periods',    'url' => route('plot-holds.index'),          'add_url' => null],
                     ['icon' => 'bi-file-earmark-arrow-up','color' => 'secondary','title' => 'Arazi Documents',      'desc' => 'Uploaded documents for arazi records',       'url' => route('arazi-documents.index'),     'add_url' => route('arazi-documents.create')],
                     ['icon' => 'bi-journal-text',         'color' => 'dark',     'title' => 'Plot Registry',        'desc' => 'Registry records for sold plots',            'url' => route('registries.index'),          'add_url' => route('registries.create')],
                 ],

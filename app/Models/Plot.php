@@ -29,4 +29,14 @@ class Plot extends Model
     {
         return $this->belongsTo(Arazi::class, 'arazi_code', 'legacy_arazi_code');
     }
+
+    public function holds()
+    {
+        return $this->hasMany(PlotHold::class);
+    }
+
+    public function activeHold()
+    {
+        return $this->hasOne(PlotHold::class)->where('status', 'active')->latestOfMany();
+    }
 }

@@ -109,7 +109,7 @@ class CustomerBondPaymentController extends Controller
         // Search by plot title
         if ($plotQ !== '') {
             $query->whereHas('plot', fn($p) =>
-                $p->where('title', 'like', '%'.$plotQ.'%')
+                $p->where('title', $plotQ) // exact — plot title behaves like a plot number
                   ->orWhere('plot_number', 'like', '%'.$plotQ.'%')
             );
         }
@@ -202,7 +202,7 @@ class CustomerBondPaymentController extends Controller
             ))
             ->when(!$selectedBondId && $araziCode !== '', fn ($query) => $query->where('arazi_code', $araziCode))
             ->when(!$selectedBondId && $plotQ, fn ($query) => $query->whereHas('plots', fn ($p) =>
-                $p->where('title', 'like', '%'.$plotQ.'%')
+                $p->where('title', $plotQ) // exact — plot title behaves like a plot number
                   ->orWhere('plot_number', 'like', '%'.$plotQ.'%')
             ))
             ->latest();
@@ -399,7 +399,7 @@ class CustomerBondPaymentController extends Controller
             ))
             ->when($araziCode !== '', fn ($query) => $query->where('arazi_code', $araziCode))
             ->when($plotQ, fn ($query) => $query->whereHas('plots', fn ($p) =>
-                $p->where('title', 'like', '%'.$plotQ.'%')
+                $p->where('title', $plotQ) // exact — plot title behaves like a plot number
                   ->orWhere('plot_number', 'like', '%'.$plotQ.'%')
             ))
             ->latest()

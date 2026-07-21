@@ -308,9 +308,13 @@ class CustomerBondController extends Controller
             $query->where('arazi_code', (string) $araziCode);
         }
         if ($plotQuery !== '') {
-            // search by title only
-            $query->whereHas('plots', function ($q) use ($plotQuery) {
-                $q->where('plots.title', 'like', '%'.$plotQuery.'%');
+            // Exact title match — a plot title behaves like a plot number, so a
+            // LIKE '%1%' would wrongly match 10, 11, 12… Scope to the selected arazi too.
+            $query->whereHas('plots', function ($q) use ($plotQuery, $araziCode) {
+                $q->where('plots.title', $plotQuery);
+                if ($araziCode) {
+                    $q->where('plots.arazi_code', (string) $araziCode);
+                }
             });
         }
 
