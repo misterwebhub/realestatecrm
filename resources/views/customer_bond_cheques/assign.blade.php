@@ -55,6 +55,24 @@
                     </select>
                 </div>
                 <div class="col-md-2">
+                    <label class="form-label small mb-1">Arazi</label>
+                    <select name="arazi_code" class="form-select form-select-sm" onchange="this.form.submit()">
+                        <option value="">— All —</option>
+                        @foreach($araziCodes as $code)
+                            <option value="{{ $code }}" @selected((string)$filterArazi === (string)$code)>{{ $code }}</option>
+                        @endforeach
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label small mb-1">Plot</label>
+                    <select name="plot_id" class="form-select form-select-sm" @disabled($filterArazi === '')>
+                        <option value="">— All —</option>
+                        @foreach($plots as $p)
+                            <option value="{{ $p->id }}" @selected((string)$filterPlot === (string)$p->id)>{{ $p->title }}</option>
+                        @endforeach
+                    </select>
+                </div>
+                <div class="col-md-2">
                     <label class="form-label small mb-1">From</label>
                     <input type="date" name="date_from" value="{{ $filterFrom }}" class="form-control form-control-sm">
                 </div>
@@ -119,6 +137,8 @@
                                 <th>Cheque No</th>
                                 <th>Amount</th>
                                 <th>Assignment</th>
+                                <th>Arazi</th>
+                                <th>Plot</th>
                                 <th>Current Bond</th>
                                 <th>Customer</th>
                                 <th>Account</th>
@@ -140,6 +160,8 @@
                                             <span class="badge bg-warning text-dark">Not Assigned</span>
                                         @endif
                                     </td>
+                                    <td>{{ $c->arazi_code ?: (optional(optional($c->customerBond)->arazi)->legacy_arazi_code ?: '—') }}</td>
+                                    <td>{{ optional($c->plot)->title ?: '—' }}</td>
                                     <td>{{ optional($c->customerBond)->bond_no ?: '—' }}</td>
                                     <td>{{ optional(optional($c->customerBond)->customer)->name ?: '—' }}</td>
                                     <td>{{ optional($c->connectedAccount)->name ?: '—' }}</td>
@@ -154,7 +176,7 @@
                                     </td>
                                 </tr>
                             @empty
-                                <tr><td colspan="10" class="text-center text-muted py-3">No cheques match the current filters.</td></tr>
+                                <tr><td colspan="12" class="text-center text-muted py-3">No cheques match the current filters.</td></tr>
                             @endforelse
                         </tbody>
                     </table>

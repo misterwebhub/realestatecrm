@@ -320,10 +320,23 @@ class CustomerBondChequeController extends Controller
 
         $accounts = \App\Models\ConnectedAccount::orderBy('name')->get();
 
+        // Arazi options keyed by their legacy code (project convention).
+        $araziCodes = \App\Models\Arazi::whereNotNull('legacy_arazi_code')
+            ->where('legacy_arazi_code', '!=', '')
+            ->orderBy('legacy_arazi_code')
+            ->get()
+            ->map(fn ($a) => [
+                'code'  => $a->legacy_arazi_code,
+                'label' => $a->legacy_arazi_code . ($a->location ? ' — ' . $a->location : ''),
+            ])
+            ->unique('code')
+            ->values();
+
         return view('customer_bond_cheques.manual', [
-            'title'    => 'Create Manual Cheque Entries',
-            'bonds'    => $bonds,
-            'accounts' => $accounts,
+            'title'      => 'Create Manual Cheque Entries',
+            'bonds'      => $bonds,
+            'accounts'   => $accounts,
+            'araziCodes' => $araziCodes,
         ]);
     }
 
@@ -339,6 +352,8 @@ class CustomerBondChequeController extends Controller
             'entries.*.bond_ids'           => ['nullable', 'array'],
             'entries.*.bond_ids.*'         => ['integer', 'exists:customer_bonds,id'],
             'entries.*.connected_account_id' => ['nullable', 'exists:connected_accounts,id'],
+            'entries.*.arazi_code'         => ['required', 'string', 'max:100'],
+            'entries.*.plot_id'            => ['required', 'integer', 'exists:plots,id'],
             'entries.*.cheque_number'      => ['required', 'string', 'max:100'],
             'entries.*.cheque_date'        => ['nullable', 'date'],
             'entries.*.action_due_date'    => ['nullable', 'date'],
@@ -389,6 +404,8 @@ class CustomerBondChequeController extends Controller
                     CustomerBondCheque::create([
                         'customer_bond_id'     => null,
                         'customer_id'          => null,
+                        'arazi_code'           => $entry['arazi_code'],
+                        'plot_id'              => $entry['plot_id'],
                         'connected_account_id' => $entry['connected_account_id'] ?? null,
                         'cheque_number'        => $entry['cheque_number'],
                         'cheque_date'          => $entry['cheque_date'] ?? null,
@@ -418,6 +435,8 @@ class CustomerBondChequeController extends Controller
                     CustomerBondCheque::create([
                         'customer_bond_id'     => $bondId,
                         'customer_id'          => CustomerBond::find($bondId)?->customer_id ?? null,
+                        'arazi_code'           => $entry['arazi_code'],
+                        'plot_id'              => $entry['plot_id'],
                         'connected_account_id' => $entry['connected_account_id'] ?? null,
                         'cheque_number'        => $entry['cheque_number'],
                         'cheque_date'          => $entry['cheque_date'] ?? null,
@@ -447,8 +466,17 @@ class CustomerBondChequeController extends Controller
      */
     public function manualTemplate()
     {
-        $headers = ['bond_no', 'account', 'cheque_number', 'amount', 'cheque_date', 'action_due_date', 'frequency_type', 'status', 'type', 'notes'];
-        $sample  = ['REGC0001', '', 'CHQ-1001', '50000', '2026-07-20', '2026-08-20', 'every_month', 'pending', 'mentioned', 'Sample note'];
+        // arazi_code and plot_title are REQUIRED; bond_no is optional (leave
+        // blank to import an unassigned cheque). Use a real arazi/plot in the
+        // sample so a copy-paste import succeeds out of the box.
+        $sampleArazi = \App\Models\Arazi::whereNotNull('legacy_arazi_code')
+            ->where('legacy_arazi_code', '!=', '')
+            ->value('legacy_arazi_code') ?: 'ARAZI_CODE';
+        $samplePlot = \App\Models\Plot::where('arazi_code', $sampleArazi)
+            ->value('title') ?: 'PLOT_TITLE';
+
+        $headers = ['arazi_code', 'plot_title', 'bond_no', 'account', 'cheque_number', 'amount', 'cheque_date', 'action_due_date', 'frequency_type', 'status', 'type', 'notes'];
+        $sample  = [$sampleArazi, $samplePlot, '', '', 'CHQ-1001', '50000', '2026-07-20', '2026-08-20', 'every_month', 'pending', 'mentioned', 'Sample note'];
 
         $callback = function () use ($headers, $sample) {
             $out = fopen('php://output', 'w');
@@ -498,7 +526,7 @@ class CustomerBondChequeController extends Controller
                 if ($rowNum === 1) {
                     $row[0] = preg_replace('/^\xEF\xBB\xBF/', '', $row[0] ?? '');
                     // Skip header row
-                    if (strtolower(trim($row[0])) === 'bond_no') {
+                    if (in_array(strtolower(trim($row[0])), ['arazi_code', 'bond_no'], true)) {
                         continue;
                     }
                 }
@@ -507,9 +535,11 @@ class CustomerBondChequeController extends Controller
                     continue; // blank line
                 }
 
-                [$bondNo, $account, $chequeNumber, $amount, $chequeDate, $actionDue, $freq, $status, $type, $notes] = array_pad($row, 10, null);
+                [$araziCode, $plotTitle, $bondNo, $account, $chequeNumber, $amount, $chequeDate, $actionDue, $freq, $status, $type, $notes] = array_pad($row, 12, null);
 
                 $bondNo = trim((string) $bondNo);
+                $araziCode = trim((string) $araziCode);
+                $plotTitle = trim((string) $plotTitle);
                 $chequeNumber = trim((string) $chequeNumber);
 
                 $bondId = null;
@@ -523,6 +553,27 @@ class CustomerBondChequeController extends Controller
                 }
                 if ($chequeNumber === '') {
                     $skipped[] = "row {$rowNum}: missing cheque number";
+                    continue;
+                }
+
+                // Arazi + plot are required and must match.
+                if ($araziCode === '') {
+                    $skipped[] = "row {$rowNum}: missing arazi_code";
+                    continue;
+                }
+                if (! \App\Models\Arazi::where('legacy_arazi_code', $araziCode)->exists()) {
+                    $skipped[] = "row {$rowNum}: arazi '{$araziCode}' not found";
+                    continue;
+                }
+                if ($plotTitle === '') {
+                    $skipped[] = "row {$rowNum}: missing plot_title";
+                    continue;
+                }
+                $plotId = \App\Models\Plot::where('arazi_code', $araziCode)
+                    ->where('title', $plotTitle)
+                    ->value('id');
+                if (! $plotId) {
+                    $skipped[] = "row {$rowNum}: plot '{$plotTitle}' not found in arazi '{$araziCode}'";
                     continue;
                 }
 
@@ -548,6 +599,8 @@ class CustomerBondChequeController extends Controller
                 CustomerBondCheque::create([
                     'customer_bond_id'     => $bondId,
                     'customer_id'          => $bondId ? (CustomerBond::find($bondId)?->customer_id ?? null) : null,
+                    'arazi_code'           => $araziCode,
+                    'plot_id'              => $plotId,
                     'connected_account_id' => $accountId,
                     'cheque_number'        => $chequeNumber,
                     'cheque_date'          => $chequeDate ?: null,
@@ -589,13 +642,17 @@ class CustomerBondChequeController extends Controller
         $filterFrom    = $request->query('date_from', '');
         $filterTo      = $request->query('date_to', '');
         $filterAssign  = $request->query('assignment', '');
+        $filterArazi   = $request->query('arazi_code', '');
+        $filterPlot    = $request->query('plot_id', '');
 
-        $cheques = CustomerBondCheque::with(['customerBond.customer', 'customerBond.arazi', 'connectedAccount'])
+        $cheques = CustomerBondCheque::with(['customerBond.customer', 'customerBond.arazi', 'connectedAccount', 'arazi', 'plot'])
             ->when($filterNumber,  fn ($q) => $q->where('cheque_number', 'like', '%' . $filterNumber . '%'))
             ->when($filterAccount, fn ($q) => $q->where('connected_account_id', $filterAccount))
             ->when($filterStatus,  fn ($q) => $q->where('status', $filterStatus))
             ->when($filterAssign === 'assigned',   fn ($q) => $q->whereNotNull('customer_bond_id'))
             ->when($filterAssign === 'unassigned', fn ($q) => $q->whereNull('customer_bond_id'))
+            ->when($filterArazi !== '', fn ($q) => $q->where('arazi_code', $filterArazi))
+            ->when($filterPlot !== '',  fn ($q) => $q->where('plot_id', $filterPlot))
             ->when($filterFrom,    fn ($q) => $q->whereDate('cheque_date', '>=', $filterFrom))
             ->when($filterTo,      fn ($q) => $q->whereDate('cheque_date', '<=', $filterTo))
             ->latest('cheque_date')
@@ -617,17 +674,33 @@ class CustomerBondChequeController extends Controller
 
         $accounts = \App\Models\ConnectedAccount::orderBy('name')->get();
 
+        // Arazi codes present on cheques (for the filter dropdown).
+        $araziCodes = CustomerBondCheque::whereNotNull('arazi_code')
+            ->where('arazi_code', '!=', '')
+            ->distinct()
+            ->orderBy('arazi_code')
+            ->pluck('arazi_code');
+
+        // Plots for the selected arazi (only relevant when an arazi is chosen).
+        $plots = $filterArazi !== ''
+            ? \App\Models\Plot::where('arazi_code', $filterArazi)->orderBy('title')->get(['id', 'title'])
+            : collect();
+
         return view('customer_bond_cheques.assign', [
             'title'         => 'Assign Cheques to Bond',
             'cheques'       => $cheques,
             'bonds'         => $bonds,
             'accounts'      => $accounts,
+            'araziCodes'    => $araziCodes,
+            'plots'         => $plots,
             'filterNumber'  => $filterNumber,
             'filterAccount' => $filterAccount,
             'filterStatus'  => $filterStatus,
             'filterFrom'    => $filterFrom,
             'filterTo'      => $filterTo,
             'filterAssign'  => $filterAssign,
+            'filterArazi'   => $filterArazi,
+            'filterPlot'    => $filterPlot,
         ]);
     }
 
@@ -642,13 +715,17 @@ class CustomerBondChequeController extends Controller
         $filterFrom    = $request->query('date_from', '');
         $filterTo      = $request->query('date_to', '');
         $filterAssign  = $request->query('assignment', '');
+        $filterArazi   = $request->query('arazi_code', '');
+        $filterPlot    = $request->query('plot_id', '');
 
-        $cheques = CustomerBondCheque::with(['customerBond.customer', 'customerBond.arazi', 'connectedAccount'])
+        $cheques = CustomerBondCheque::with(['customerBond.customer', 'customerBond.arazi', 'connectedAccount', 'arazi', 'plot'])
             ->when($filterNumber,  fn ($q) => $q->where('cheque_number', 'like', '%' . $filterNumber . '%'))
             ->when($filterAccount, fn ($q) => $q->where('connected_account_id', $filterAccount))
             ->when($filterStatus,  fn ($q) => $q->where('status', $filterStatus))
             ->when($filterAssign === 'assigned',   fn ($q) => $q->whereNotNull('customer_bond_id'))
             ->when($filterAssign === 'unassigned', fn ($q) => $q->whereNull('customer_bond_id'))
+            ->when($filterArazi !== '', fn ($q) => $q->where('arazi_code', $filterArazi))
+            ->when($filterPlot !== '',  fn ($q) => $q->where('plot_id', $filterPlot))
             ->when($filterFrom,    fn ($q) => $q->whereDate('cheque_date', '>=', $filterFrom))
             ->when($filterTo,      fn ($q) => $q->whereDate('cheque_date', '<=', $filterTo))
             ->latest('cheque_date')
@@ -659,7 +736,7 @@ class CustomerBondChequeController extends Controller
             $out = fopen('php://output', 'w');
             fprintf($out, chr(0xEF) . chr(0xBB) . chr(0xBF)); // UTF-8 BOM
             fputcsv($out, [
-                'Cheque No', 'Amount', 'Assignment', 'Bond No', 'Customer', 'Arazi Code',
+                'Cheque No', 'Amount', 'Assignment', 'Bond No', 'Customer', 'Arazi Code', 'Plot',
                 'Account', 'Cheque Date', 'Due Date', 'Frequency', 'Status', 'Type', 'Notes',
             ]);
             foreach ($cheques as $c) {
@@ -669,7 +746,8 @@ class CustomerBondChequeController extends Controller
                     $c->customer_bond_id ? 'Assigned' : 'Not Assigned',
                     optional($c->customerBond)->bond_no ?: '',
                     optional(optional($c->customerBond)->customer)->name ?: '',
-                    optional(optional($c->customerBond)->arazi)->legacy_arazi_code ?: '',
+                    $c->arazi_code ?: (optional(optional($c->customerBond)->arazi)->legacy_arazi_code ?: ''),
+                    optional($c->plot)->title ?: '',
                     optional($c->connectedAccount)->name ?: '',
                     $c->cheque_date ? \Carbon\Carbon::parse($c->cheque_date)->format('Y-m-d') : '',
                     $c->action_due_date ? \Carbon\Carbon::parse($c->action_due_date)->format('Y-m-d') : '',

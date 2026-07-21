@@ -13,6 +13,8 @@ class CustomerBondCheque extends Model
         'customer_bond_id',
         'connected_account_id',
         'customer_id',
+        'arazi_code',
+        'plot_id',
         'cheque_number',
         'bank_name',
         'branch_name',
@@ -45,6 +47,16 @@ class CustomerBondCheque extends Model
     public function customer()
     {
         return $this->belongsTo(Customer::class);
+    }
+
+    public function arazi()
+    {
+        return $this->belongsTo(Arazi::class, 'arazi_code', 'legacy_arazi_code');
+    }
+
+    public function plot()
+    {
+        return $this->belongsTo(Plot::class);
     }
 
     public function creator()

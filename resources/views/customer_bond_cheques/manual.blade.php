@@ -33,7 +33,7 @@
                     <a href="{{ route('customer-bond-cheques.manual-template') }}" class="btn btn-outline-secondary btn-sm"><i class="bi bi-download me-1"></i>Download Template</a>
                 </div>
                 <div class="col-12">
-                    <span class="text-muted small"><i class="bi bi-info-circle me-1"></i>Columns: bond_no, account, cheque_number, amount, cheque_date, action_due_date, frequency_type, status, type, notes. Bonds are matched by bond number.</span>
+                    <span class="text-muted small"><i class="bi bi-info-circle me-1"></i>Columns: <strong>arazi_code*</strong>, <strong>plot_title*</strong>, bond_no, account, cheque_number*, amount*, cheque_date, action_due_date, frequency_type, status, type, notes. Fields marked * are required; arazi is matched by code and plot by title, bond_no is optional (blank = unassigned).</span>
                 </div>
             </form>
         </div>
@@ -58,6 +58,8 @@
                             <tr>
                                 <th style="width:36px">#</th>
                                 <th style="min-width:220px">Assign to Bond(s)</th>
+                                <th style="min-width:160px">Arazi <span class="text-danger">*</span></th>
+                                <th style="min-width:150px">Plot <span class="text-danger">*</span></th>
                                 <th style="min-width:150px">Account</th>
                                 <th style="width:140px">Cheque No <span class="text-danger">*</span></th>
                                 <th style="width:140px">Amount <span class="text-danger">*</span></th>
@@ -95,6 +97,19 @@
                 @foreach($bonds as $b)
                     <option value="{{ $b['id'] }}">{{ $b['label'] }}</option>
                 @endforeach
+            </select>
+        </td>
+        <td>
+            <select name="entries[__IDX0__][arazi_code]" required class="form-select form-select-sm arazi-select">
+                <option value="">— Select arazi —</option>
+                @foreach($araziCodes as $a)
+                    <option value="{{ $a['code'] }}">{{ $a['label'] }}</option>
+                @endforeach
+            </select>
+        </td>
+        <td>
+            <select name="entries[__IDX0__][plot_id]" required class="form-select form-select-sm plot-select" disabled>
+                <option value="">— Select arazi first —</option>
             </select>
         </td>
         <td>
@@ -144,10 +159,53 @@
     var tpl    = document.getElementById('rowTemplate').innerHTML;
     var addBtn = document.getElementById('addRow');
 
+    var plotsUrlTpl = @json(route('arazis.plots-by-code', ['code' => '__CODE__']));
+
     function initSelect2($scope){
         if(!(window.jQuery && jQuery.fn.select2)) return;
         try{ jQuery($scope).find('.bond-select').select2({ theme:'bootstrap-5', width:'100%', placeholder:'Select bond(s)…', closeOnSelect:false }); }catch(e){}
         try{ jQuery($scope).find('.acc-select').select2({ theme:'bootstrap-5', width:'100%', placeholder:'— Select —' }); }catch(e){}
+        try{ jQuery($scope).find('.arazi-select').select2({ theme:'bootstrap-5', width:'100%', placeholder:'— Select arazi —' }); }catch(e){}
+        try{ jQuery($scope).find('.plot-select').select2({ theme:'bootstrap-5', width:'100%', placeholder:'— Select plot —' }); }catch(e){}
+    }
+
+    // Rebuild the plot <select> and re-sync Select2 (Select2 v4 doesn't pick up
+    // a native `disabled` toggle on its own, so we re-init it after each change).
+    function renderPlotOptions(plotSel, html, disabled){
+        var hadSelect2 = window.jQuery && jQuery.fn.select2 && jQuery(plotSel).data('select2');
+        if(hadSelect2){ try{ jQuery(plotSel).select2('destroy'); }catch(e){} }
+        plotSel.innerHTML = html;
+        plotSel.disabled = !!disabled;
+        if(window.jQuery && jQuery.fn.select2){
+            try{ jQuery(plotSel).select2({ theme:'bootstrap-5', width:'100%', placeholder:'— Select plot —' }); }catch(e){}
+        }
+    }
+
+    function loadPlots(araziSel){
+        var row  = araziSel.closest('tr');
+        var plotSel = row.querySelector('.plot-select');
+        if(!plotSel) return;
+        var code = araziSel.value;
+        if(!code){
+            renderPlotOptions(plotSel, '<option value="">— Select arazi first —</option>', true);
+            return;
+        }
+        renderPlotOptions(plotSel, '<option value="">— Loading… —</option>', true);
+        fetch(plotsUrlTpl.replace('__CODE__', encodeURIComponent(code)), { headers: { 'Accept':'application/json' } })
+            .then(function(r){ return r.json(); })
+            .then(function(data){
+                var plots = (data && data.plots) ? data.plots : [];
+                var html = '<option value="">— Select plot —</option>';
+                plots.forEach(function(p){
+                    var lbl = (p.label || p.title || ('Plot-' + p.id)) + (p.block ? ' (Block ' + p.block + ')' : '');
+                    html += '<option value="' + p.id + '">' + lbl + '</option>';
+                });
+                if(plots.length === 0){ html = '<option value="">— No plots found —</option>'; }
+                renderPlotOptions(plotSel, html, plots.length === 0);
+            })
+            .catch(function(){
+                renderPlotOptions(plotSel, '<option value="">— Failed to load —</option>', true);
+            });
     }
 
     function reindex(){
@@ -180,10 +238,20 @@
 
     addBtn.addEventListener('click', addRow);
 
+    // When an arazi is chosen, load its plots into the same row.
+    // Select2 fires its change through jQuery's event system (which does NOT
+    // reach native delegated listeners), so bind via jQuery when available.
+    if(window.jQuery){
+        jQuery(document).on('change', '.arazi-select', function(){ loadPlots(this); });
+    } else {
+        table.addEventListener('change', function(e){
+            var arazi = e.target.closest && e.target.closest('.arazi-select');
+            if(arazi){ loadPlots(arazi); }
+        });
+    }
+
     // When the first row's account changes, apply it to all other rows.
-    table.addEventListener('change', function(e){
-        var sel = e.target.closest && e.target.closest('.acc-select');
-        if(!sel) return;
+    function propagateAccount(sel){
         var firstRow = table.querySelector('tr');
         if(!firstRow || !firstRow.contains(sel)) return;
         var val = sel.value;
@@ -194,7 +262,15 @@
             s.value = val;
             if(window.jQuery && jQuery.fn.select2){ try{ jQuery(s).trigger('change.select2'); }catch(e){} }
         });
-    });
+    }
+    if(window.jQuery){
+        jQuery(document).on('change', '.acc-select', function(){ propagateAccount(this); });
+    } else {
+        table.addEventListener('change', function(e){
+            var sel = e.target.closest && e.target.closest('.acc-select');
+            if(sel){ propagateAccount(sel); }
+        });
+    }
 
     table.addEventListener('click', function(e){
         var btn = e.target.closest('.btn-remove');

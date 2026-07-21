@@ -1,5 +1,21 @@
 # Project Conventions — Real Estate CRM
 
+## Plot identification: always use the `title` field, never `plot_number`
+
+Whenever a plot is displayed, labelled, searched, matched, or exported anywhere
+in the app, use the plot's **`title`** column. **Do not use `plot_number`**
+anywhere (labels, dropdown options, CSV import/export columns, lookups).
+
+### Rules
+
+1. **Display/labels** — show `plot->title` in tables, badges, dropdowns.
+2. **Lookups/matching** — resolve a plot by `title` (scoped to its `arazi_code`),
+   e.g. `Plot::where('arazi_code', $code)->where('title', $title)`.
+3. **CSV import/export** — the plot column is `plot_title` (value = `title`),
+   never `plot_number`.
+4. Internally a plot is still referenced by its `id` (FK `plot_id`); `title` is
+   the human-facing identifier, the same way `legacy_arazi_code` is for arazi.
+
 ## Arazi identification: always use the arazi CODE, never the arazi ID
 
 Whenever "arazi" is referenced anywhere in the app, use the **legacy arazi code**
