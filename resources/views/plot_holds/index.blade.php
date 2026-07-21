@@ -24,10 +24,10 @@
                         </select>
                     </div>
                     <div class="col-md-4">
-                        <label class="form-label mb-1">Plot <span class="text-danger">*</span></label>
-                        <select name="plot_id" id="hold_plot_id" class="form-select" required disabled>
-                            <option value="">Select Arazi first</option>
+                        <label class="form-label mb-1">Plot(s) <span class="text-danger">*</span></label>
+                        <select name="plot_id[]" id="hold_plot_id" class="form-select" required disabled multiple>
                         </select>
+                        <small class="text-muted">Select one or more plots in this arazi.</small>
                     </div>
                     <div class="col-md-4">
                         <label class="form-label mb-1">Broker <span class="text-danger">*</span></label>
@@ -166,17 +166,26 @@ jQuery(function(){
         });
     }
 
+    function initPlotSelect2(){
+        if(window.jQuery && jQuery.fn.select2){
+            jQuery('#hold_plot_id').select2({
+                theme: 'bootstrap-5', width: '100%', placeholder: 'Select plot(s)',
+                dropdownParent: jQuery('#addHoldForm')
+            });
+        }
+    }
+
     async function loadPlots(code){
         const plotSel = document.getElementById('hold_plot_id');
         if(!plotSel) return;
-        plotSel.innerHTML = '<option value="">Loading…</option>';
+        plotSel.innerHTML = '';
         plotSel.disabled = true;
-        if(!code){ plotSel.innerHTML = '<option value="">Select Arazi first</option>'; return; }
+        if(!code){ initPlotSelect2(); return; }
         try{
             const res = await fetch(plotsByCodeBase + '/' + encodeURIComponent(code) + '/plots');
             const raw = await res.json();
             const data = Array.isArray(raw) ? raw : (raw.plots || []);
-            plotSel.innerHTML = '<option value="">Select Plot</option>';
+            plotSel.innerHTML = '';
             data.forEach(function(p){
                 const opt = document.createElement('option');
                 opt.value = p.id;
@@ -184,8 +193,10 @@ jQuery(function(){
                 plotSel.appendChild(opt);
             });
             plotSel.disabled = false;
+            initPlotSelect2();
         }catch(e){
-            plotSel.innerHTML = '<option value="">Failed to load plots</option>';
+            plotSel.innerHTML = '';
+            initPlotSelect2();
         }
     }
 

@@ -73,7 +73,8 @@ class PlotHoldController extends Controller
     {
         $data = $request->validate([
             'arazi_code' => ['required', 'string', 'exists:arazis,legacy_arazi_code'],
-            'plot_id' => ['required', 'integer', 'exists:plots,id'],
+            'plot_id' => ['required', 'array', 'min:1'],
+            'plot_id.*' => ['integer', 'exists:plots,id'],
             'agent_id' => ['required', 'integer', 'exists:agents,id'],
             'days' => ['required', 'integer', 'min:1'],
             'start_date' => ['required', 'date'],
@@ -84,36 +85,40 @@ class PlotHoldController extends Controller
             'notes' => ['nullable', 'string'],
         ]);
 
-        $plot = Plot::findOrFail($data['plot_id']);
+        $plots = Plot::whereIn('id', $data['plot_id'])->get();
 
-        // Only one active hold per plot — release any existing one first.
-        PlotHold::where('plot_id', $plot->id)
-            ->where('status', 'active')
-            ->update(['status' => 'released']);
+        foreach ($plots as $plot) {
+            // Only one active hold per plot — release any existing one first.
+            PlotHold::where('plot_id', $plot->id)
+                ->where('status', 'active')
+                ->update(['status' => 'released']);
 
-        PlotHold::create([
-            'plot_id' => $plot->id,
-            'arazi_code' => $plot->arazi_code ?: $data['arazi_code'],
-            'agent_id' => $data['agent_id'],
-            'days' => $data['days'],
-            'start_date' => $data['start_date'],
-            'end_date' => $data['end_date'],
-            'customer_id' => $data['customer_id'] ?? null,
-            'customer_name' => $data['customer_name'] ?? null,
-            'customer_phone' => $data['customer_phone'] ?? null,
-            'notes' => $data['notes'] ?? null,
-            'status' => 'active',
-            'created_by' => auth()->id(),
-        ]);
+            PlotHold::create([
+                'plot_id' => $plot->id,
+                'arazi_code' => $plot->arazi_code ?: $data['arazi_code'],
+                'agent_id' => $data['agent_id'],
+                'days' => $data['days'],
+                'start_date' => $data['start_date'],
+                'end_date' => $data['end_date'],
+                'customer_id' => $data['customer_id'] ?? null,
+                'customer_name' => $data['customer_name'] ?? null,
+                'customer_phone' => $data['customer_phone'] ?? null,
+                'notes' => $data['notes'] ?? null,
+                'status' => 'active',
+                'created_by' => auth()->id(),
+            ]);
 
-        // Adding a hold here auto-sets the plot to "hold".
-        if ($plot->status !== 'hold') {
-            $plot->update(['status' => 'hold']);
+            // Adding a hold here auto-sets the plot to "hold".
+            if ($plot->status !== 'hold') {
+                $plot->update(['status' => 'hold']);
+            }
         }
+
+        $count = $plots->count();
 
         return redirect()
             ->route('plot-holds.index')
-            ->with('success', 'Hold created and plot set to hold.');
+            ->with('success', $count . ' plot' . ($count === 1 ? '' : 's') . ' set to hold.');
     }
 
     public function release(PlotHold $plotHold)
