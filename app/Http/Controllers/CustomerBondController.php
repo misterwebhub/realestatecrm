@@ -417,6 +417,14 @@ class CustomerBondController extends Controller
                     'data_toggle' => 'modal',
                     'data_target' => 'chequesModal',
                 ],
+                [
+                    'url' => route('change-log.record', ['type' => 'bond', 'id' => $item->id]),
+                    'label' => 'Log',
+                    'class' => 'btn-outline-dark',
+                    'data_modal' => true,
+                    'data_toggle' => 'modal',
+                    'data_target' => 'changeLogModal',
+                ],
             ],
             // mark that links for this resource should open in a new tab
             'open_in_new_tab' => true,

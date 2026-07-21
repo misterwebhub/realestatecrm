@@ -60,6 +60,7 @@ Route::middleware('auth')->group(function () {
 
     Route::get('activity-logs', [\App\Http\Controllers\ActivityLogController::class, 'index'])->name('activity-logs.index');
     Route::get('audit-logs', [\App\Http\Controllers\AuditLogController::class, 'index'])->name('audit-logs.index');
+    Route::get('change-log', [\App\Http\Controllers\AuditLogController::class, 'forRecord'])->name('change-log.record');
     Route::resource('customers', CustomerController::class)->except(['show']);
     Route::get('agents/type/{type}', [AgentController::class, 'typeIndex'])->name('agents.type.index');
     Route::post('agents/type/{type}', [AgentController::class, 'typeStore'])->name('agents.type.store');
@@ -143,7 +144,7 @@ Route::middleware('auth')->group(function () {
     Route::post('converter', [\App\Http\Controllers\AreaConverterController::class, 'convert'])->name('converter.convert');
     Route::get('arazi/{arazi}/plots', [\App\Http\Controllers\AraziController::class, 'plots'])->name('arazis.plots');
     Route::get('arazi/{arazi}/info', [\App\Http\Controllers\AraziController::class, 'info'])->name('arazis.info');
-    Route::get('arazi/{arazi}/dashboard', [\App\Http\Controllers\AraziDashboardController::class, 'show'])->name('arazi.dashboard');
+    Route::get('arazi/{code}/dashboard', [\App\Http\Controllers\AraziDashboardController::class, 'show'])->name('arazi.dashboard');
     // Support both numeric id and legacy arazi code/plot_number via gridByIdentifier
     Route::get('arazi/{identifier}/grid', [\App\Http\Controllers\AraziController::class, 'gridByIdentifier'])->name('arazis.grid');
     Route::get('arazi/{arazi}/saleable', [\App\Http\Controllers\AraziController::class, 'saleable'])->name('arazis.saleable');

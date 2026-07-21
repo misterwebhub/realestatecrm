@@ -9,8 +9,11 @@ use Illuminate\Http\Request;
 
 class AraziDashboardController extends Controller
 {
-    public function show(Request $request, Arazi $arazi)
+    public function show(Request $request, string $code)
     {
+        // Always resolve an arazi by its legacy code, never the internal id.
+        $arazi = Arazi::where('legacy_arazi_code', $code)->firstOrFail();
+
         $totalPlots = Plot::where('arazi_code', $arazi->legacy_arazi_code)->count();
         $soldPlots = Plot::where('arazi_code', $arazi->legacy_arazi_code)->where('status', 'sold')->count();
         $leftPlots = max($totalPlots - $soldPlots, 0);
@@ -22,7 +25,7 @@ class AraziDashboardController extends Controller
         $totalBrokerPayment = $bonds->sum(function ($b) { return (float) ($b->broker_payment ?? 0); });
         $totalBrokerPaid = $bonds->sum(function ($b) { return (float) ($b->broker_paid ?? 0); });
 
-        $shareUrl = route('arazi.dashboard', ['arazi' => $arazi->id, 'shared' => 1]);
+        $shareUrl = route('arazi.dashboard', ['code' => $arazi->legacy_arazi_code, 'shared' => 1]);
 
         return view('dashboards.arazi', compact(
             'arazi', 'totalPlots', 'soldPlots', 'leftPlots', 'bonds', 'totalBonds', 'customers', 'totalBrokerPayment', 'totalBrokerPaid', 'shareUrl'

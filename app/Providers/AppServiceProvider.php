@@ -5,6 +5,7 @@ namespace App\Providers;
 use App\Models\AuditLog;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Pagination\Paginator;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
@@ -47,25 +48,48 @@ class AppServiceProvider extends ServiceProvider
      */
     protected function registerAuditLogging(): void
     {
-        Model::created(function (Model $model) {
-            $this->writeAudit('created', $model, null, $this->cleanAttrs($model->getAttributes()));
+        // NOTE: these MUST be wildcard event listeners. Registering via
+        // Model::created()/updated()/deleted() only fires for the base Model
+        // class, NOT its subclasses, so nothing would ever be logged.
+        Event::listen('eloquent.created: *', function ($eventName, $data) {
+            $model = $data[0] ?? null;
+            if ($model instanceof Model) {
+                $this->writeAudit('created', $model, null, $this->cleanAttrs($model->getAttributes()));
+            }
         });
 
-        Model::updated(function (Model $model) {
+        Event::listen('eloquent.updated: *', function ($eventName, $data) {
+            $model = $data[0] ?? null;
+            if (! $model instanceof Model) {
+                return;
+            }
             $changes = $model->getChanges();
             unset($changes['updated_at']);
+
+            // Drop "changes" where the value is only formatted differently
+            // (e.g. "350000.00" -> 350000, "50.00" -> 50). These are not real edits.
+            $old = [];
+            foreach (array_keys($changes) as $key) {
+                $originalVal = $model->getOriginal($key);
+                if ($this->valuesEquivalent($originalVal, $changes[$key])) {
+                    unset($changes[$key]);
+                    continue;
+                }
+                $old[$key] = $originalVal;
+            }
+
             if (empty($changes)) {
                 return;
             }
-            $old = [];
-            foreach (array_keys($changes) as $key) {
-                $old[$key] = $model->getOriginal($key);
-            }
+
             $this->writeAudit('updated', $model, $this->cleanAttrs($old), $this->cleanAttrs($changes));
         });
 
-        Model::deleted(function (Model $model) {
-            $this->writeAudit('deleted', $model, $this->cleanAttrs($model->getAttributes()), null);
+        Event::listen('eloquent.deleted: *', function ($eventName, $data) {
+            $model = $data[0] ?? null;
+            if ($model instanceof Model) {
+                $this->writeAudit('deleted', $model, $this->cleanAttrs($model->getOriginal()), null);
+            }
         });
     }
 
@@ -92,6 +116,36 @@ class AppServiceProvider extends ServiceProvider
         } catch (\Throwable $e) {
             // Auditing must never break the request.
         }
+    }
+
+    /**
+     * True when two values differ only in formatting (e.g. "350000.00" vs 350000,
+     * "50.00" vs 50, null vs "", trailing whitespace) and not in actual meaning.
+     */
+    protected function valuesEquivalent($a, $b): bool
+    {
+        if ($a === $b) {
+            return true;
+        }
+
+        // Treat null and empty string as the same "empty" value.
+        $aEmpty = $a === null || $a === '';
+        $bEmpty = $b === null || $b === '';
+        if ($aEmpty && $bEmpty) {
+            return true;
+        }
+        if ($aEmpty !== $bEmpty) {
+            return false;
+        }
+
+        // Numeric values that are equal in value but differ in formatting
+        // ("350000.00" == 350000, "50.00" == 50).
+        if (is_numeric($a) && is_numeric($b)) {
+            return (float) $a === (float) $b;
+        }
+
+        // Fall back to trimmed string comparison.
+        return trim((string) $a) === trim((string) $b);
     }
 
     protected function cleanAttrs(array $attrs): array

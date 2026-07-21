@@ -706,6 +706,16 @@ class CustomerBondPaymentController extends Controller
                 $item->takenByUser?->name ?? '—',
                 optional($item->created_at)->format('d-m-Y H:i') ?? '—',
             ],
+            'action_buttons' => [
+                [
+                    'url' => route('change-log.record', ['type' => 'payment', 'id' => $item->id]),
+                    'label' => 'Log',
+                    'class' => 'btn-outline-dark',
+                    'data_modal' => true,
+                    'data_toggle' => 'modal',
+                    'data_target' => 'changeLogModal',
+                ],
+            ],
         ];
     }
 

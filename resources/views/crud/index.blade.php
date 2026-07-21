@@ -616,6 +616,77 @@
         </script>
     @endif
 
+    <!-- Change Log Modal -->
+    <div class="modal fade" id="changeLogModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-lg modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header bg-light">
+                    <h5 class="modal-title fw-bold">
+                        <i class="bi bi-clock-history me-1"></i> Change Log — <span id="clHeading" class="text-primary">Loading…</span>
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body" id="changeLogBody">
+                    <div class="text-center py-4"><div class="spinner-border text-primary" role="status"></div></div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        (function(){
+            var modalEl = document.getElementById('changeLogModal');
+            if(!modalEl) return;
+            var actionColors = { created:'success', updated:'info', deleted:'danger' };
+
+            function esc(s){ return (s == null ? '' : String(s)).replace(/[&<>"]/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
+
+            function render(data){
+                var body = document.getElementById('changeLogBody');
+                document.getElementById('clHeading').textContent = data.heading || '';
+                if(!data.found || !data.entries || !data.entries.length){
+                    body.innerHTML = '<p class="text-center text-muted py-4">No changes logged yet.</p>';
+                    return;
+                }
+                var rows = '';
+                data.entries.forEach(function(e){
+                    var changes = e.changes || [];
+                    if(!changes.length){
+                        // created / deleted with no field diff — still show the action as one row
+                        rows += '<tr><td>'+esc(e.user)+'</td><td class="text-nowrap">'+esc(e.when)+'</td>'
+                             + '<td colspan="3" class="text-muted text-capitalize">'+esc(e.action)+'</td></tr>';
+                        return;
+                    }
+                    changes.forEach(function(c){
+                        rows += '<tr><td>'+esc(e.user)+'</td><td class="text-nowrap">'+esc(e.when)+'</td>'
+                             + '<td class="fw-semibold">'+esc(c.field)+'</td>'
+                             + '<td class="text-muted">'+esc(c.old)+'</td>'
+                             + '<td>'+esc(c.new)+'</td></tr>';
+                    });
+                });
+                body.innerHTML = '<div class="table-responsive"><table class="table table-sm table-bordered mb-0 small align-middle">'
+                    + '<thead class="table-light"><tr><th>User</th><th>Date</th><th>Field</th><th>Old</th><th>New</th></tr></thead>'
+                    + '<tbody>'+rows+'</tbody></table></div>';
+            }
+
+            modalEl.addEventListener('show.bs.modal', function(ev){
+                var trigger = ev.relatedTarget;
+                var url = trigger ? trigger.getAttribute('href') || trigger.getAttribute('data-url') : null;
+                var body = document.getElementById('changeLogBody');
+                document.getElementById('clHeading').textContent = 'Loading…';
+                body.innerHTML = '<div class="text-center py-4"><div class="spinner-border text-primary" role="status"></div></div>';
+                if(!url) return;
+                fetch(url, {headers:{'Accept':'application/json'}})
+                    .then(function(r){ return r.json(); })
+                    .then(render)
+                    .catch(function(){ body.innerHTML = '<div class="alert alert-danger m-2">Failed to load change log.</div>'; });
+            });
+        })();
+    </script>
+
     <!-- Cheques Modal -->
     <div class="modal fade" id="chequesModal" tabindex="-1" role="dialog" aria-labelledby="chequesModalLabel" aria-hidden="true">
         <div class="modal-dialog modal-xl" role="document">
