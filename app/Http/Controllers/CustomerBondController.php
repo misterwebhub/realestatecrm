@@ -193,13 +193,12 @@ class CustomerBondController extends Controller
             }
         }
 
-        // Mark selected plots (or all plots for the arazi) as booked; do NOT change Arazi.status
+        // Mark ONLY the explicitly selected plots as booked. Never fall back to
+        // updating every plot of the arazi — a bond saved without specific plots
+        // must not flip the whole arazi's plots to booked.
         try {
             if (! empty($plotIds)) {
                 Plot::whereIn('id', $plotIds)->update(['status' => 'booked']);
-            } elseif (! empty($validated['arazi_code'])) {
-                Plot::where('arazi_code', (string) $validated['arazi_code'])
-                    ->update(['status' => 'booked']);
             }
         } catch (\Throwable $e) {
             // Ignore to avoid breaking bond save flow
