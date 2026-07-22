@@ -13,6 +13,7 @@ class KisanController extends Controller
 {
     use ManagesCrud;
 
+    // Owner-scoped: each user sees only the kisans they created (Super Admin sees all).
     protected function resourceTitle(): string
     {
         return 'Kisan';
@@ -79,6 +80,8 @@ class KisanController extends Controller
 
     public function create()
     {
+        $this->authorizeCrud('create');
+
         $modelClass = $this->resourceModel();
 
         return view('kisans.form', [
@@ -95,6 +98,7 @@ class KisanController extends Controller
     {
         $modelClass = $this->resourceModel();
         $item = $modelClass::findOrFail($id);
+        $this->authorizeCrud('edit', $item);
 
         return view('kisans.form', [
             'title' => 'EDIT KISHAN REGISTRATION',
@@ -108,7 +112,7 @@ class KisanController extends Controller
 
     protected function resourceQuery()
     {
-        return Kisan::withCount('arazis')->latest();
+        return $this->applyOwnershipScope(Kisan::withCount('arazis')->latest());
     }
 
     public function index(Request $request)
@@ -116,7 +120,7 @@ class KisanController extends Controller
         $q         = trim((string) $request->input('q', ''));
         $araziCode = trim((string) $request->input('arazi_code', ''));
 
-        $query = Kisan::with('arazis')->withCount('arazis')->latest();
+        $query = $this->applyOwnershipScope(Kisan::with('arazis')->withCount('arazis')->latest());
 
         // Search by name, mobile or reg_no
         if ($q !== '') {

@@ -28,11 +28,12 @@ class RegistryController extends Controller
     {
         $this->registryLifecycleService->expirePendingRegistries();
 
-        $records = Registry::with(['customer', 'arazi', 'agent'])
-            ->where('status', 'pending')
-            ->whereNotNull('due_date')
-            ->orderBy('due_date')
-            ->get();
+        $records = $this->applyOwnershipScope(
+            Registry::with(['customer', 'arazi', 'agent'])
+                ->where('status', 'pending')
+                ->whereNotNull('due_date')
+                ->orderBy('due_date')
+        )->get();
 
         // Exclude registries where more than 50% of the linked bond amount is already paid.
         $records = $records->reject(function (Registry $registry) {
@@ -336,11 +337,12 @@ class RegistryController extends Controller
 
     protected function resourceQuery()
     {
-        return Registry::with(['customer', 'arazi', 'agent'])->latest();
+        return $this->applyOwnershipScope(Registry::with(['customer', 'arazi', 'agent'])->latest());
     }
 
     public function store(Request $request)
     {
+        $this->authorizeCrud('create');
         $request->validate($this->resourceRules());
 
         return $this->crudStore($request);
@@ -349,6 +351,8 @@ class RegistryController extends Controller
     public function update(Request $request, $id)
     {
         $item = Registry::findOrFail($id);
+        $this->authorizeOwnership($item);
+        $this->authorizeCrud('edit', $item);
         $request->validate($this->resourceRules($item));
 
         return $this->crudUpdate($request, $id);
@@ -357,7 +361,7 @@ class RegistryController extends Controller
     // Override index to support search filters for plot registry listing
     public function index(Request $request)
     {
-        $q = Registry::with(['customer', 'arazi', 'agent', 'plot']);
+        $q = $this->applyOwnershipScope(Registry::with(['customer', 'arazi', 'agent', 'plot']));
 
         $filterAraziCode = trim((string) $request->input('arazi_code', ''));
         $filterPlotId    = $request->input('plot_id');
@@ -425,6 +429,8 @@ class RegistryController extends Controller
 
     public function create()
     {
+        $this->authorizeCrud('create');
+
         $modelClass = $this->resourceModel();
         $item = new $modelClass();
 
@@ -453,6 +459,8 @@ class RegistryController extends Controller
     {
         $modelClass = $this->resourceModel();
         $item = $modelClass::findOrFail($id);
+        $this->authorizeOwnership($item);
+        $this->authorizeCrud('edit', $item);
 
         $customers = Customer::orderBy('name')->get(['id','name','mobile','secondary_mobile']);
         $arazis = Arazi::orderBy('legacy_arazi_code')->get(['id','legacy_arazi_code','plot_number'])
@@ -475,12 +483,14 @@ class RegistryController extends Controller
     public function print($id)
     {
         $registry = Registry::with(['customer', 'arazi', 'agent'])->findOrFail($id);
+        $this->authorizeOwnership($registry);
         return view('prints.registry_certificate', ['registry' => $registry, 'title' => 'Registry Certificate']);
     }
 
     public function download($id)
     {
         $registry = Registry::findOrFail($id);
+        $this->authorizeOwnership($registry);
 
         if (! $registry->document_path) {
             abort(404, 'No file attached.');
@@ -498,6 +508,7 @@ class RegistryController extends Controller
     public function pdf($id)
     {
         $registry = Registry::with(['customer', 'arazi', 'agent'])->findOrFail($id);
+        $this->authorizeOwnership($registry);
         $html = view('prints.registry_certificate', ['registry' => $registry, 'title' => 'Registry Certificate'])->render();
         if (class_exists(\Barryvdh\DomPDF\Facade\Pdf::class)) {
             $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadHTML($html);
@@ -509,6 +520,7 @@ class RegistryController extends Controller
     public function esign(Request $request, $id)
     {
         $registry = Registry::findOrFail($id);
+        $this->authorizeOwnership($registry);
         $registry->esign_signed = true;
         $registry->esign_data = json_encode(['signed_at' => now()->toDateTimeString(), 'by' => auth()->id()]);
         $registry->save();

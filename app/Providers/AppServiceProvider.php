@@ -40,7 +40,43 @@ class AppServiceProvider extends ServiceProvider
     {
         Paginator::useBootstrapFive();
 
+        $this->registerOwnershipStamping();
         $this->registerAuditLogging();
+    }
+
+    /**
+     * Stamp `created_by` with the current user on any model that has the column,
+     * so records can later be scoped to the user who created them. Admins are
+     * still able to see everything (scoping is enforced at read time).
+     */
+    protected function registerOwnershipStamping(): void
+    {
+        static $hasColumn = [];
+
+        Event::listen('eloquent.creating: *', function ($eventName, $data) use (&$hasColumn) {
+            $model = $data[0] ?? null;
+            if (! $model instanceof Model) {
+                return;
+            }
+
+            $userId = auth()->id();
+            if (! $userId) {
+                return; // console / seed / unauthenticated — leave it null
+            }
+
+            $table = $model->getTable();
+            if (! array_key_exists($table, $hasColumn)) {
+                try {
+                    $hasColumn[$table] = \Illuminate\Support\Facades\Schema::hasColumn($table, 'created_by');
+                } catch (\Throwable $e) {
+                    $hasColumn[$table] = false;
+                }
+            }
+
+            if ($hasColumn[$table] && empty($model->getAttribute('created_by'))) {
+                $model->setAttribute('created_by', $userId);
+            }
+        });
     }
 
     /**

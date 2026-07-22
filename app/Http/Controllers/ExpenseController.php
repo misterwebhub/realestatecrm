@@ -11,6 +11,10 @@ class ExpenseController extends Controller
     public function index(Request $request)
     {
         $query = Expense::with('arazi')->latest();
+        $user = auth()->user();
+        if ($user && ! $user->isSuperAdmin()) {
+            $query->where('expenses.created_by', $user->getKey());
+        }
         if ($request->filled('arazi_code')) {
             $query->where('arazi_code', $request->arazi_code);
         }

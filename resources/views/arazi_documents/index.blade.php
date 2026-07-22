@@ -4,11 +4,11 @@
     <div class="card card-outline card-primary">
         <div class="card-header d-flex align-items-center gap-2">
             <h5 class="card-title mb-0 fw-bold">{{ $title }}</h5>
-            @if(auth()->check() && in_array(auth()->user()->role, ['admin','manager']))
+            @can('arazis.create')
                 <a href="{{ $createUrl }}" class="btn btn-primary btn-sm ms-auto">
                     <i class="bi bi-plus-lg"></i> Add Arazi Registry
                 </a>
-            @endif
+            @endcan
         </div>
 
         <div class="card-body border-bottom">
@@ -68,14 +68,16 @@
                             <td>{{ optional($document->uploaded_at)->format('d-m-Y h:i A') ?? '-' }}</td>
                             <td class="text-end" style="white-space:nowrap;">
                                 <a href="{{ route('arazi-documents.download', $document) }}" class="btn btn-outline-success btn-sm">Download</a>
-                                @if(auth()->check() && in_array(auth()->user()->role, ['admin','manager']))
+                                @can('arazis.edit')
                                     <a href="{{ route('arazi-documents.edit', $document) }}" class="btn btn-outline-secondary btn-sm">Edit</a>
+                                @endcan
+                                @can('arazis.delete')
                                     <form action="{{ route('arazi-documents.destroy', $document) }}" method="POST" class="d-inline-block" onsubmit="return confirm('Delete this registry document?');">
                                         @csrf
                                         @method('DELETE')
                                         <button type="submit" class="btn btn-outline-danger btn-sm">Delete</button>
                                     </form>
-                                @endif
+                                @endcan
                             </td>
                         </tr>
                     @empty

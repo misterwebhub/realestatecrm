@@ -25,7 +25,84 @@ trait ManagesCrud
     {
         $modelClass = $this->resourceModel();
 
-        return $modelClass::query()->latest();
+        return $this->applyOwnershipScope($modelClass::query()->latest());
+    }
+
+    /**
+     * Column that records the creating user for owner-based visibility.
+     * Return null in a controller to disable ownership scoping for that resource.
+     */
+    protected function ownershipColumn(): ?string
+    {
+        return 'created_by';
+    }
+
+    /**
+     * Restrict a query to records owned by the current user, unless they are a
+     * Super Admin (who sees everything). No-ops when the model has no owner
+     * column or nobody is authenticated. Overriding resourceQuery() methods
+     * should wrap their query with this call.
+     */
+    protected function applyOwnershipScope($query)
+    {
+        $column = $this->ownershipColumn();
+        $user = auth()->user();
+
+        if (! $column || ! $user || $user->isSuperAdmin()) {
+            return $query;
+        }
+
+        $model = $query->getModel();
+        if (! $this->tableHasColumn($model->getTable(), $column)) {
+            return $query;
+        }
+
+        return $query->where($model->qualifyColumn($column), $user->getKey());
+    }
+
+    /**
+     * Find a record by id, enforcing that a non-admin only touches their own.
+     * Aborts 404 (not 403) so we don't reveal that the record exists.
+     */
+    protected function resourceFindOrFail($id): Model
+    {
+        $modelClass = $this->resourceModel();
+        $item = $modelClass::findOrFail($id);
+
+        $this->authorizeOwnership($item);
+
+        return $item;
+    }
+
+    /**
+     * Abort 404 if a non-admin tries to touch a record they do not own. Safe to
+     * call from controllers that load the model themselves (custom edit/update).
+     */
+    protected function authorizeOwnership(Model $item): void
+    {
+        $column = $this->ownershipColumn();
+        $user = auth()->user();
+
+        if ($column && $user && ! $user->isSuperAdmin()
+            && $this->tableHasColumn($item->getTable(), $column)
+            && (string) $item->getAttribute($column) !== (string) $user->getKey()) {
+            abort(404);
+        }
+    }
+
+    protected function tableHasColumn(string $table, string $column): bool
+    {
+        static $cache = [];
+        $key = $table . '.' . $column;
+        if (! array_key_exists($key, $cache)) {
+            try {
+                $cache[$key] = \Illuminate\Support\Facades\Schema::hasColumn($table, $column);
+            } catch (\Throwable $e) {
+                $cache[$key] = false;
+            }
+        }
+
+        return $cache[$key];
     }
 
     protected function resourceRow(Model $item): array
@@ -94,6 +171,7 @@ trait ManagesCrud
 
     public function index()
     {
+        $this->authorizeCrud('view');
         $records = $this->resourceQuery()->get();
         $routeName = $this->resourceRouteName();
 
@@ -126,14 +204,41 @@ trait ManagesCrud
             'customer-bond-payments' => 'customer_payments',
             'customer-bond-cheques'  => 'cheques',
             'kisan-payment'          => 'kisan_payments',
+            'arazi-documents'        => 'arazis',
+            'bookings'               => 'plots',
+            'sales'                  => 'registries',
         ];
         $route = $this->resourceRouteName();
 
         return $map[$route] ?? str_replace('-', '_', $route);
     }
 
+    /**
+     * Server-side permission gate for a CRUD action. Aborts 403 when the current
+     * user lacks "{module}.{action}". Super Admin bypasses via Gate::before.
+     * $item is passed for edit/update/delete so subclasses (e.g. brokers, whose
+     * module depends on broker_type) can resolve the correct module per record.
+     */
+    protected function authorizeCrud(string $action, ?Model $item = null): void
+    {
+        $module = $this->resourcePermModule();
+        if (! $module) {
+            return;
+        }
+
+        $user = auth()->user();
+        if ($user && $user->isSuperAdmin()) {
+            return;
+        }
+
+        if (! $user || ! $user->can($module . '.' . $action)) {
+            abort(403, 'You are not allowed to ' . $action . ' ' . $this->resourceTitle() . '.');
+        }
+    }
+
     public function create()
     {
+        $this->authorizeCrud('create');
         $modelClass = $this->resourceModel();
 
         return view('crud.form', [
@@ -147,6 +252,7 @@ trait ManagesCrud
 
     public function store(Request $request)
     {
+        $this->authorizeCrud('create');
         $validated = $request->validate($this->resourceRules());
         $modelClass = $this->resourceModel();
         $payload = $this->resourcePrepareData($validated, $request);
@@ -160,8 +266,8 @@ trait ManagesCrud
 
     public function edit($id)
     {
-        $modelClass = $this->resourceModel();
-        $item = $modelClass::findOrFail($id);
+        $item = $this->resourceFindOrFail($id);
+        $this->authorizeCrud('edit', $item);
 
         return view('crud.form', [
             'title' => 'Edit ' . $this->resourceTitle(),
@@ -174,8 +280,8 @@ trait ManagesCrud
 
     public function update(Request $request, $id)
     {
-        $modelClass = $this->resourceModel();
-        $item = $modelClass::findOrFail($id);
+        $item = $this->resourceFindOrFail($id);
+        $this->authorizeCrud('edit', $item);
         $validated = $request->validate($this->resourceRules($item));
         $payload = $this->resourcePrepareData($validated, $request, $item);
         $item->update($payload);
@@ -188,8 +294,8 @@ trait ManagesCrud
 
     public function destroy($id)
     {
-        $modelClass = $this->resourceModel();
-        $item = $modelClass::findOrFail($id);
+        $item = $this->resourceFindOrFail($id);
+        $this->authorizeCrud('delete', $item);
         $item->delete();
 
         return redirect()

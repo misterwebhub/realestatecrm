@@ -60,7 +60,7 @@ class CustomerController extends Controller
 
     protected function resourceQuery()
     {
-        return Customer::withCount('registries')->latest();
+        return $this->applyOwnershipScope(Customer::withCount('registries')->latest());
     }
 
     public function index(Request $request)
@@ -69,7 +69,7 @@ class CustomerController extends Controller
         $araziCode = trim((string) $request->input('arazi_code', ''));
         $plotQ     = trim((string) $request->input('plot', ''));
 
-        $query = Customer::withCount('registries')->latest();
+        $query = $this->applyOwnershipScope(Customer::withCount('registries')->latest());
 
         // Filter by name or phone
         if ($q !== '') {

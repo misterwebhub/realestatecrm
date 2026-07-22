@@ -130,7 +130,9 @@
                                 <span class="badge bg-{{ $badge }}">{{ ucfirst($hold->status) }}</span>
                             </td>
                             <td class="text-end">
-                                <a href="{{ route('plots.edit', $hold->plot_id) }}" class="btn btn-sm btn-outline-primary">Edit Plot</a>
+                                @can('plots.edit')
+                                    <a href="{{ route('plots.edit', $hold->plot_id) }}" class="btn btn-sm btn-outline-primary">Edit Plot</a>
+                                @endcan
                                 @if($hold->status === 'active')
                                     <form method="POST" action="{{ route('plot-holds.release', $hold) }}" class="d-inline" onsubmit="return confirm('Release this hold and free the plot?');">
                                         @csrf

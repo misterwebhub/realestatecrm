@@ -100,14 +100,16 @@
                         </a>
                     </li>
 
+                    @can('quick_access.view')
                     <li class="nav-item">
                         <a href="{{ route('quick-access') }}" class="nav-link {{ request()->routeIs('quick-access') ? 'active' : '' }}">
                             <i class="nav-icon bi bi-grid-3x3-gap-fill"></i>
                             <p>Quick Access</p>
                         </a>
                     </li>
+                    @endcan
 
-                    @can('plots.view')
+                    @can('plot_holds.view')
                     <li class="nav-item">
                         <a href="{{ route('plot-holds.index') }}" class="nav-link {{ request()->routeIs('plot-holds.*') ? 'active' : '' }}">
                             <i class="nav-icon bi bi-hourglass-split"></i>
@@ -123,14 +125,18 @@
                                 <p>Arazi (Lands)</p>
                             </a>
                         </li>
+                    @endcan
 
+                    @can('arazi_maps.view')
                         <li class="nav-item">
                             <a href="{{ route('arazis.map.index') }}" class="nav-link {{ request()->routeIs('arazis.map.*') || request()->routeIs('arazis-map') ? 'active' : '' }}">
                                 <i class="nav-icon bi bi-geo-alt"></i>
                                 <p>Arazi Maps</p>
                             </a>
                         </li>
+                    @endcan
 
+                    @can('arazi_groups.view')
                         <li class="nav-item">
                             <a href="{{ route('arazi-groups.index') }}" class="nav-link {{ request()->routeIs('arazi-groups.*') ? 'active' : '' }}">
                                 <i class="nav-icon bi bi-collection"></i>
@@ -148,7 +154,7 @@
                         </li>
                     @endcan
 
-                    @canany(['kisans.view', 'kisan_registries.view', 'kisan_bonds.view', 'kisan_payments.view', 'agents.view'])
+                    @canany(['kisans.view', 'kisan_registries.view', 'kisan_bonds.view', 'kisan_payments.view', 'kisan_ledger.view', 'kisan_brokers.view'])
                         <li class="nav-item {{ request()->routeIs('kisans.*') || request()->routeIs('kisan-bonds.*') || request()->routeIs('kisan-payment.*') || request()->routeIs('kisan-payment.ledger') || request()->routeIs('kisan-registries.*') || (request()->routeIs('agents.type.index') && request()->route('type') === 'kisan') ? 'menu-open' : '' }}">
                         <a href="#" class="nav-link {{ request()->routeIs('kisans.*') || request()->routeIs('kisan-bonds.*') || request()->routeIs('kisan-payment.*') || request()->routeIs('kisan-payment.ledger') || request()->routeIs('kisan-registries.*') || (request()->routeIs('agents.type.index') && request()->route('type') === 'kisan') ? 'active' : '' }}">
                             <i class="nav-icon bi bi-people-fill"></i>
@@ -162,13 +168,13 @@
                             @can('kisan_registries.view')<li class="nav-item"><a href="{{ route('kisan-registries.index') }}" class="nav-link {{ request()->routeIs('kisan-registries.*') ? 'active' : '' }}"><i class="nav-icon bi bi-file-earmark-text"></i><p>Kisan Registry</p></a></li>@endcan
                             @can('kisan_bonds.view')<li class="nav-item"><a href="{{ route('kisan-bonds.index') }}" class="nav-link {{ request()->routeIs('kisan-bonds.*') ? 'active' : '' }}"><i class="nav-icon bi bi-circle"></i><p>Kisan Bonds</p></a></li>@endcan
                             @can('kisan_payments.view')<li class="nav-item"><a href="{{ route('kisan-payment.index') }}" class="nav-link {{ request()->routeIs('kisan-payment.*') ? 'active' : '' }}"><i class="nav-icon bi bi-circle"></i><p>Kisan Payment</p></a></li>@endcan
-                            @can('kisan_payments.view')<li class="nav-item"><a href="{{ route('kisan-payment.ledger') }}" class="nav-link {{ request()->routeIs('kisan-payment.ledger') ? 'active' : '' }}"><i class="nav-icon bi bi-circle"></i><p>Kisan Ledger</p></a></li>@endcan
-                            @can('agents.view')<li class="nav-item"><a href="{{ route('agents.type.index', 'kisan') }}" class="nav-link {{ request()->routeIs('agents.type.index') && request()->route('type') === 'kisan' ? 'active' : '' }}"><i class="nav-icon bi bi-circle"></i><p>Kisan Broker</p></a></li>@endcan
+                            @can('kisan_ledger.view')<li class="nav-item"><a href="{{ route('kisan-payment.ledger') }}" class="nav-link {{ request()->routeIs('kisan-payment.ledger') ? 'active' : '' }}"><i class="nav-icon bi bi-circle"></i><p>Kisan Ledger</p></a></li>@endcan
+                            @can('kisan_brokers.view')<li class="nav-item"><a href="{{ route('agents.type.index', 'kisan') }}" class="nav-link {{ request()->routeIs('agents.type.index') && request()->route('type') === 'kisan' ? 'active' : '' }}"><i class="nav-icon bi bi-circle"></i><p>Kisan Broker</p></a></li>@endcan
                         </ul>
                         </li>
                     @endcanany
 
-                    @canany(['customer_bonds.view', 'customer_payments.view', 'agents.view'])
+                    @canany(['customer_bonds.view', 'customer_payments.view', 'customer_ledger.view', 'customer_brokers.view'])
                         <li class="nav-item {{ request()->routeIs('customer-bonds.*') || request()->routeIs('customer-bond-payments.*') || request()->routeIs('customer-bond-payments.ledger') || (request()->routeIs('agents.type.index') && request()->route('type') === 'customer') ? 'menu-open' : '' }}">
                             <a href="#" class="nav-link {{ request()->routeIs('customer-bonds.*') || request()->routeIs('customer-bond-payments.*') || request()->routeIs('customer-bond-payments.ledger') || (request()->routeIs('agents.type.index') && request()->route('type') === 'customer') ? 'active' : '' }}">
                             <i class="nav-icon bi bi-receipt"></i>
@@ -180,8 +186,8 @@
                             <ul class="nav nav-treeview">
                                 @can('customer_bonds.view')<li class="nav-item"><a href="{{ route('customer-bonds.index') }}" class="nav-link {{ request()->routeIs('customer-bonds.*') ? 'active' : '' }}"><i class="nav-icon bi bi-circle"></i><p>Customer Bonds</p></a></li>@endcan
                                 @can('customer_payments.view')<li class="nav-item"><a href="{{ route('customer-bond-payments.index') }}" class="nav-link {{ request()->routeIs('customer-bond-payments.*') ? 'active' : '' }}"><i class="nav-icon bi bi-circle"></i><p>Customer Payment</p></a></li>@endcan
-                                @can('customer_payments.view')<li class="nav-item"><a href="{{ route('customer-bond-payments.ledger') }}" class="nav-link {{ request()->routeIs('customer-bond-payments.ledger') ? 'active' : '' }}"><i class="nav-icon bi bi-circle"></i><p>Customer Ledger</p></a></li>@endcan
-                                @can('agents.view')<li class="nav-item"><a href="{{ route('agents.type.index', 'customer') }}" class="nav-link {{ request()->routeIs('agents.type.index') && request()->route('type') === 'customer' ? 'active' : '' }}"><i class="nav-icon bi bi-circle"></i><p>Customer Broker</p></a></li>@endcan
+                                @can('customer_ledger.view')<li class="nav-item"><a href="{{ route('customer-bond-payments.ledger') }}" class="nav-link {{ request()->routeIs('customer-bond-payments.ledger') ? 'active' : '' }}"><i class="nav-icon bi bi-circle"></i><p>Customer Ledger</p></a></li>@endcan
+                                @can('customer_brokers.view')<li class="nav-item"><a href="{{ route('agents.type.index', 'customer') }}" class="nav-link {{ request()->routeIs('agents.type.index') && request()->route('type') === 'customer' ? 'active' : '' }}"><i class="nav-icon bi bi-circle"></i><p>Customer Broker</p></a></li>@endcan
                             </ul>
                         </li>
                     @endcanany
@@ -190,7 +196,7 @@
                         <li class="nav-item"><a href="{{ route('customers.index') }}" class="nav-link {{ request()->routeIs('customers.*') ? 'active' : '' }}"><i class="nav-icon bi bi-people"></i><p>Customers</p></a></li>
                     @endcan
 
-                    @can('agents.view')
+                    @can('office_brokers.view')
                         <li class="nav-item"><a href="{{ route('agents.type.index', 'office') }}" class="nav-link {{ request()->routeIs('agents.type.index') && request()->route('type') === 'office' ? 'active' : '' }}"><i class="nav-icon bi bi-person-badge"></i><p>Office Brokers</p></a></li>
                     @endcan
 
@@ -210,7 +216,7 @@
                         <li class="nav-item"><a href="{{ route('partners.index') }}" class="nav-link {{ request()->routeIs('partners.*') ? 'active' : '' }}"><i class="nav-icon bi bi-diagram-3"></i><p>Partners</p></a></li>
                     @endcan
 
-                    @can('reports.view')
+                    @canany(['reports.view','report_partners.view','report_arazis.view','report_brokers.view','report_registries.view','report_payments.view','report_sales.view','report_payments_by_user.view','report_bonds_cumulative.view','report_plot_details.view'])
                         <li class="nav-item {{ request()->routeIs('reports.*') ? 'menu-open' : '' }}">
                             <a href="#" class="nav-link {{ request()->routeIs('reports.*') ? 'active' : '' }}">
                                 <i class="nav-icon bi bi-journal-text"></i>
@@ -220,31 +226,33 @@
                                 </p>
                             </a>
                             <ul class="nav nav-treeview">
-                                <li class="nav-item"><a href="{{ route('reports.index') }}" class="nav-link {{ request()->routeIs('reports.index') ? 'active' : '' }}"><i class="nav-icon bi bi-grid"></i><p>All Reports</p></a></li>
-                                <li class="nav-item"><a href="{{ route('reports.partners') }}" class="nav-link {{ request()->routeIs('reports.partners') ? 'active' : '' }}"><i class="nav-icon bi bi-people"></i><p>Partner-wise</p></a></li>
-                                <li class="nav-item"><a href="{{ route('reports.arazis') }}" class="nav-link {{ request()->routeIs('reports.arazis') ? 'active' : '' }}"><i class="nav-icon bi bi-map"></i><p>Arazi-wise</p></a></li>
-                                <li class="nav-item"><a href="{{ route('reports.brokers') }}" class="nav-link {{ request()->routeIs('reports.brokers') ? 'active' : '' }}"><i class="nav-icon bi bi-person-badge"></i><p>Broker</p></a></li>
-                                <li class="nav-item"><a href="{{ route('reports.registries') }}" class="nav-link {{ request()->routeIs('reports.registries') ? 'active' : '' }}"><i class="nav-icon bi bi-file-earmark-text"></i><p>Registry</p></a></li>
-                                <li class="nav-item"><a href="{{ route('reports.payments') }}" class="nav-link {{ request()->routeIs('reports.payments') ? 'active' : '' }}"><i class="nav-icon bi bi-cash-stack"></i><p>Payment Collection</p></a></li>
-                                <li class="nav-item"><a href="{{ route('reports.sales') }}" class="nav-link {{ request()->routeIs('reports.sales') ? 'active' : '' }}"><i class="nav-icon bi bi-graph-up-arrow"></i><p>Sales Summary</p></a></li>
-                                <li class="nav-item"><a href="{{ route('reports.customer-payments.by-user') }}" class="nav-link {{ request()->routeIs('reports.customer-payments.by-user') ? 'active' : '' }}"><i class="nav-icon bi bi-receipt"></i><p>Payments by User</p></a></li>
-                                <li class="nav-item"><a href="{{ route('reports.bonds-cumulative') }}" class="nav-link {{ request()->routeIs('reports.bonds-cumulative') ? 'active' : '' }}"><i class="nav-icon bi bi-collection"></i><p>Bond Cumulative</p></a></li>
-                                <li class="nav-item"><a href="{{ route('reports.plot.details') }}" class="nav-link {{ request()->routeIs('reports.plot.details') ? 'active' : '' }}"><i class="nav-icon bi bi-grid-3x3-gap"></i><p>Plot Details</p></a></li>
+                                @can('reports.view')<li class="nav-item"><a href="{{ route('reports.index') }}" class="nav-link {{ request()->routeIs('reports.index') ? 'active' : '' }}"><i class="nav-icon bi bi-grid"></i><p>All Reports</p></a></li>@endcan
+                                @can('report_partners.view')<li class="nav-item"><a href="{{ route('reports.partners') }}" class="nav-link {{ request()->routeIs('reports.partners') ? 'active' : '' }}"><i class="nav-icon bi bi-people"></i><p>Partner-wise</p></a></li>@endcan
+                                @can('report_arazis.view')<li class="nav-item"><a href="{{ route('reports.arazis') }}" class="nav-link {{ request()->routeIs('reports.arazis') ? 'active' : '' }}"><i class="nav-icon bi bi-map"></i><p>Arazi-wise</p></a></li>@endcan
+                                @can('report_brokers.view')<li class="nav-item"><a href="{{ route('reports.brokers') }}" class="nav-link {{ request()->routeIs('reports.brokers') ? 'active' : '' }}"><i class="nav-icon bi bi-person-badge"></i><p>Broker</p></a></li>@endcan
+                                @can('report_registries.view')<li class="nav-item"><a href="{{ route('reports.registries') }}" class="nav-link {{ request()->routeIs('reports.registries') ? 'active' : '' }}"><i class="nav-icon bi bi-file-earmark-text"></i><p>Registry</p></a></li>@endcan
+                                @can('report_payments.view')<li class="nav-item"><a href="{{ route('reports.payments') }}" class="nav-link {{ request()->routeIs('reports.payments') ? 'active' : '' }}"><i class="nav-icon bi bi-cash-stack"></i><p>Payment Collection</p></a></li>@endcan
+                                @can('report_sales.view')<li class="nav-item"><a href="{{ route('reports.sales') }}" class="nav-link {{ request()->routeIs('reports.sales') ? 'active' : '' }}"><i class="nav-icon bi bi-graph-up-arrow"></i><p>Sales Summary</p></a></li>@endcan
+                                @can('report_payments_by_user.view')<li class="nav-item"><a href="{{ route('reports.customer-payments.by-user') }}" class="nav-link {{ request()->routeIs('reports.customer-payments.by-user') ? 'active' : '' }}"><i class="nav-icon bi bi-receipt"></i><p>Payments by User</p></a></li>@endcan
+                                @can('report_bonds_cumulative.view')<li class="nav-item"><a href="{{ route('reports.bonds-cumulative') }}" class="nav-link {{ request()->routeIs('reports.bonds-cumulative') ? 'active' : '' }}"><i class="nav-icon bi bi-collection"></i><p>Bond Cumulative</p></a></li>@endcan
+                                @can('report_plot_details.view')<li class="nav-item"><a href="{{ route('reports.plot.details') }}" class="nav-link {{ request()->routeIs('reports.plot.details') ? 'active' : '' }}"><i class="nav-icon bi bi-grid-3x3-gap"></i><p>Plot Details</p></a></li>@endcan
                             </ul>
                         </li>
-                    @endcan
+                    @endcanany
 
-                    @can('registries.view')
+                    @can('waiting_payments.view')
                         <li class="nav-item"><a href="{{ route('registries.waiting-payments') }}" class="nav-link {{ request()->routeIs('registries.waiting-payments') ? 'active' : '' }}"><i class="nav-icon bi bi-hourglass-split"></i><p>Waiting Payments</p></a></li>
                     @endcan
 
+                    @can('converter.view')
                     <li class="nav-item">
                         <a href="{{ route('converter.index') }}" class="nav-link {{ request()->routeIs('converter.*') ? 'active' : '' }}">
                             <i class="nav-icon bi bi-calculator"></i>
                             <p>Area Converter</p>
                         </a>
                     </li>
-                    
+                    @endcan
+
                     @if(auth()->check() && auth()->user()->isSuperAdmin())
                         <li class="nav-item">
                             <a href="{{ route('uploads.index') }}" class="nav-link {{ request()->routeIs('uploads.*') ? 'active' : '' }}">
@@ -279,7 +287,7 @@
                     </li>
                     @endcan
 
-                    @can('user_master.view')
+                    @can('activity_logs.view')
                     <li class="nav-item">
                         <a href="{{ route('activity-logs.index') }}" class="nav-link {{ request()->routeIs('activity-logs.*') ? 'active' : '' }}">
                             <i class="nav-icon bi bi-activity"></i>
@@ -288,7 +296,7 @@
                     </li>
                     @endcan
 
-                    @can('user_master.view')
+                    @can('audit_logs.view')
                     <li class="nav-item">
                         <a href="{{ route('audit-logs.index') }}" class="nav-link {{ request()->routeIs('audit-logs.*') ? 'active' : '' }}">
                             <i class="nav-icon bi bi-database-check"></i>
@@ -297,7 +305,7 @@
                     </li>
                     @endcan
 
-                    @canany(['cheques.view', 'connected_accounts.view'])
+                    @canany(['cheques.view', 'cheque_manual.view', 'cheque_assign.view', 'connected_accounts.view'])
                     <li class="nav-item {{ request()->routeIs('customer-bond-cheques.index') || request()->routeIs('customer-bond-cheques.manual') || request()->routeIs('customer-bond-cheques.assign') || request()->routeIs('connected-accounts.*') ? 'menu-open' : '' }}">
                         <a href="#" class="nav-link {{ request()->routeIs('customer-bond-cheques.index') || request()->routeIs('customer-bond-cheques.manual') || request()->routeIs('customer-bond-cheques.assign') || request()->routeIs('connected-accounts.*') ? 'active' : '' }}">
                             <i class="nav-icon bi bi-credit-card-2-front"></i>
@@ -313,11 +321,15 @@
                                     <i class="nav-icon bi bi-circle"></i><p>Account Cheques</p>
                                 </a>
                             </li>
+                            @endcan
+                            @can('cheque_manual.view')
                             <li class="nav-item">
                                 <a href="{{ route('customer-bond-cheques.manual') }}" class="nav-link {{ request()->routeIs('customer-bond-cheques.manual') ? 'active' : '' }}">
                                     <i class="nav-icon bi bi-pencil-square"></i><p>Create Manual Cheque Entries</p>
                                 </a>
                             </li>
+                            @endcan
+                            @can('cheque_assign.view')
                             <li class="nav-item">
                                 <a href="{{ route('customer-bond-cheques.assign') }}" class="nav-link {{ request()->routeIs('customer-bond-cheques.assign') ? 'active' : '' }}">
                                     <i class="nav-icon bi bi-link-45deg"></i><p>Assign Cheques to Bond</p>

@@ -94,13 +94,18 @@
                             <input type="number" step="0.01" name="amount" id="amount_input" class="form-control">
                         </div>
                         <div class="col-md-4">
+                            @php($isPaymentAdmin = auth()->user()?->isSuperAdmin())
                             <label class="form-label fw-semibold">Taken By <span class="text-danger">*</span></label>
-                            <select name="taken_by_user_id" id="taken_by_user_id" class="form-select" required>
+                            <select name="taken_by_user_id" id="taken_by_user_id" class="form-select" required @unless($isPaymentAdmin) disabled @endunless>
                                 <option value="">— Select User —</option>
                                 @foreach($activeUsers as $user)
-                                    <option value="{{ $user->id }}">{{ $user->name }}{{ $user->username ? ' ('.$user->username.')' : '' }}</option>
+                                    <option value="{{ $user->id }}" @selected(!$isPaymentAdmin && auth()->id() == $user->id)>{{ $user->name }}{{ $user->username ? ' ('.$user->username.')' : '' }}</option>
                                 @endforeach
                             </select>
+                            @unless($isPaymentAdmin)
+                                {{-- Disabled selects don't submit; carry the value in a hidden field. --}}
+                                <input type="hidden" name="taken_by_user_id" value="{{ auth()->id() }}">
+                            @endunless
                         </div>
                         <div class="col-md-12">
                             <label class="form-label">Remarks</label>

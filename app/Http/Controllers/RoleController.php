@@ -102,13 +102,16 @@ class RoleController extends Controller
      */
     protected function groupedPermissions(): array
     {
-        $labels = collect(config('permissions.modules', []))
-            ->mapWithKeys(fn ($meta, $key) => [$key => $meta['label'] ?? Str::headline($key)]);
+        $config = collect(config('permissions.modules', []));
+        // Preserve the module order defined in config/permissions.php.
+        $order = $config->keys()->flip();
 
-        return Permission::orderBy('module')->orderBy('id')->get()
+        return Permission::get()
             ->groupBy('module')
+            ->sortBy(fn ($perms, $module) => $order[$module] ?? 999)
             ->map(fn ($perms, $module) => [
-                'label'       => $labels[$module] ?? Str::headline($module),
+                'label'       => $config[$module]['label'] ?? Str::headline($module),
+                'group'       => $config[$module]['group'] ?? 'Other',
                 'permissions' => $perms,
             ])->all();
     }

@@ -10,9 +10,9 @@
             @if(!empty($exportCsvUrl))
                 <a href="{{ $exportCsvUrl }}" class="btn btn-outline-success btn-sm"><i class="bi bi-filetype-csv"></i> Export CSV</a>
             @endif
-            @if(auth()->check() && in_array(auth()->user()->role, ['admin','manager']))
+            @can('customers.create')
                 <a href="{{ $createUrl }}" class="btn btn-primary btn-sm"><i class="bi bi-plus-lg"></i> Add New</a>
-            @endif
+            @endcan
         </div>
     </div>
 
@@ -94,11 +94,13 @@
                                     <tr style="background:{{ $i % 2 === 0 ? '#fff' : '#f6f9ff' }};border-bottom:1px solid #e4ecf7;"
                                         onmouseover="this.style.background='#edf3ff'" onmouseout="this.style.background='{{ $i % 2 === 0 ? '#fff' : '#f6f9ff' }}'">
                                         <td style="padding:5px 10px;border-right:1px solid #e4ecf7;white-space:nowrap;">
-                                            <a href="{{ route('customer-bond-cheques.manage', $b['bond_id']) }}"
-                                               target="_blank"
-                                               style="color:#1a3a6b;font-weight:700;font-size:12px;text-decoration:none;letter-spacing:.2px;">
-                                                {{ $b['bond_no'] }}
-                                            </a>
+                                            <span style="color:#1a3a6b;font-weight:700;font-size:12px;letter-spacing:.2px;">{{ $b['bond_no'] }}</span>
+                                            <button type="button" class="btn-copy-bond"
+                                                    data-bond="{{ $b['bond_no'] }}"
+                                                    title="Copy bond no"
+                                                    style="border:none;background:none;padding:0 0 0 4px;cursor:pointer;color:#6b7280;vertical-align:middle;line-height:1;">
+                                                <i class="bi bi-clipboard" style="font-size:12px;"></i>
+                                            </button>
                                         </td>
                                         <td style="padding:5px 10px;border-right:1px solid #e4ecf7;white-space:nowrap;">
                                             <span style="background:#1a3a6b;color:#fff;border-radius:4px;padding:2px 8px;font-size:11px;font-weight:700;letter-spacing:.3px;">{{ $b['arazi_code'] }}</span>
@@ -147,13 +149,15 @@
                             @foreach($row['action_buttons'] ?? [] as $btn)
                                 <a href="{{ $btn['url'] }}" class="btn {{ $btn['class'] ?? 'btn-outline-secondary' }} btn-sm">{{ $btn['label'] }}</a>
                             @endforeach
-                            @if(auth()->check() && in_array(auth()->user()->role, ['admin','manager']))
+                            @can('customers.edit')
                                 <a href="{{ $row['edit_url'] }}" class="btn btn-outline-secondary btn-sm">Edit</a>
+                            @endcan
+                            @can('customers.delete')
                                 <form action="{{ $row['delete_url'] }}" method="POST" class="d-inline-block" onsubmit="return confirm('Delete this customer?');">
                                     @csrf @method('DELETE')
                                     <button class="btn btn-outline-danger btn-sm">Del</button>
                                 </form>
-                            @endif
+                            @endcan
                         </td>
                     </tr>
                 @empty
@@ -198,5 +202,32 @@
     .customers-table > tbody > tr:hover > td {
         background: #f4f7fd !important;
     }
+    .btn-copy-bond:hover { color: #1a3a6b !important; }
 </style>
+@endpush
+
+@push('scripts')
+<script>
+document.addEventListener('click', function(e){
+    var btn = e.target.closest('.btn-copy-bond');
+    if (!btn) return;
+    var text = btn.dataset.bond || '';
+    var icon = btn.querySelector('i');
+    function ok(){
+        if (!icon) return;
+        var prev = icon.className;
+        icon.className = 'bi bi-check-lg';
+        btn.style.color = '#15803d';
+        setTimeout(function(){ icon.className = prev; btn.style.color = ''; }, 1200);
+    }
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(ok).catch(function(){});
+    } else {
+        var ta = document.createElement('textarea');
+        ta.value = text; document.body.appendChild(ta); ta.select();
+        try { document.execCommand('copy'); ok(); } catch (err) {}
+        document.body.removeChild(ta);
+    }
+});
+</script>
 @endpush

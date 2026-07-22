@@ -14,6 +14,12 @@ class AraziController extends Controller
 {
     use ManagesCrud;
 
+    // Shared inventory (land parcels) — visible to every user, not owner-scoped.
+    protected function ownershipColumn(): ?string
+    {
+        return null;
+    }
+
     protected function resourceTitle(): string
     {
         return 'Arazi';
@@ -511,6 +517,7 @@ class AraziController extends Controller
      */
     public function destroy($id)
     {
+        $this->authorizeCrud('delete');
         $arazi = Arazi::findOrFail($id);
 
         $code = $arazi->legacy_arazi_code;

@@ -46,6 +46,7 @@ class CustomerBondPaymentController extends Controller
             $bond = CustomerBond::with(['customer', 'arazi', 'plots'])
                 ->withSum('payments as total_paid', 'amount')
                 ->findOrFail($bondId);
+            $this->authorizeOwnership($bond);
 
             $entries = CustomerBondPayment::with('takenByUser')
                 ->where('customer_bond_id', $bondId)
@@ -207,6 +208,9 @@ class CustomerBondPaymentController extends Controller
             ))
             ->latest();
 
+        // Non-admins only see the bonds they created; admins see everything.
+        $bondsQuery = $this->applyOwnershipScope($bondsQuery);
+
         $bonds = $bondsQuery->get()->map(function (CustomerBond $bond) {
             $total = (float) ($bond->total_amount ?? $bond->bond_amount ?? 0);
             $paid  = (float) ($bond->paid_amount ?? 0);
@@ -244,9 +248,10 @@ class CustomerBondPaymentController extends Controller
         $chequeSummary = ['count' => 0, 'total' => 0, 'cleared' => 0, 'bounced' => 0, 'pending' => 0, 'cancelled' => 0, 'balance' => 0];
         $selectedBond  = null;
         if ($selectedBondId) {
-            $selectedBond = CustomerBond::with(['customer', 'arazi', 'plots', 'broker', 'witnesses'])
-                ->withSum('payments as total_paid', 'amount')
-                ->find($selectedBondId);
+            $selectedBond = $this->applyOwnershipScope(
+                    CustomerBond::with(['customer', 'arazi', 'plots', 'broker', 'witnesses'])
+                        ->withSum('payments as total_paid', 'amount')
+                )->find($selectedBondId);
 
             if ($selectedBond) {
                 $entries = \App\Models\CustomerBondPayment::with(['customerBond.customer', 'takenByUser', 'cheque.connectedAccount'])
@@ -362,7 +367,14 @@ class CustomerBondPaymentController extends Controller
 
         // ── Bond-level: export payment entries for a specific bond ──
         if ($bondId) {
-            $bond = CustomerBond::with(['customer', 'arazi', 'plots'])->find($bondId);
+            $bond = $this->applyOwnershipScope(
+                CustomerBond::with(['customer', 'arazi', 'plots'])
+            )->find($bondId);
+
+            // Non-admin requesting a bond they don't own → nothing to export.
+            if (! $bond) {
+                abort(404);
+            }
 
             $entries = \App\Models\CustomerBondPayment::where('customer_bond_id', $bondId)
                 ->orderBy('entry_date')
@@ -388,11 +400,12 @@ class CustomerBondPaymentController extends Controller
         }
 
         // ── Default: export bond-wise summary ──
-        $bonds = CustomerBond::with(['customer', 'arazi', 'plots'])
+        $bonds = $this->applyOwnershipScope(
+            CustomerBond::with(['customer', 'arazi', 'plots'])
             ->withSum(['payments as paid_amount' => function ($query) use ($dateFrom, $dateTo) {
                 if ($dateFrom) $query->whereDate('entry_date', '>=', $dateFrom);
                 if ($dateTo)   $query->whereDate('entry_date', '<=', $dateTo);
-            }], 'amount')
+            }], 'amount'))
             ->when($q, fn ($query) => $query->whereHas('customer', fn ($c) =>
                 $c->where('name', 'like', '%'.$q.'%')
                   ->orWhere('mobile', 'like', '%'.$q.'%')
@@ -594,6 +607,14 @@ class CustomerBondPaymentController extends Controller
     protected function resourcePrepareData(array $validated, \Illuminate\Http\Request $request, ?Model $item = null): array
     {
         $validated['entry_no'] = ($validated['entry_no'] ?? null) ?: $this->nextEntryNumber();
+
+        // Non-admins may only record payments under their own name — force it
+        // server-side so a spoofed/disabled field can't reassign the payment.
+        $currentUser = auth()->user();
+        if ($currentUser && ! $currentUser->isSuperAdmin()) {
+            $validated['taken_by_user_id'] = $currentUser->getKey();
+        }
+
         $bond = CustomerBond::with('plots')->find($validated['customer_bond_id']);
 
         if ($bond) {
@@ -675,9 +696,11 @@ class CustomerBondPaymentController extends Controller
 
     protected function resourceQuery()
     {
-        return CustomerBondPayment::with(['customerBond.customer', 'customer', 'arazi', 'plot', 'takenByUser', 'cheque.connectedAccount'])
-            ->whereNotNull('customer_bond_id')
-            ->latest();
+        return $this->applyOwnershipScope(
+            CustomerBondPayment::with(['customerBond.customer', 'customer', 'arazi', 'plot', 'takenByUser', 'cheque.connectedAccount'])
+                ->whereNotNull('customer_bond_id')
+                ->latest()
+        );
     }
 
     protected function resourceRow(Model $item): array
@@ -744,6 +767,7 @@ class CustomerBondPaymentController extends Controller
      */
     public function compact()
     {
+        $this->authorizeCrud('create');
         $arazis = \App\Models\Arazi::orderBy('id')->get()->mapWithKeys(function ($a) {
             return [$a->id => $a->araziNoCode()];
         })->all();
@@ -774,6 +798,7 @@ class CustomerBondPaymentController extends Controller
      */
     public function store(Request $request)
     {
+        $this->authorizeCrud('create');
         $validated = $request->validate($this->resourceRules());
         $modelClass = $this->resourceModel();
         $payload = $this->resourcePrepareData($validated, $request);
@@ -906,11 +931,12 @@ class CustomerBondPaymentController extends Controller
             return null;
         }
 
-        return CustomerBondPayment::with(['customerBond.customer', 'customer'])
-            ->where('entry_no', $entryNo)
-            ->latest('entry_date')
-            ->latest('id')
-            ->first();
+        return $this->applyOwnershipScope(
+            CustomerBondPayment::with(['customerBond.customer', 'customer'])
+                ->where('entry_no', $entryNo)
+                ->latest('entry_date')
+                ->latest('id')
+        )->first();
     }
 
     protected function resourceAfterSave(Model $item, \Illuminate\Http\Request $request, array $validated, ?Model $original = null): void

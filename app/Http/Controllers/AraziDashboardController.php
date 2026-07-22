@@ -18,7 +18,14 @@ class AraziDashboardController extends Controller
         $soldPlots = Plot::where('arazi_code', $arazi->legacy_arazi_code)->where('status', 'sold')->count();
         $leftPlots = max($totalPlots - $soldPlots, 0);
 
-        $bonds = CustomerBond::with('customer')->where('arazi_code', $arazi->legacy_arazi_code)->get();
+        // Plot counts are shared inventory, but bond/broker figures are deal data —
+        // non-admins only see their own bonds on this arazi; admins see all.
+        $bondsQuery = CustomerBond::with('customer')->where('arazi_code', $arazi->legacy_arazi_code);
+        $user = auth()->user();
+        if ($user && ! $user->isSuperAdmin()) {
+            $bondsQuery->where('customer_bonds.created_by', $user->getKey());
+        }
+        $bonds = $bondsQuery->get();
         $totalBonds = $bonds->count();
         $customers = $bonds->pluck('customer_id')->unique()->count();
 

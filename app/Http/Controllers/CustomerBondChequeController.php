@@ -10,6 +10,33 @@ use Illuminate\Support\Facades\DB;
 
 class CustomerBondChequeController extends Controller
 {
+    /**
+     * Restrict a cheque query to the current user's own records, unless they are
+     * a Super Admin (who sees everything). Cheques are deal data → owner-scoped.
+     */
+    protected function scopeToOwner($query)
+    {
+        $user = auth()->user();
+        if ($user && ! $user->isSuperAdmin()) {
+            $query->where('customer_bond_cheques.created_by', $user->getKey());
+        }
+
+        return $query;
+    }
+
+    /**
+     * Abort 404 if a non-admin tries to manage a bond they do not own, so the
+     * cheque screen never exposes another user's deal via a guessed bond id.
+     */
+    protected function authorizeBondOwnership(CustomerBond $bond): void
+    {
+        $user = auth()->user();
+        if ($user && ! $user->isSuperAdmin()
+            && (string) $bond->getAttribute('created_by') !== (string) $user->getKey()) {
+            abort(404);
+        }
+    }
+
     public function index(Request $request)
     {
         $filterStatus  = $request->query('status', '');
@@ -26,6 +53,7 @@ class CustomerBondChequeController extends Controller
             ->when($filterTo,      fn ($q) => $q->whereDate('cheque_date', '<=', $filterTo))
             ->latest('cheque_date')
             ->latest('id');
+        $this->scopeToOwner($query);
 
         $cheques = $query->get();
 
@@ -35,6 +63,7 @@ class CustomerBondChequeController extends Controller
             ->when($filterAccount, fn ($q) => $q->where('connected_account_id', $filterAccount))
             ->when($filterFrom,    fn ($q) => $q->whereDate('cheque_date', '>=', $filterFrom))
             ->when($filterTo,      fn ($q) => $q->whereDate('cheque_date', '<=', $filterTo));
+        $this->scopeToOwner($summaryQuery);
 
         $all     = (clone $summaryQuery)->selectRaw('status, SUM(amount) as total, COUNT(*) as count')->groupBy('status')->get()->keyBy('status');
         $summary = [
@@ -138,6 +167,8 @@ class CustomerBondChequeController extends Controller
 
     public function manage(CustomerBond $customer_bond)
     {
+        $this->authorizeBondOwnership($customer_bond);
+
         $customer_bond->loadMissing(['customer', 'arazi', 'plots', 'witnesses', 'payments']);
 
         $cheques = CustomerBondCheque::with('connectedAccount')
@@ -778,6 +809,7 @@ class CustomerBondChequeController extends Controller
         ]);
 
         $bond = CustomerBond::find($data['customer_bond_id']);
+        $this->authorizeBondOwnership($bond);
         $moved = 0;
         $skipped = [];
 
@@ -820,7 +852,9 @@ class CustomerBondChequeController extends Controller
             'cheque_ids.*' => ['integer', 'exists:customer_bond_cheques,id'],
         ]);
 
-        $deleted = CustomerBondCheque::whereIn('id', $data['cheque_ids'])->delete();
+        $deleted = $this->scopeToOwner(
+            CustomerBondCheque::whereIn('id', $data['cheque_ids'])
+        )->delete();
 
         return redirect()->back()->with('success', $deleted . ' cheque(s) deleted.');
     }
@@ -834,7 +868,9 @@ class CustomerBondChequeController extends Controller
             'cheque_id' => ['required', 'integer', 'exists:customer_bond_cheques,id'],
         ]);
 
-        $cheque = CustomerBondCheque::find($data['cheque_id']);
+        $cheque = $this->scopeToOwner(
+            CustomerBondCheque::whereKey($data['cheque_id'])
+        )->firstOrFail();
         $cheque->update([
             'customer_bond_id' => null,
             'customer_id'      => null,
@@ -845,6 +881,11 @@ class CustomerBondChequeController extends Controller
 
     public function destroy(CustomerBondCheque $customerBondCheque)
     {
+        $user = auth()->user();
+        if ($user && ! $user->isSuperAdmin()
+            && (string) $customerBondCheque->getAttribute('created_by') !== (string) $user->getKey()) {
+            abort(404);
+        }
         $customerBondCheque->delete();
         return redirect()->back()->with('success', 'Cheque entry deleted.');
     }

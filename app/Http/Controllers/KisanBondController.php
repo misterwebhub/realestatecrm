@@ -99,6 +99,8 @@ class KisanBondController extends Controller
 
     public function create()
     {
+        $this->authorizeCrud('create');
+
         $item = new KisanBond([
             'bond_no' => $this->nextBondNumber(),
             'kisan_id' => request('kisan_id'),
@@ -111,6 +113,8 @@ class KisanBondController extends Controller
     public function edit($id)
     {
         $item = KisanBond::with(['arazis', 'witnesses'])->findOrFail($id);
+        $this->authorizeOwnership($item);
+        $this->authorizeCrud('edit', $item);
 
         return view('kisan_bonds.form', $this->formData($item, 'Edit Kisan Bond', route('kisan-bonds.update', $item), 'PUT'));
     }
@@ -224,7 +228,7 @@ class KisanBondController extends Controller
 
     protected function resourceQuery()
     {
-        return KisanBond::with(['kisan', 'arazi', 'arazis'])->latest();
+        return $this->applyOwnershipScope(KisanBond::with(['kisan', 'arazi', 'arazis'])->latest());
     }
 
     public function index(Request $request)
@@ -232,7 +236,7 @@ class KisanBondController extends Controller
         $q         = trim((string) $request->input('q', ''));
         $araziCode = trim((string) $request->input('arazi_code', ''));
 
-        $query = KisanBond::with(['kisan', 'arazi', 'arazis'])->latest();
+        $query = $this->applyOwnershipScope(KisanBond::with(['kisan', 'arazi', 'arazis'])->latest());
 
         // Search by kisan name or mobile
         if ($q !== '') {
@@ -295,6 +299,7 @@ class KisanBondController extends Controller
     public function print($id)
     {
         $bond = KisanBond::with(['kisan', 'arazi', 'arazis', 'witnesses', 'broker'])->findOrFail($id);
+        $this->authorizeOwnership($bond);
 
         return view('prints.bond', [
             'title' => 'Kisan Bond',
@@ -305,6 +310,7 @@ class KisanBondController extends Controller
     public function pdf($id)
     {
         $bond = KisanBond::with(['kisan', 'arazi', 'arazis', 'witnesses', 'broker'])->findOrFail($id);
+        $this->authorizeOwnership($bond);
         $html = view('prints.bond', ['title' => 'Kisan Bond', 'bond' => $bond])->render();
 
         if (class_exists(\Barryvdh\DomPDF\Facade\Pdf::class)) {

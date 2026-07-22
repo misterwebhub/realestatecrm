@@ -14,6 +14,12 @@ class AraziDocumentController extends Controller
 {
     use ManagesCrud;
 
+    // Shared inventory documents — visible to every user, not owner-scoped.
+    protected function ownershipColumn(): ?string
+    {
+        return null;
+    }
+
     protected function resourceTitle(): string
     {
         return 'Arazi Document';

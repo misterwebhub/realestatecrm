@@ -4,11 +4,11 @@
     <div class="card card-outline card-primary">
         <div class="card-header d-flex align-items-center gap-2">
             <h5 class="card-title mb-0 fw-bold">{{ $title }}</h5>
-            @if(auth()->check() && in_array(auth()->user()->role, ['admin','manager']))
+            @can($permModule.'.create')
                 <button type="button" class="btn btn-primary btn-sm ms-auto" data-bs-toggle="modal" data-bs-target="#addBrokerModal">
                     <i class="bi bi-plus-lg"></i> Add {{ $typeLabel }} Broker
                 </button>
-            @endif
+            @endcan
         </div>
 
         <div class="card-body table-responsive p-0">
@@ -38,14 +38,16 @@
                             <td>{{ $broker->legacy_percent !== null ? number_format((float) $broker->legacy_percent, 2) : '-' }}</td>
                             <td>{{ $broker->registries_count }}</td>
                             <td class="text-end">
-                                @if(auth()->check() && in_array(auth()->user()->role, ['admin','manager']))
+                                @can($permModule.'.edit')
                                     <a href="{{ route('agents.edit', $broker) }}" class="btn btn-outline-secondary btn-sm">Edit</a>
+                                @endcan
+                                @can($permModule.'.delete')
                                     <form action="{{ route('agents.destroy', $broker) }}" method="POST" class="d-inline-block" onsubmit="return confirm('Delete this broker?');">
                                         @csrf
                                         @method('DELETE')
                                         <button type="submit" class="btn btn-outline-danger btn-sm">Delete</button>
                                     </form>
-                                @endif
+                                @endcan
                             </td>
                         </tr>
                     @empty

@@ -69,22 +69,23 @@ class PaymentController extends Controller
             return null;
         }
 
-        return Payment::with([
-            'kisanBond.kisan',
-            'kisanBond.arazi',
-            'registry.arazi.kisan',
-            'registry.customer',
-            'registry.agent',
-            'customer',
-            'kisan',
-        ])
-            ->where(function ($q) use ($receiptNo) {
-                $q->where('receipt_no', $receiptNo)
-                    ->orWhere('reference_no', $receiptNo);
-            })
-            ->latest('payment_date')
-            ->latest('id')
-            ->first();
+        return $this->applyOwnershipScope(
+            Payment::with([
+                'kisanBond.kisan',
+                'kisanBond.arazi',
+                'registry.arazi.kisan',
+                'registry.customer',
+                'registry.agent',
+                'customer',
+                'kisan',
+            ])
+                ->where(function ($q) use ($receiptNo) {
+                    $q->where('receipt_no', $receiptNo)
+                        ->orWhere('reference_no', $receiptNo);
+                })
+                ->latest('payment_date')
+                ->latest('id')
+        )->first();
     }
 
     public function ledger(Request $request)
@@ -97,18 +98,18 @@ class PaymentController extends Controller
         $allKisans = Kisan::orderBy('name')->get(['id', 'name', 'mobile']);
 
         // Bonds filtered by kisan and/or arazi
-        $bonds = KisanBond::with(['kisan', 'arazis'])
+        $bonds = $this->applyOwnershipScope(KisanBond::with(['kisan', 'arazis'])
             ->withSum('payments as paid_amount', 'amount')
             ->when($selectedKisanId, fn ($q) => $q->where('kisan_id', $selectedKisanId))
             ->when($araziCode !== '', fn ($q) => $q->where(fn ($q2) =>
                 $q2->where('arazi_code', $araziCode)
                    ->orWhereHas('arazis', fn ($a) => $a->where('kisan_bond_arazi.arazi_code', $araziCode))
             ))
-            ->latest()
+            ->latest())
             ->get();
 
-        $entries = Payment::with(['kisanBond.kisan'])
-            ->whereNotNull('kisan_bond_id')
+        $entries = $this->applyOwnershipScope(Payment::with(['kisanBond.kisan'])
+            ->whereNotNull('kisan_bond_id'))
             ->when($selectedKisanId, fn ($q) => $q->whereHas('kisanBond', fn ($b) => $b->where('kisan_id', $selectedKisanId)))
             ->when($araziCode !== '', fn ($q) => $q->whereHas('kisanBond', fn ($b) =>
                 $b->where('arazi_code', $araziCode)
@@ -283,9 +284,11 @@ class PaymentController extends Controller
 
     protected function resourceQuery()
     {
-        return Payment::with(['kisanBond.kisan', 'registry.arazi', 'kisan'])
-            ->whereNotNull('kisan_bond_id')
-            ->latest();
+        return $this->applyOwnershipScope(
+            Payment::with(['kisanBond.kisan', 'registry.arazi', 'kisan'])
+                ->whereNotNull('kisan_bond_id')
+                ->latest()
+        );
     }
 
     protected function resourceRow(Model $item): array
@@ -429,6 +432,8 @@ class PaymentController extends Controller
     // Kisan-scoped create
     public function create(Request $request, ?Kisan $kisan = null)
     {
+        $this->authorizeCrud('create');
+
         $modelClass = $this->resourceModel();
 
         return view('crud.form', [
@@ -443,6 +448,8 @@ class PaymentController extends Controller
     // Kisan-scoped store
     public function store(Request $request, ?Kisan $kisan = null)
     {
+        $this->authorizeCrud('create');
+
         $validated = $request->validate($this->resourceRules());
         $modelClass = $this->resourceModel();
         $payload = $this->resourcePrepareData($validated, $request);

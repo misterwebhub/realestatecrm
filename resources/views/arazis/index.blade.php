@@ -13,11 +13,11 @@
                 @endif
             </form>
         </div>
-        @if(auth()->check() && in_array(auth()->user()->role, ['admin','manager']))
+        @can('arazis.create')
             <a href="{{ $createUrl }}" class="btn btn-primary btn-sm ms-auto">
                 <i class="bi bi-plus-lg"></i> Add New Arazi
             </a>
-        @endif
+        @endcan
     </div>
 
     <div class="card-body table-responsive p-0">
@@ -60,12 +60,12 @@
                                 data-bs-target="#modal-{{ $i }}">
                             <i class="bi bi-eye"></i> View Arazi Details
                         </button>
-                        @if(auth()->check() && in_array(auth()->user()->role, ['admin','manager']))
+                        @can('arazis.create')
                             <a href="{{ $createUrl }}?legacy_arazi_code={{ urlencode($group['arazi_code']) }}"
                                class="btn btn-outline-success btn-sm ms-1">
                                 <i class="bi bi-plus-lg"></i> Add Entry
                             </a>
-                        @endif
+                        @endcan
                     </td>
                 </tr>
             @empty
@@ -100,9 +100,9 @@
                             <th>Unit</th>
                             <th>Road Area</th>
                             <th>Status</th>
-                            @if(auth()->check() && in_array(auth()->user()->role, ['admin','manager']))
+                            @canany(['arazis.edit','arazis.delete'])
                                 <th class="text-end">Actions</th>
-                            @endif
+                            @endcanany
                         </tr>
                     </thead>
                     <tbody>
@@ -119,14 +119,17 @@
                                     {{ $detail['status_label'] }}
                                 </span>
                             </td>
-                            @if(auth()->check() && in_array(auth()->user()->role, ['admin','manager']))
+                            @canany(['arazis.edit','arazis.delete'])
                             <td class="text-end text-nowrap">
                                 <a href="{{ $detail['grid_url'] }}" class="btn btn-outline-primary btn-sm">
                                     <i class="bi bi-grid-3x3-gap"></i> Plots
                                 </a>
+                                @can('arazis.edit')
                                 <a href="{{ $detail['edit_url'] }}" class="btn btn-outline-secondary btn-sm ms-1">
                                     <i class="bi bi-pencil"></i> Edit
                                 </a>
+                                @endcan
+                                @can('arazis.delete')
                                 @if(!empty($detail['has_bonds']))
                                     <button type="button" class="btn btn-outline-danger btn-sm ms-1 disabled"
                                             tabindex="-1" aria-disabled="true"
@@ -145,8 +148,9 @@
                                         </button>
                                     </form>
                                 @endif
+                                @endcan
                             </td>
-                            @endif
+                            @endcanany
                         </tr>
                     @endforeach
                     </tbody>
@@ -157,9 +161,9 @@
                             <td></td>
                             <td>{{ number_format($group['total_road'], 2) }}</td>
                             <td></td>
-                            @if(auth()->check() && in_array(auth()->user()->role, ['admin','manager']))
+                            @canany(['arazis.edit','arazis.delete'])
                                 <td></td>
-                            @endif
+                            @endcanany
                         </tr>
                     </tfoot>
                 </table>

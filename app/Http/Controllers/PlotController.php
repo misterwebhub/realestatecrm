@@ -11,6 +11,12 @@ class PlotController extends Controller
 {
     use ManagesCrud;
 
+    // Shared inventory — visible to every user, not owner-scoped.
+    protected function ownershipColumn(): ?string
+    {
+        return null;
+    }
+
     protected function resourceTitle(): string
     {
         return 'Plot';
@@ -173,6 +179,7 @@ class PlotController extends Controller
 
     public function index(\Illuminate\Http\Request $request)
     {
+        $this->authorizeCrud('view');
         $q = trim((string) $request->query('q', ''));
         $filterArazi = trim((string) $request->query('arazi_code', ''));
         $filterPlotId = trim((string) $request->query('plot_id', ''));

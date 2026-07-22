@@ -77,6 +77,7 @@ class BookingController extends Controller
 
     public function store(Request $request)
     {
+        $this->authorizeCrud('create');
         $validated = $request->validate($this->resourceRules());
 
         // Prevent double booking/locking

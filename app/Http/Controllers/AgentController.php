@@ -12,6 +12,7 @@ class AgentController extends Controller
 {
     use ManagesCrud;
 
+    // Owner-scoped: each user sees only the brokers they created (Super Admin sees all).
     protected function resourceTitle(): string
     {
         return 'Broker';
@@ -25,6 +26,29 @@ class AgentController extends Controller
     protected function resourceRouteName(): string
     {
         return 'agents';
+    }
+
+    // The "agents" module was split into kisan_brokers / customer_brokers /
+    // office_brokers. Resolve the permission module from the record's broker
+    // type (or the requested type when creating), defaulting to office.
+    protected function resourcePermModule(): ?string
+    {
+        return 'office_brokers';
+    }
+
+    protected function authorizeCrud(string $action, ?\Illuminate\Database\Eloquent\Model $item = null): void
+    {
+        $type = $item?->getAttribute('broker_type') ?? request('broker_type', 'office');
+        $module = $this->typePermModule((string) $type);
+
+        $user = auth()->user();
+        if ($user && $user->isSuperAdmin()) {
+            return;
+        }
+
+        if (! $user || ! $user->can($module . '.' . $action)) {
+            abort(403, 'You are not allowed to ' . $action . ' this broker.');
+        }
     }
 
     protected function resourceColumns(): array
@@ -78,7 +102,7 @@ class AgentController extends Controller
 
     protected function resourceQuery()
     {
-        return Agent::with(['sponsor'])->withCount('registries')->latest();
+        return $this->applyOwnershipScope(Agent::with(['sponsor'])->withCount('registries')->latest());
     }
 
     protected function resourceRow(Model $item): array
@@ -100,17 +124,20 @@ class AgentController extends Controller
     public function typeIndex(string $type)
     {
         $this->abortInvalidType($type);
+        $this->authorizeBrokerType($type, 'view');
 
         return view('agents.type_index', [
             'title' => $this->brokerTypeOptions()[$type] . ' Brokers',
             'type' => $type,
             'typeLabel' => $this->brokerTypeOptions()[$type],
+            'permModule' => $this->typePermModule($type),
             'nextFormCode' => $this->nextBrokerCode($type),
-            'brokers' => Agent::with('sponsor')
-                ->where('broker_type', $type)
-                ->withCount('registries')
-                ->latest()
-                ->get(),
+            'brokers' => $this->applyOwnershipScope(
+                Agent::with('sponsor')
+                    ->where('broker_type', $type)
+                    ->withCount('registries')
+                    ->latest()
+            )->get(),
             'sponsors' => Agent::where('broker_type', $type)->orderBy('name')->pluck('name', 'id')->all(),
         ]);
     }
@@ -126,6 +153,7 @@ class AgentController extends Controller
     public function typeStore(Request $request, string $type)
     {
         $this->abortInvalidType($type);
+        $this->authorizeBrokerType($type, 'create');
 
         $validated = $request->validate([
             'form_code' => ['nullable', 'string', 'max:30', Rule::unique('agents', 'form_code')],
@@ -162,6 +190,31 @@ class AgentController extends Controller
             'customer' => 'Customer',
             'office' => 'Office',
         ];
+    }
+
+    /**
+     * Map a broker type to its permission module so each broker menu
+     * (Kisan / Customer / Office) can be controlled independently.
+     */
+    private function typePermModule(string $type): string
+    {
+        return match ($type) {
+            'kisan' => 'kisan_brokers',
+            'customer' => 'customer_brokers',
+            default => 'office_brokers',
+        };
+    }
+
+    private function authorizeBrokerType(string $type, string $action): void
+    {
+        $user = auth()->user();
+        if ($user && $user->isSuperAdmin()) {
+            return;
+        }
+
+        if (! $user || ! $user->can($this->typePermModule($type) . '.' . $action)) {
+            abort(403, 'You are not allowed to ' . $action . ' ' . $type . ' brokers.');
+        }
     }
 
     private function abortInvalidType(string $type): void

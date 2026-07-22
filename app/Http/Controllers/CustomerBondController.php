@@ -257,14 +257,17 @@ class CustomerBondController extends Controller
 
     protected function resourceQuery()
     {
-        return CustomerBond::with(['customer', 'arazi', 'plots', 'witnesses', 'broker'])
-            ->withSum('payments as paid_amount', 'amount')
-            ->withSum(['payments as installment_paid' => function ($q) { $q->where('entry_type', 'installment'); }], 'amount')
-            ->latest();
+        return $this->applyOwnershipScope(
+            CustomerBond::with(['customer', 'arazi', 'plots', 'witnesses', 'broker'])
+                ->withSum('payments as paid_amount', 'amount')
+                ->withSum(['payments as installment_paid' => function ($q) { $q->where('entry_type', 'installment'); }], 'amount')
+                ->latest()
+        );
     }
 
     public function create()
     {
+        $this->authorizeCrud('create');
         $modelClass = $this->resourceModel();
         $item = new $modelClass([
             'bond_no' => $this->nextBondNumber(),
@@ -344,8 +347,10 @@ class CustomerBondController extends Controller
 
     public function edit($id)
     {
+        $this->authorizeCrud('edit');
         $modelClass = $this->resourceModel();
         $item = $modelClass::with('plots')->findOrFail($id);
+        $this->authorizeOwnership($item);
 
         $customersList = \App\Models\Customer::orderBy('name')->get();
         $customers = $customersList->pluck('name', 'id')->all();
@@ -508,7 +513,9 @@ class CustomerBondController extends Controller
             return response()->json(['found' => false, 'message' => 'Bond number is required.']);
         }
 
-        $bond = CustomerBond::where('bond_no', $bondNo)->with(['arazi', 'plots', 'customer', 'witnesses', 'payments'])->latest()->first();
+        $bond = $this->applyOwnershipScope(
+            CustomerBond::where('bond_no', $bondNo)->with(['arazi', 'plots', 'customer', 'witnesses', 'payments'])->latest()
+        )->first();
 
         if (! $bond) {
             return response()->json(['found' => false, 'message' => 'Bond not found.']);
@@ -576,9 +583,11 @@ class CustomerBondController extends Controller
      */
     public function byPlot(\App\Models\Plot $plot)
     {
-        $bond = CustomerBond::whereHas('plots', function ($q) use ($plot) {
-            $q->where('plots.id', $plot->id);
-        })->latest()->first();
+        $bond = $this->applyOwnershipScope(
+            CustomerBond::whereHas('plots', function ($q) use ($plot) {
+                $q->where('plots.id', $plot->id);
+            })->latest()
+        )->first();
 
         if (! $bond) {
             return response()->json(['found' => false]);
@@ -590,6 +599,7 @@ class CustomerBondController extends Controller
     public function print($id)
     {
         $bond = CustomerBond::with(['customer', 'arazi', 'plots', 'witnesses', 'broker'])->findOrFail($id);
+        $this->authorizeOwnership($bond);
         $lastPaymentDate = $bond->payments()->max('entry_date');
 
         return view('prints.customer_bond_certificate', [
@@ -602,6 +612,7 @@ class CustomerBondController extends Controller
     public function pdf($id)
     {
         $bond = CustomerBond::with(['customer', 'arazi', 'plots', 'witnesses', 'broker'])->findOrFail($id);
+        $this->authorizeOwnership($bond);
         $lastPaymentDate = $bond->payments()->max('entry_date');
         $html = view('prints.customer_bond_certificate', [
             'title' => 'Customer Bond Certificate',

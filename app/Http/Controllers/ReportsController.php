@@ -15,6 +15,32 @@ use Illuminate\Http\Request;
 
 class ReportsController extends Controller
 {
+    /**
+     * Restrict a deal-data query to the current user's own records, unless they
+     * are a Super Admin (who sees everything). No-ops when the model lacks the
+     * created_by column or nobody is authenticated.
+     */
+    protected function ownScope($query)
+    {
+        $user = auth()->user();
+        if (! $user || $user->isSuperAdmin()) {
+            return $query;
+        }
+
+        $model = $query->getModel();
+        try {
+            $hasColumn = \Illuminate\Support\Facades\Schema::hasColumn($model->getTable(), 'created_by');
+        } catch (\Throwable $e) {
+            $hasColumn = false;
+        }
+
+        if ($hasColumn) {
+            $query->where($model->qualifyColumn('created_by'), $user->getKey());
+        }
+
+        return $query;
+    }
+
     public function index()
     {
         return view('reports.index');
@@ -44,7 +70,7 @@ class ReportsController extends Controller
         $dateFrom      = $request->query('date_from', '');
         $dateTo        = $request->query('date_to', '');
 
-        $payments = CustomerBondPayment::with([
+        $paymentsQuery = CustomerBondPayment::with([
                 'takenByUser',
                 'customer',
                 'customerBond.customer',
@@ -63,8 +89,10 @@ class ReportsController extends Controller
             ->when($dateFrom,      fn ($q) => $q->whereDate('entry_date', '>=', $dateFrom))
             ->when($dateTo,        fn ($q) => $q->whereDate('entry_date', '<=', $dateTo))
             ->orderBy('entry_date')
-            ->orderBy('id')
-            ->get();
+            ->orderBy('id');
+
+        // Non-admins only see payments they created; admins see everything.
+        $payments = $this->ownScope($paymentsQuery)->get();
 
         // Registry lookup (deed no, partner, status) keyed by customer + arazi.
         $regMap = [];
@@ -160,7 +188,7 @@ class ReportsController extends Controller
         $dateFrom      = $request->query('date_from', '');
         $dateTo        = $request->query('date_to', '');
 
-        $bonds = CustomerBond::with(['customer', 'arazi', 'plots', 'broker', 'payments', 'cheques.connectedAccount'])
+        $bondsQuery = CustomerBond::with(['customer', 'arazi', 'plots', 'broker', 'payments', 'cheques.connectedAccount'])
             ->when($customerId,    fn ($q) => $q->where('customer_id', $customerId))
             ->when($bondId,        fn ($q) => $q->where('id', $bondId))
             ->when($araziCode,     fn ($q) => $q->where('arazi_code', $araziCode))
@@ -168,8 +196,10 @@ class ReportsController extends Controller
             ->when($userId,        fn ($q) => $q->whereHas('payments', fn ($p) => $p->where('taken_by_user_id', $userId)))
             ->when($entryType,     fn ($q) => $q->whereHas('payments', fn ($p) => $p->where('entry_type', $entryType)))
             ->when($paymentMethod, fn ($q) => $q->whereHas('payments', fn ($p) => $p->where('payment_method', $paymentMethod)))
-            ->orderBy('bond_no')
-            ->get();
+            ->orderBy('bond_no');
+
+        // Non-admins only see their own bonds; admins see everything.
+        $bonds = $this->ownScope($bondsQuery)->get();
 
         // Registry lookup keyed by customer + arazi (deed/partner/status).
         $regMap = [];
@@ -396,9 +426,9 @@ class ReportsController extends Controller
     {
         $bondId = $request->query('bond_id', '');
 
-        $bond = CustomerBond::with(['cheques' => function ($q) {
+        $bond = $this->ownScope(CustomerBond::with(['cheques' => function ($q) {
             $q->orderBy('cheque_date');
-        }])->find($bondId);
+        }]))->find($bondId);
 
         if (! $bond) {
             return response()->json(['found' => false, 'cheques' => []]);
@@ -438,7 +468,7 @@ class ReportsController extends Controller
             return response()->json(['deeds' => []]);
         }
 
-        $deeds = Registry::where('arazi_code', $code)
+        $deeds = $this->ownScope(Registry::where('arazi_code', $code))
             ->whereNotNull('deed_no')
             ->where('deed_no', '!=', '')
             ->distinct()
@@ -484,7 +514,7 @@ class ReportsController extends Controller
             $assigned[$b->partner_id][$code] = ($assigned[$b->partner_id][$code] ?? 0) + (float) $b->area;
         }
 
-        $registries = Registry::with('plot:id,area')
+        $registries = $this->ownScope(Registry::with('plot:id,area'))
             ->whereNotNull('partner_id')
             ->when($dateFrom, fn ($q) => $q->whereDate('registry_date', '>=', $dateFrom))
             ->when($dateTo,   fn ($q) => $q->whereDate('registry_date', '<=', $dateTo))
@@ -603,11 +633,13 @@ class ReportsController extends Controller
 
         $plotArea = Plot::selectRaw('arazi_code, COUNT(*) as cnt, COALESCE(SUM(area),0) as area')
             ->groupBy('arazi_code')->get()->keyBy('arazi_code');
-        $regAgg = Registry::selectRaw("arazi_code, COUNT(*) as cnt, SUM(CASE WHEN LOWER(status)='completed' THEN 1 ELSE 0 END) as done, COALESCE(SUM(COALESCE(land_size,0)),0) as land")
+        $regAgg = $this->ownScope(Registry::query())
+            ->selectRaw("arazi_code, COUNT(*) as cnt, SUM(CASE WHEN LOWER(status)='completed' THEN 1 ELSE 0 END) as done, COALESCE(SUM(COALESCE(land_size,0)),0) as land")
             ->when($dateFrom, fn ($q) => $q->whereDate('registry_date', '>=', $dateFrom))
             ->when($dateTo,   fn ($q) => $q->whereDate('registry_date', '<=', $dateTo))
             ->groupBy('arazi_code')->get()->keyBy('arazi_code');
-        $bondAgg = CustomerBond::selectRaw('arazi_code, COUNT(*) as cnt')
+        $bondAgg = $this->ownScope(CustomerBond::query())
+            ->selectRaw('arazi_code, COUNT(*) as cnt')
             ->groupBy('arazi_code')->get()->keyBy('arazi_code');
 
         $araziOptions = $grouped->keys()->sort()->values();
@@ -695,13 +727,15 @@ class ReportsController extends Controller
 
         $agents = Agent::orderBy('name')->get(['id', 'name', 'mobile', 'commission_percentage']);
 
-        $bondAgg = CustomerBond::selectRaw('broker_id, COUNT(*) as cnt, COALESCE(SUM(total_amount),0) as total, COALESCE(SUM(broker_payment),0) as commission, COALESCE(SUM(broker_paid),0) as paid, COALESCE(SUM(broker_balance),0) as balance')
+        $bondAgg = $this->ownScope(CustomerBond::query())
+            ->selectRaw('broker_id, COUNT(*) as cnt, COALESCE(SUM(total_amount),0) as total, COALESCE(SUM(broker_payment),0) as commission, COALESCE(SUM(broker_paid),0) as paid, COALESCE(SUM(broker_balance),0) as balance')
             ->whereNotNull('broker_id')
             ->when($dateFrom, fn ($q) => $q->whereDate('created_at', '>=', $dateFrom))
             ->when($dateTo,   fn ($q) => $q->whereDate('created_at', '<=', $dateTo))
             ->groupBy('broker_id')->get()->keyBy('broker_id');
 
-        $regAgg = Registry::selectRaw("agent_id, COUNT(*) as cnt, SUM(CASE WHEN LOWER(status)='completed' THEN 1 ELSE 0 END) as done")
+        $regAgg = $this->ownScope(Registry::query())
+            ->selectRaw("agent_id, COUNT(*) as cnt, SUM(CASE WHEN LOWER(status)='completed' THEN 1 ELSE 0 END) as done")
             ->whereNotNull('agent_id')
             ->when($dateFrom, fn ($q) => $q->whereDate('registry_date', '>=', $dateFrom))
             ->when($dateTo,   fn ($q) => $q->whereDate('registry_date', '<=', $dateTo))
@@ -769,7 +803,8 @@ class ReportsController extends Controller
         $dateFrom  = $request->query('date_from', '');
         $dateTo    = $request->query('date_to', '');
 
-        $agg = Registry::selectRaw("COALESCE(NULLIF(status,''),'unknown') as status, COUNT(*) as cnt, COALESCE(SUM(registry_amount),0) as amount")
+        $agg = $this->ownScope(Registry::query())
+            ->selectRaw("COALESCE(NULLIF(status,''),'unknown') as status, COUNT(*) as cnt, COALESCE(SUM(registry_amount),0) as amount")
             ->groupBy('status')->get();
 
         $statusRows = $agg->map(fn ($r) => [
@@ -778,7 +813,7 @@ class ReportsController extends Controller
             'amount' => round((float) $r->amount, 2),
         ])->all();
 
-        $recent = Registry::with(['customer:id,name', 'agent:id,name'])
+        $recent = $this->ownScope(Registry::with(['customer:id,name', 'agent:id,name']))
             ->when($araziCode,  fn ($q) => $q->where('arazi_code', $araziCode))
             ->when($agentId,    fn ($q) => $q->where('agent_id', $agentId))
             ->when($customerId, fn ($q) => $q->where('customer_id', $customerId))
@@ -878,7 +913,7 @@ class ReportsController extends Controller
         $method    = $request->query('payment_method', '');
         $araziCode = $request->query('arazi_code', '');
 
-        $base = CustomerBondPayment::query();
+        $base = $this->ownScope(CustomerBondPayment::query());
         if ($from !== '') $base->whereDate('entry_date', '>=', $from);
         if ($to !== '')   $base->whereDate('entry_date', '<=', $to);
         if ($entryType)   $base->where('entry_type', $entryType);
@@ -935,7 +970,8 @@ class ReportsController extends Controller
         $araziOptions = $grouped->keys()->sort()->values();
         $locationOptions = $arazis->pluck('location')->filter()->unique()->sort()->values();
 
-        $regLand = Registry::selectRaw('arazi_code, COALESCE(SUM(COALESCE(land_size,0)),0) as land')
+        $regLand = $this->ownScope(Registry::query())
+            ->selectRaw('arazi_code, COALESCE(SUM(COALESCE(land_size,0)),0) as land')
             ->when($dateFrom, fn ($q) => $q->whereDate('registry_date', '>=', $dateFrom))
             ->when($dateTo,   fn ($q) => $q->whereDate('registry_date', '<=', $dateTo))
             ->groupBy('arazi_code')->get()->keyBy('arazi_code');

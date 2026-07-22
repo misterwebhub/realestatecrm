@@ -168,13 +168,13 @@
         <span class="text-muted small">Track all bond payments, credits &amp; debits</span>
     </div>
     <div class="d-flex gap-2 ms-auto">
-        @if(auth()->check() && in_array(auth()->user()->role, ['admin','manager']))
+        @can('customer_payments.view')
             @if(!empty($exportLedgerCsvUrl))
                 <a href="{{ $exportLedgerCsvUrl }}" class="btn btn-sm btn-outline-success">
                     <i class="bi bi-download"></i> Export CSV
                 </a>
             @endif
-        @endif
+        @endcan
         <button class="btn btn-sm btn-outline-secondary" onclick="window.print()">
             <i class="bi bi-printer"></i> Print
         </button>

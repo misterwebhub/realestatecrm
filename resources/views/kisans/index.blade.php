@@ -10,9 +10,9 @@
             @if(!empty($exportCsvUrl))
                 <a href="{{ $exportCsvUrl }}" class="btn btn-outline-success btn-sm"><i class="bi bi-filetype-csv"></i> Export CSV</a>
             @endif
-            @if(auth()->check() && in_array(auth()->user()->role, ['admin','manager']))
+            @can('kisans.create')
                 <a href="{{ $createUrl }}" class="btn btn-primary btn-sm"><i class="bi bi-plus-lg"></i> Add New</a>
-            @endif
+            @endcan
         </div>
     </div>
 
@@ -69,13 +69,15 @@
                             @foreach($row['action_buttons'] ?? [] as $btn)
                                 <a href="{{ $btn['url'] }}" class="btn {{ $btn['class'] ?? 'btn-outline-secondary' }} btn-sm ms-1">{{ $btn['label'] }}</a>
                             @endforeach
-                            @if(auth()->check() && in_array(auth()->user()->role, ['admin','manager']))
+                            @can('kisans.edit')
                                 <a href="{{ $row['edit_url'] }}" class="btn btn-outline-secondary btn-sm ms-1">Edit</a>
+                            @endcan
+                            @can('kisans.delete')
                                 <form action="{{ $row['delete_url'] }}" method="POST" class="d-inline-block ms-1" onsubmit="return confirm('Delete this kisan?');">
                                     @csrf @method('DELETE')
                                     <button class="btn btn-outline-danger btn-sm">Delete</button>
                                 </form>
-                            @endif
+                            @endcan
                         </td>
                     </tr>
                 @empty

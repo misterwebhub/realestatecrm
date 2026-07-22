@@ -4,11 +4,11 @@
 <div class="card card-outline card-primary">
     <div class="card-header d-flex align-items-center flex-wrap gap-2">
         <h5 class="card-title mb-0 fw-bold">{{ $title }}</h5>
-        @if(auth()->check() && in_array(auth()->user()->role, ['admin','manager']))
+        @can('kisan_registries.create')
             <a href="{{ $createUrl }}" class="btn btn-primary btn-sm ms-auto">
                 <i class="bi bi-plus-lg"></i> Add New Registry
             </a>
-        @endif
+        @endcan
     </div>
 
     <div class="card-body table-responsive p-0">
@@ -55,9 +55,9 @@
                     <th>Broker Name</th>
                     <th>Total Expense</th>
                     <th>File</th>
-                    @if(auth()->check() && in_array(auth()->user()->role, ['admin','manager']))
+                    @canany(['kisan_registries.edit','kisan_registries.delete'])
                         <th class="text-end">Actions</th>
-                    @endif
+                    @endcanany
                 </tr>
             </thead>
             <tbody>
@@ -102,11 +102,14 @@
                             <span class="text-muted">-</span>
                         @endif
                     </td>
-                    @if(auth()->check() && in_array(auth()->user()->role, ['admin','manager']))
+                    @canany(['kisan_registries.edit','kisan_registries.delete'])
                     <td class="text-end text-nowrap">
+                        @can('kisan_registries.edit')
                         <a href="{{ route('kisan-registries.edit', $rec) }}" class="btn btn-outline-secondary btn-sm">
                             <i class="bi bi-pencil"></i> Edit
                         </a>
+                        @endcan
+                        @can('kisan_registries.delete')
                         <form action="{{ route('kisan-registries.destroy', $rec) }}" method="POST"
                               class="d-inline-block ms-1"
                               onsubmit="return confirm('Delete this registry record?');">
@@ -116,8 +119,9 @@
                                 <i class="bi bi-trash"></i>
                             </button>
                         </form>
+                        @endcan
                     </td>
-                    @endif
+                    @endcanany
                 </tr>
             @empty
                 <tr>
