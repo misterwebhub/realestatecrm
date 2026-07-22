@@ -385,7 +385,7 @@ class CustomerBondController extends Controller
     {
         /** @var CustomerBond $item */
         $araziCode = $item->arazi
-            ? ($item->arazi->legacy_arazi_code ?: ($item->arazi->plot_number ?? ('Arazi-'.$item->arazi->id)))
+            ? ($item->arazi->legacy_arazi_code ?: ('Arazi-'.$item->arazi->id))
             : '-';
 
         $plotRows = $item->plots->map(fn($p) => [

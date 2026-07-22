@@ -264,7 +264,7 @@ class PlotController extends Controller
         /** @var Plot $item */
         return [
             'cells' => [
-                $item->arazi?->legacy_arazi_code ?: ($item->arazi?->plot_number ?? '-'),
+                $item->arazi?->legacy_arazi_code ?: '-',
                 $item->block ?? '-',
                 $item->title,
                 (string) ($item->area ?? '-'),

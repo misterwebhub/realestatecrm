@@ -43,7 +43,7 @@
         <div class="col-6 col-md-3">
             <div class="text-muted" style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;">Plot(s)</div>
             @forelse($plots as $p)
-                <div class="fw-semibold" style="font-size:15px;">{{ $p->plot_number ?? $p->name ?? 'Plot #'.$p->id }}
+                <div class="fw-semibold" style="font-size:15px;">{{ $p->title ?? $p->name ?? 'Plot #'.$p->id }}
                     @if($p->land_size)<span class="text-muted fw-normal" style="font-size:12px;">({{ $p->land_size }})</span>@endif
                 </div>
             @empty

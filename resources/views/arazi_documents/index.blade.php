@@ -59,7 +59,7 @@
                 <tbody>
                     @forelse($documents as $document)
                         <tr>
-                            <td>{{ $document->arazi?->legacy_arazi_code ?: ($document->arazi?->plot_number ?? '-') }}</td>
+                            <td>{{ $document->arazi?->legacy_arazi_code ?: '-' }}</td>
                             <td>{{ $document->arazi?->kisan?->name ?? '-' }}</td>
                             <td>{{ $document->document_name }}</td>
                             <td>{{ basename($document->file_path) }}</td>

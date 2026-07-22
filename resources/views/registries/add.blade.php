@@ -83,7 +83,7 @@
                 <span><strong>Bond:</strong> <span id="b_bond_no">{{ $item->registry_code ?? '-' }}</span></span>
                 <span><strong>Customer:</strong> <span id="b_customer">{{ $item->customer?->name ?? '-' }}</span></span>
                 <span><strong>Arazi:</strong> <span id="b_arazi">{{ $item->arazi?->legacy_arazi_code ?? '-' }}</span></span>
-                <span><strong>Plot:</strong> <span id="b_plot">{{ $item->plot?->title ?? $item->plot?->plot_number ?? '-' }}</span></span>
+                <span><strong>Plot:</strong> <span id="b_plot">{{ $item->plot?->title ?? '-' }}</span></span>
                 <button type="button" id="clearBondBtn" class="btn btn-outline-secondary btn-sm py-0 ms-auto">
                     <i class="bi bi-x"></i> Clear
                 </button>
@@ -156,7 +156,7 @@
                     <label class="form-label small fw-semibold">Plots in Bond</label>
                     <div id="d_plots_info" class="form-control form-control-sm bg-light" style="min-height:31px; height:auto; white-space:normal;">
                         @if($isEdit && $item->plot)
-                            <span class="badge bg-secondary me-1">{{ $item->plot->title ?? $item->plot->plot_number }}</span>
+                            <span class="badge bg-secondary me-1">{{ $item->plot->title ?? ('Plot-'.$item->plot->id) }}</span>
                         @else
                             <span class="text-muted" style="font-size:12px;">Auto-filled from bond</span>
                         @endif

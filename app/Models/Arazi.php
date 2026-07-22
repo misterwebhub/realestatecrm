@@ -34,9 +34,8 @@ class Arazi extends Model
     }
 
     /**
-     * The "Arazi No" code used to identify this record in selects/lookups: legacy_arazi_code,
-     * falling back to plot_number. If neither is set, returns a visible error placeholder
-     * instead of inventing a synthetic code.
+     * The "Arazi No" code used to identify this record in selects/lookups: legacy_arazi_code.
+     * If it is not set, returns a visible error placeholder instead of inventing a synthetic code.
      */
     public function araziNoCode(): string
     {
@@ -44,16 +43,11 @@ class Arazi extends Model
             return $this->legacy_arazi_code;
         }
 
-        if ($this->plot_number) {
-            return $this->plot_number;
-        }
-
         return '⚠ Missing Arazi No (#' . $this->id . ')';
     }
 
     /**
-     * All Arazi records matching the given "Arazi No" code (legacy_arazi_code, falling back to
-     * plot_number).
+     * All Arazi records matching the given "Arazi No" code (legacy_arazi_code).
      */
     public static function arazisForCode(string $code): \Illuminate\Support\Collection
     {
@@ -62,12 +56,7 @@ class Arazi extends Model
             return collect();
         }
 
-        $byLegacy = static::where('legacy_arazi_code', $code)->get();
-        if ($byLegacy->isNotEmpty()) {
-            return $byLegacy;
-        }
-
-        return static::where('plot_number', $code)->get();
+        return static::where('legacy_arazi_code', $code)->get();
     }
 
     /**

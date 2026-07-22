@@ -111,7 +111,7 @@
             <th colspan="2">Arazi No.</th>
         </tr>
         <tr>
-            <td colspan="2">{{ $bond->arazi?->legacy_arazi_code ?? $bond->arazi?->plot_number ?? '-' }}</td>
+            <td colspan="2">{{ $bond->arazi?->legacy_arazi_code ?? '-' }}</td>
         </tr>
         <tr>
             <th colspan="2">Plot No./Plot Size</th>
@@ -122,7 +122,7 @@
                     <ul style="margin:0;padding-left:20px;text-align:left; list-style-type: disc;">
                         @foreach($bond->plots as $plot)
                             <li style="text-align:left; margin-bottom:4px;">
-                                {{ $plot->plot_number ?? $plot->title ?? ('Plot-' . $plot->id) }}
+                                {{ $plot->title ?? ('Plot-' . $plot->id) }}
                                 /{{ ($fmtArea($plot->area ?? $plot->size ?? '-') !== '-') ? $fmtArea($plot->area ?? $plot->size ?? '-') . ' gaz' : '-' }}
                             </li>
                         @endforeach

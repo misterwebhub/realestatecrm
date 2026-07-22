@@ -43,9 +43,9 @@
                     <span class="label">Arazis:</span>
                     <span class="value">
                         @if($bond->arazis && $bond->arazis->isNotEmpty())
-                            {{ $bond->arazis->map(fn ($arazi) => $arazi->legacy_arazi_code ?: ($arazi->plot_number ?? ('Arazi-' . $arazi->id)))->join(', ') }}
+                            {{ $bond->arazis->map(fn ($arazi) => $arazi->legacy_arazi_code ?: ('Arazi-' . $arazi->id))->join(', ') }}
                         @else
-                            {{ $bond->arazi?->legacy_arazi_code ?? $bond->arazi?->plot_number ?? '-' }}
+                            {{ $bond->arazi?->legacy_arazi_code ?? '-' }}
                         @endif
                     </span>
                 </div>
@@ -83,7 +83,7 @@
                         @foreach($bond->arazis as $arazi)
                             <tr>
                                 <td style="border:1px solid #ddd;padding:6px">
-                                    <strong>{{ $arazi->legacy_arazi_code ?: ($arazi->plot_number ?? ('Arazi-' . $arazi->id)) }}</strong>
+                                    <strong>{{ $arazi->legacy_arazi_code ?: ('Arazi-' . $arazi->id) }}</strong>
                                     @if($arazi->location)<br><span class="small">{{ $arazi->location }}</span>@endif
                                 </td>
                                 <td style="border:1px solid #ddd;padding:6px;text-align:right">{{ number_format((float) ($arazi->pivot->land_size ?? $arazi->size ?? 0), 2) }}</td>
@@ -104,7 +104,7 @@
                     </tfoot>
                 </table>
             @else
-                <div class="small">{{ $bond->arazi?->legacy_arazi_code ?? $bond->arazi?->plot_number ?? '-' }}</div>
+                <div class="small">{{ $bond->arazi?->legacy_arazi_code ?? '-' }}</div>
             @endif
         </div>
 

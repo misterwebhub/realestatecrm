@@ -88,8 +88,7 @@ class CustomerController extends Controller
 
         // Filter by plot number / title → bonds → customers
         if ($plotQ !== '') {
-            $plotIds = Plot::where('plot_number', 'like', '%' . $plotQ . '%')
-                ->orWhere('title', $plotQ) // exact — plot title behaves like a plot number
+            $plotIds = Plot::where('title', $plotQ) // exact — plot title behaves like a plot number, never LIKE
                 ->pluck('id')->all();
             $bondCustomerIds = CustomerBond::whereHas('plots', fn($pb) => $pb->whereIn('plots.id', $plotIds))
                 ->pluck('customer_id')->unique()->all();
@@ -158,7 +157,7 @@ class CustomerController extends Controller
             }
             // Build per-plot list with gaz (area) so multiple plots each show their own gaz.
             $plotList = $bond->plots->map(function ($p) {
-                $name = $p->title ?? $p->plot_number ?? ('Plot-' . $p->id);
+                $name = $p->title ?? ('Plot-' . $p->id);
                 $gaz  = ($p->area !== null && $p->area !== '') ? (float) $p->area : null;
                 return [
                     'name' => $name,

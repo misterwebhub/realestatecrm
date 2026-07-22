@@ -195,7 +195,7 @@
                     $bond    = $p->customerBond;
                     $cust    = $bond?->customer?->name ?? $p->customer?->name ?? '—';
                     $code    = $bond?->arazi?->legacy_arazi_code ?? $p->arazi_code ?? '—';
-                    $plots   = $bond?->plots?->map(fn($pl) => $pl->plot_number ?: $pl->title)->filter()->implode(', ');
+                    $plots   = $bond?->plots?->map(fn($pl) => $pl->title ?: ('Plot-'.$pl->id))->filter()->implode(', ');
                     $broker  = $bond?->broker?->name ?? '—';
                     $reg     = $p->reg_info;
                     $partner = $reg?->partner?->name ?? '—';

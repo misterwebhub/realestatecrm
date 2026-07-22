@@ -24,7 +24,7 @@
                         <option value="">-- Plot No. --</option>
                         @foreach($filterPlots as $p)
                             <option value="{{ $p->id }}" {{ (string)$p->id === (string)($filterPlotId ?? '') ? 'selected' : '' }}>
-                                {{ $p->plot_number }}{{ $p->title ? ' — '.$p->title : '' }}
+                                {{ $p->title ?? ('Plot-'.$p->id) }}
                             </option>
                         @endforeach
                     </select>
@@ -111,7 +111,7 @@
             (data.plots || data).forEach(p => {
                 const o = document.createElement('option');
                 o.value = p.id;
-                o.textContent = p.label || p.plot_number || p.id;
+                o.textContent = p.label || p.title || p.id;
                 if(selectedId && String(p.id) === String(selectedId)) o.selected = true;
                 plotSel.appendChild(o);
             });

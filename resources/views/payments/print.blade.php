@@ -147,10 +147,10 @@
                     <div class="col-6"><div class="field-box">{{ $bond?->bond_no ?? '-' }}</div></div>
 
                     <div class="col-6 field-label">Arazi No.</div>
-                    <div class="col-6"><div class="field-box">{{ $arazi?->legacy_arazi_code ?: ($arazi?->plot_number ?? '-') }}</div></div>
+                    <div class="col-6"><div class="field-box">{{ $arazi?->legacy_arazi_code ?: '-' }}</div></div>
 
                     <div class="col-6 field-label">Plot No.</div>
-                    <div class="col-6"><div class="field-box">{{ $arazi?->plots->first()?->plot_number ?? $arazi?->plots->first()?->title ?? '-' }}</div></div>
+                    <div class="col-6"><div class="field-box">{{ $arazi?->plots->first()?->title ?? '-' }}</div></div>
 
                     <div class="col-6 field-label">Date</div>
                     <div class="col-6"><div class="field-box">{{ optional($payment?->payment_date)->format('d-m-Y') ?? '-' }}</div></div>

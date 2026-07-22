@@ -272,7 +272,7 @@ class ReportsController extends Controller
                 'customer'       => $bond->customer?->name ?? '—',
                 'arazi'          => $code,
                 'plots'          => $bond->plots->map(fn ($pl) => [
-                                        'label' => $pl->plot_number ?: $pl->title,
+                                        'label' => $pl->title ?: ('Plot-' . $pl->id),
                                         'gaz'   => (float) ($pl->area ?? 0),
                                     ])->values()->all(),
                 'broker'         => $bond->broker?->name ?? '—',

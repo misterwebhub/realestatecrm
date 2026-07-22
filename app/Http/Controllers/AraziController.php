@@ -104,7 +104,6 @@ class AraziController extends Controller
         if ($q !== '') {
             $query->where(function($sub) use ($q) {
                 $sub->where('legacy_arazi_code', 'like', '%'.$q.'%')
-                    ->orWhere('plot_number', 'like', '%'.$q.'%')
                     ->orWhere('location', 'like', '%'.$q.'%')
                     ->orWhereHas('kisan', function($k) use ($q) { $k->where('name', 'like', '%'.$q.'%'); });
             });
@@ -362,8 +361,8 @@ class AraziController extends Controller
 
             return [
                 'id' => $p->id,
-                'plot_number' => $p->plot_number ?? ($p->title ?? $p->id),
-                'label' => $p->title ?? ($p->plot_number ?: ('Plot-' . $p->id)),
+                'plot_number' => $p->title ?? $p->id,
+                'label' => $p->title ?? ('Plot-' . $p->id),
                 'block' => $p->block,
                 'area' => $p->area,
                 'description' => $p->description,
@@ -383,7 +382,7 @@ class AraziController extends Controller
             return response()->json(['found' => false]);
         }
 
-        $araziQuery = Arazi::where('legacy_arazi_code', $code)->orWhere('plot_number', $code);
+        $araziQuery = Arazi::where('legacy_arazi_code', $code);
         $arazis = $araziQuery->get();
         if ($arazis->isEmpty()) {
             return response()->json(['found' => false]);
@@ -394,7 +393,7 @@ class AraziController extends Controller
             $matches = $arazis->map(function (Arazi $a) {
                 return [
                     'id' => $a->id,
-                    'arazi_code' => $a->legacy_arazi_code ?: $a->plot_number,
+                    'arazi_code' => $a->legacy_arazi_code,
                     'label' => $a->araziNoCode(),
                     'kisan' => $a->kisan?->name ?? null,
                     'location' => $a->location,
@@ -416,7 +415,7 @@ class AraziController extends Controller
         return response()->json([
             'found' => true,
             'arazi_id' => $arazi->id,
-            'arazi_code' => $arazi->legacy_arazi_code ?: $arazi->plot_number,
+            'arazi_code' => $arazi->legacy_arazi_code,
             'arazi_label' => $arazi->araziNoCode(),
             'plots' => $plots,
         ]);
@@ -444,7 +443,7 @@ class AraziController extends Controller
 
         return response()->json([
             'id' => $arazi->id,
-            'legacy_arazi_code' => $arazi->legacy_arazi_code ?: ($arazi->plot_number ?? null),
+            'legacy_arazi_code' => $arazi->legacy_arazi_code,
             'kisan' => [
                 'id' => $arazi->kisan?->id ?? null,
                 'name' => $arazi->kisan?->name ?? null,
@@ -508,7 +507,7 @@ class AraziController extends Controller
             if ($status === null) $status = 'available';
             return [
                 'id' => $p->id,
-                'plot_number' => $p->plot_number ?? $p->title ?? ('Plot-' . $p->id),
+                'plot_number' => $p->title ?? ('Plot-' . $p->id),
                 'title' => $p->title,
                 'block' => $p->block,
                 'area' => $p->area,
@@ -679,7 +678,7 @@ class AraziController extends Controller
                 return [
                     'id' => $b->id,
                     'bond_no' => $b->bond_no,
-                    'plots' => $b->plots->map(fn($p) => ['id' => $p->id, 'plot_number' => $p->plot_number])->values()->all(),
+                    'plots' => $b->plots->map(fn($p) => ['id' => $p->id, 'plot_number' => $p->title])->values()->all(),
                 ];
             })->values()->all();
 
@@ -740,7 +739,6 @@ class AraziController extends Controller
         $basic = [
             'id' => $arazi->id,
             'legacy_arazi_code' => $arazi->legacy_arazi_code,
-            'plot_number' => $arazi->plot_number,
             'location' => $arazi->location,
             'size' => $arazi->size,
             'unit' => $arazi->unit,
@@ -749,10 +747,10 @@ class AraziController extends Controller
         ];
 
         // plots
-        $plots = $arazi->plots()->get(['id','plot_number','area','status'])->map(function($p){
+        $plots = $arazi->plots()->get(['id','title','area','status'])->map(function($p){
             return [
                 'id' => $p->id,
-                'plot_number' => $p->plot_number,
+                'plot_number' => $p->title,
                 'area' => $p->area,
                 'status' => $p->status,
             ];
@@ -784,7 +782,7 @@ class AraziController extends Controller
                     'bond_no' => $c->bond_no,
                     'bond_date' => optional($c->bond_date)->toDateString(),
                     'customer' => $c->customer ? ['id'=>$c->customer->id,'name'=>$c->customer->name] : null,
-                    'plots' => $c->plots->map(fn($p) => ['id'=>$p->id,'plot_number'=>$p->plot_number])->values(),
+                    'plots' => $c->plots->map(fn($p) => ['id'=>$p->id,'plot_number'=>$p->title])->values(),
                     'total_amount' => $c->total_amount,
                     'payments' => $c->payments->map(function($p){ return ['id'=>$p->id,'amount'=>$p->amount,'entry_date'=>optional($p->entry_date)->toDateString(),'entry_no'=>$p->entry_no,'payment_method'=>$p->payment_method,'plot_id'=>$p->plot_id]; })->values(),
                 ];
@@ -829,9 +827,7 @@ class AraziController extends Controller
      */
     public function detailsByAraziNo(string $code)
     {
-        $arazi = Arazi::where('legacy_arazi_code', $code)
-            ->orWhere('plot_number', $code)
-            ->first();
+        $arazi = Arazi::where('legacy_arazi_code', $code)->first();
 
         if (! $arazi) {
             return response()->json(['found' => false], 404);

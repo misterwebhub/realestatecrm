@@ -287,7 +287,7 @@ class KisanBondController extends Controller
                 $item->kisan?->name ?? '-',
                 $item->arazis->isNotEmpty()
                     ? $item->arazis->map(fn (Arazi $arazi) => $arazi->araziNoCode())->join(', ')
-                    : ($item->arazi?->legacy_arazi_code ?: ($item->arazi?->plot_number ?? '-')),
+                    : ($item->arazi?->legacy_arazi_code ?: '-'),
                 optional($item->bond_date)->format('d-m-Y') ?? '-',
                 number_format((float) $item->bond_amount, 2),
             ],

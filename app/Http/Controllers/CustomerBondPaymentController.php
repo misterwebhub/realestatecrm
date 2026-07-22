@@ -110,8 +110,7 @@ class CustomerBondPaymentController extends Controller
         // Search by plot title
         if ($plotQ !== '') {
             $query->whereHas('plot', fn($p) =>
-                $p->where('title', $plotQ) // exact — plot title behaves like a plot number
-                  ->orWhere('plot_number', 'like', '%'.$plotQ.'%')
+                $p->where('title', $plotQ) // exact — plot title behaves like a plot number, never LIKE
             );
         }
 
@@ -203,8 +202,7 @@ class CustomerBondPaymentController extends Controller
             ))
             ->when(!$selectedBondId && $araziCode !== '', fn ($query) => $query->where('arazi_code', $araziCode))
             ->when(!$selectedBondId && $plotQ, fn ($query) => $query->whereHas('plots', fn ($p) =>
-                $p->where('title', $plotQ) // exact — plot title behaves like a plot number
-                  ->orWhere('plot_number', 'like', '%'.$plotQ.'%')
+                $p->where('title', $plotQ) // exact — plot title behaves like a plot number, never LIKE
             ))
             ->latest();
 
@@ -217,7 +215,7 @@ class CustomerBondPaymentController extends Controller
             $pct   = $total > 0 ? min(round(($paid / $total) * 100), 100) : 0;
 
             $araziCode = $bond->arazi
-                ? ($bond->arazi->legacy_arazi_code ?: ($bond->arazi->plot_number ?? '-'))
+                ? ($bond->arazi->legacy_arazi_code ?: '-')
                 : '-';
 
             $plotTitles = $bond->plots->pluck('title')->filter()->implode(', ') ?: '-';
@@ -412,8 +410,7 @@ class CustomerBondPaymentController extends Controller
             ))
             ->when($araziCode !== '', fn ($query) => $query->where('arazi_code', $araziCode))
             ->when($plotQ, fn ($query) => $query->whereHas('plots', fn ($p) =>
-                $p->where('title', $plotQ) // exact — plot title behaves like a plot number
-                  ->orWhere('plot_number', 'like', '%'.$plotQ.'%')
+                $p->where('title', $plotQ) // exact — plot title behaves like a plot number, never LIKE
             ))
             ->latest()
             ->get()
@@ -425,7 +422,7 @@ class CustomerBondPaymentController extends Controller
                     'bond_no' => $bond->bond_no,
                     'party'   => $bond->customer?->name ?? '-',
                     'mobile'  => $bond->customer?->mobile ?? '',
-                    'arazi'   => $bond->arazi ? ($bond->arazi->legacy_arazi_code ?: ($bond->arazi->plot_number ?? '-')) : '-',
+                    'arazi'   => $bond->arazi ? ($bond->arazi->legacy_arazi_code ?: '-') : '-',
                     'plots'   => $bond->plots->pluck('title')->filter()->implode(', ') ?: '-',
                     'total'   => $total,
                     'paid'    => $paid,
@@ -712,8 +709,8 @@ class CustomerBondPaymentController extends Controller
                 optional($item->customerBond?->bond_date)->format('d-m-Y') ?? '-',
                 $item->customerBond?->bond_no ?? '-',
                 $item->customer?->name ?? $item->customerBond?->customer?->name ?? '-',
-                $item->arazi?->legacy_arazi_code ?? ($item->arazi?->plot_number ?? '-'),
-                $item->plot?->title ?? ($item->plot?->plot_number ?? '-'),
+                $item->arazi?->legacy_arazi_code ?? '-',
+                $item->plot?->title ?? '-',
                 (string) ($item->land_size ?? '-'),
                 optional($item->entry_date)->format('d-m-Y') ?? '-',
                 ucfirst($item->entry_type),

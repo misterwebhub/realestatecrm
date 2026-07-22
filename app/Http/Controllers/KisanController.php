@@ -164,7 +164,7 @@ class KisanController extends Controller
     {
         /** @var Kisan $item */
         $araziCodes = ($item->relationLoaded('arazis') ? $item->arazis : collect())
-            ->map(fn($a) => $a->legacy_arazi_code ?: ($a->plot_number ?? ('Arazi-'.$a->id)))
+            ->map(fn($a) => $a->legacy_arazi_code ?: ('Arazi-'.$a->id))
             ->filter()
             ->unique()
             ->implode(', ');
@@ -197,11 +197,11 @@ class KisanController extends Controller
     {
         $list = $kisan->arazis()
             ->where('status', 'available')
-            ->get(['id', 'legacy_arazi_code', 'plot_number', 'location', 'size', 'unit', 'road_area', 'status'])
+            ->get(['id', 'legacy_arazi_code', 'location', 'size', 'unit', 'road_area', 'status'])
             ->map(function ($a) {
             return [
                 'id' => $a->id,
-                'arazi_code' => $a->legacy_arazi_code ?: $a->plot_number,
+                'arazi_code' => $a->legacy_arazi_code,
                 'label' => $a->araziNoCode(),
                 'location' => $a->location,
                 'land_size' => (float) ($a->size ?? 0),

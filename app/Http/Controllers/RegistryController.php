@@ -402,7 +402,7 @@ class RegistryController extends Controller
         // Plots for selected arazi code (all arazis with that code)
         $filterPlots = collect();
         if ($filterAraziCode !== '') {
-            $filterPlots = \App\Models\Plot::where('arazi_code', $filterAraziCode)->orderBy('plot_number')->get(['id','plot_number','title']);
+            $filterPlots = \App\Models\Plot::where('arazi_code', $filterAraziCode)->orderBy('title')->get(['id','title']);
         }
 
         // Unique arazi codes for dropdown
@@ -438,8 +438,8 @@ class RegistryController extends Controller
         $item->receipt_no = $this->nextRegistryNumber();
 
         $customers = Customer::orderBy('name')->get(['id','name','mobile','secondary_mobile']);
-        $arazis = Arazi::orderBy('legacy_arazi_code')->get(['id','legacy_arazi_code','plot_number'])
-                        ->mapWithKeys(fn($a) => [$a->id => ($a->legacy_arazi_code ?: $a->plot_number)])
+        $arazis = Arazi::orderBy('legacy_arazi_code')->get(['id','legacy_arazi_code'])
+                        ->mapWithKeys(fn($a) => [$a->id => $a->legacy_arazi_code])
                         ->all();
         $agents = Agent::orderBy('name')->pluck('name', 'id')->all();
 
@@ -463,8 +463,8 @@ class RegistryController extends Controller
         $this->authorizeCrud('edit', $item);
 
         $customers = Customer::orderBy('name')->get(['id','name','mobile','secondary_mobile']);
-        $arazis = Arazi::orderBy('legacy_arazi_code')->get(['id','legacy_arazi_code','plot_number'])
-                        ->mapWithKeys(fn($a) => [$a->id => ($a->legacy_arazi_code ?: $a->plot_number)])
+        $arazis = Arazi::orderBy('legacy_arazi_code')->get(['id','legacy_arazi_code'])
+                        ->mapWithKeys(fn($a) => [$a->id => $a->legacy_arazi_code])
                         ->all();
         $agents = Agent::orderBy('name')->pluck('name', 'id')->all();
 
@@ -537,7 +537,7 @@ class RegistryController extends Controller
                 $item->customer?->name ?? '-',
                 $item->plot?->arazi_code ?: '-',
                 $item->arazi_code ?: '-',
-                $item->plot?->title ?? $item->plot?->plot_number ?? '-',
+                $item->plot?->title ?? '-',
                 strtoupper((string) $item->booking_mode),
                 optional($item->registry_date)->format('d-m-Y') ?? '-',
                 $item->deed_no ?? '—',
@@ -629,8 +629,7 @@ class RegistryController extends Controller
         }
         if ($plotQ) {
             $query->whereHas('plots', fn ($p) =>
-                $p->where('title', $plotQ) // exact — plot title behaves like a plot number
-                  ->orWhere('plot_number', 'like', '%'.$plotQ.'%')
+                $p->where('title', $plotQ) // exact — plot title behaves like a plot number, never LIKE
             );
         }
 
@@ -656,7 +655,7 @@ class RegistryController extends Controller
                 'mobile'           => $bond->customer?->mobile ?? '',
                 'secondary_mobile' => $bond->customer?->secondary_mobile ?? '',
                 'arazi_code'       => $bond->arazi_code ?: ($bond->arazi?->legacy_arazi_code ?? ''),
-                'plots'            => $bond->plots->map(fn ($p) => ['id' => $p->id, 'title' => $p->title ?? $p->plot_number])->values(),
+                'plots'            => $bond->plots->map(fn ($p) => ['id' => $p->id, 'title' => $p->title ?? ('Plot-'.$p->id)])->values(),
                 'bond_amount'      => $total,
                 'paid_amount'      => $netPaid,
                 'pending_amount'   => $pending,

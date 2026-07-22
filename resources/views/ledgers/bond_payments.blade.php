@@ -189,7 +189,7 @@
     $bdPaid    = (float) ($bd->total_paid ?? 0);
     $bdBalance = max($bdTotal - $bdPaid, 0);
     $bdPct     = $bdTotal > 0 ? min(round(($bdPaid / $bdTotal) * 100), 100) : 0;
-    $bdAraziCode = $bd->arazi ? ($bd->arazi->legacy_arazi_code ?: ($bd->arazi->plot_number ?? '-')) : ($bd->arazi_code ?? '-');
+    $bdAraziCode = $bd->arazi ? ($bd->arazi->legacy_arazi_code ?: '-') : ($bd->arazi_code ?? '-');
     $bdPlots   = $bd->plots->map(fn($p) => $p->title ?? 'Plot-'.$p->id)->implode(', ') ?: '-';
 @endphp
 <div class="card border-0 shadow-sm mb-4 no-print" style="border-left:4px solid #1a3a6b !important; border-radius:10px;">

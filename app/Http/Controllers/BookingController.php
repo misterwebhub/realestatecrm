@@ -37,7 +37,7 @@ class BookingController extends Controller
     protected function resourceFields(?Model $item = null): array
     {
         return [
-            ['name' => 'plot_id', 'label' => 'Plot', 'type' => 'select', 'options' => Plot::with('arazi')->get()->mapWithKeys(function ($p) { return [$p->id => (($p->arazi?->plot_number ? $p->arazi->plot_number.' - ' : '') . ($p->title ?? $p->plot_number ?? ('Plot-' . $p->id)))]; })->all(), 'value' => $item?->plot_id],
+            ['name' => 'plot_id', 'label' => 'Plot', 'type' => 'select', 'options' => Plot::with('arazi')->get()->mapWithKeys(function ($p) { return [$p->id => (($p->arazi?->legacy_arazi_code ? $p->arazi->legacy_arazi_code.' - ' : '') . ($p->title ?? ('Plot-' . $p->id)))]; })->all(), 'value' => $item?->plot_id],
             ['name' => 'customer_id', 'label' => 'Customer', 'type' => 'text', 'value' => $item?->customer_id],
             ['name' => 'advance_amount', 'label' => 'Advance Amount', 'type' => 'number', 'step' => '0.01', 'value' => $item?->advance_amount],
             ['name' => 'booking_date', 'label' => 'Booking Date', 'type' => 'date', 'value' => optional($item?->booking_date)->format('Y-m-d')],

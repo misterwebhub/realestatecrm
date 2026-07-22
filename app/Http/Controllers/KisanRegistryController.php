@@ -51,9 +51,6 @@ class KisanRegistryController extends Controller
             if (! empty($a->legacy_arazi_code)) {
                 $araziMap[$a->legacy_arazi_code] = $label;
             }
-            if (! empty($a->plot_number)) {
-                $araziMap[$a->plot_number] = $label;
-            }
         }
 
         return view('kisan_registries.index', [
@@ -71,7 +68,7 @@ class KisanRegistryController extends Controller
     public function create()
     {
         // Provide list of arazis to allow filtering kisans by selected arazi in the form
-        $arazis = \App\Models\Arazi::orderBy('legacy_arazi_code')->get(['id', 'legacy_arazi_code', 'plot_number']);
+        $arazis = \App\Models\Arazi::orderBy('legacy_arazi_code')->get(['id', 'legacy_arazi_code']);
 
         return view('kisan_registries.form', [
             'title'    => 'Add Kisan Registry',
@@ -100,7 +97,7 @@ class KisanRegistryController extends Controller
 
     public function edit(KisanRegistry $kisanRegistry)
     {
-        $arazis = \App\Models\Arazi::orderBy('legacy_arazi_code')->get(['id', 'legacy_arazi_code', 'plot_number']);
+        $arazis = \App\Models\Arazi::orderBy('legacy_arazi_code')->get(['id', 'legacy_arazi_code']);
 
         $kisanRegistry->load('buyers');
 

@@ -110,7 +110,7 @@ class AraziDocumentController extends Controller
         /** @var AraziDocument $item */
         return [
             'cells' => [
-                $item->arazi?->legacy_arazi_code ?: ($item->arazi?->plot_number ?? '-'),
+                $item->arazi?->legacy_arazi_code ?: '-',
                 $item->document_name,
                 basename($item->file_path),
                 $item->mime_type ?? '-',

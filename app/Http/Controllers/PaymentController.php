@@ -136,8 +136,8 @@ class PaymentController extends Controller
 
                 // Collect arazi codes
                 $arazis = $bond->arazis->isNotEmpty()
-                    ? $bond->arazis->map(fn($a) => $a->legacy_arazi_code ?: ($a->plot_number ?? ('Arazi-'.$a->id)))->unique()->implode(', ')
-                    : ($bond->arazi ? ($bond->arazi->legacy_arazi_code ?: ($bond->arazi->plot_number ?? '-')) : '-');
+                    ? $bond->arazis->map(fn($a) => $a->legacy_arazi_code ?: ('Arazi-'.$a->id))->unique()->implode(', ')
+                    : ($bond->arazi ? ($bond->arazi->legacy_arazi_code ?: '-') : '-');
 
                 return [
                     'id'        => $bond->id,
