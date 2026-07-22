@@ -252,7 +252,23 @@ class AraziController extends Controller
             return response()->json(['found' => false, 'plots' => []]);
         }
 
-        $plots = $this->decoratePlots(Arazi::plotsForCode($code));
+        $plots = Arazi::plotsForCode($code);
+
+        // Payment creation asks for only the plots that belong to a bond the
+        // current user created. Non-admins are then limited to their own deals;
+        // Super Admin keeps seeing every plot for the arazi.
+        $user = auth()->user();
+        if (request()->boolean('only_my_bonds') && $user && ! $user->isSuperAdmin()) {
+            $ownBondPlotIds = \Illuminate\Support\Facades\DB::table('customer_bond_plot')
+                ->join('customer_bonds', 'customer_bonds.id', '=', 'customer_bond_plot.customer_bond_id')
+                ->where('customer_bonds.created_by', $user->getKey())
+                ->pluck('customer_bond_plot.plot_id')
+                ->all();
+
+            $plots = $plots->whereIn('id', $ownBondPlotIds)->values();
+        }
+
+        $plots = $this->decoratePlots($plots);
 
         return response()->json([
             'found' => true,

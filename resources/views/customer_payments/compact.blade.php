@@ -174,7 +174,9 @@
 <script>
 (function(){
     const arazisByCodeUrl       = @json(route('arazis.by-code'));
-    const araziPlotsByCodeUrl   = @json(route('arazis.plots-by-code', ['code' => '__ARAZI_CODE__']));
+    // only_my_bonds=1 → restrict the plot list to plots that are part of a bond
+    // the current user created (Super Admin still sees all plots).
+    const araziPlotsByCodeUrl   = @json(route('arazis.plots-by-code', ['code' => '__ARAZI_CODE__', 'only_my_bonds' => 1]));
     const bondByPlotUrl         = @json(route('customer-bonds.by-plot', ['plot' => '__PLOT_ID__']));
     const customerBondChequesUrl= @json(route('customer-bond-cheques.for-bond', ['customer_bond' => '__BOND_ID__']));
     const bondByBondNoUrl       = @json(route('customer-bonds.by-bond-no'));
@@ -317,7 +319,8 @@
             if(!res.ok) return;
             const json = await res.json();
             if(!json.found || !Array.isArray(json.plots)) return;
-            populatePlots(json.plots, json.plots.length === 1);
+            // Always leave the dropdown on "Select Plot" — never auto-pick a plot.
+            populatePlots(json.plots, false);
         }catch(e){}
     }
 
@@ -336,7 +339,8 @@
             }
             araziIdHidden.value = json.arazi_code || code;
             document.getElementById('arazi_label').textContent = json.arazi_code || code;
-            populatePlots(json.plots || [], (json.plots || []).length === 1);
+            // Always leave the dropdown on "Select Plot" — never auto-pick a plot.
+            populatePlots(json.plots || [], false);
         }catch(e){}
     });
 
