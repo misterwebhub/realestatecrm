@@ -130,10 +130,10 @@
                                 </a>
                                 @endcan
                                 @can('arazis.delete')
-                                @if(!empty($detail['has_bonds']))
+                                @if(!empty($detail['has_bonds']) || !empty($detail['has_plots']))
                                     <button type="button" class="btn btn-outline-danger btn-sm ms-1 disabled"
                                             tabindex="-1" aria-disabled="true"
-                                            title="Cannot delete: a bond exists against this Arazi"
+                                            title="{{ !empty($detail['has_bonds']) ? 'Cannot delete: a bond exists against this Arazi' : 'Cannot delete: plots exist against this Arazi. Remove its plots first.' }}"
                                             style="pointer-events:auto;cursor:not-allowed;opacity:.55;"
                                             onclick="return false;">
                                         <i class="bi bi-trash"></i>

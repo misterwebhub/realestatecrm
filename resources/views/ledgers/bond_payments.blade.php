@@ -665,7 +665,7 @@
                         </td>
                     </tr>
                     @empty
-                    <tr><td colspan="{{ $colspan }}" class="text-center py-4 text-muted">No bonds found.</td></tr>
+                    <tr><td colspan="{{ $isCustomerLedger ? 11 : 9 }}" class="text-center py-4 text-muted">No bonds found.</td></tr>
                     @endforelse
                 </tbody>
             </table>

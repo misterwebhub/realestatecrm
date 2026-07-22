@@ -152,6 +152,11 @@ class AraziController extends Controller
                     $hasBonds = \App\Models\CustomerBond::where('arazi_code', $a->legacy_arazi_code)->exists();
                 }
 
+                // Plots existing against this Arazi block deletion (remove plots first).
+                $hasPlots = \App\Models\Plot::where('arazi_id', $a->id)
+                    ->when($a->legacy_arazi_code, fn ($q) => $q->orWhere('arazi_code', $a->legacy_arazi_code))
+                    ->exists();
+
                 return [
                     'id'               => $a->id,
                     'kisan'            => $a->kisan?->name ?? '-',
@@ -166,6 +171,7 @@ class AraziController extends Controller
                     'delete_url'       => route($routeName . '.destroy', $a),
                     'grid_url'         => route('arazis.grid', $a),
                     'has_bonds'        => $hasBonds,
+                    'has_plots'        => $hasPlots,
                 ];
             })->values()->all();
 
@@ -555,20 +561,22 @@ class AraziController extends Controller
                 ->with('error', 'Cannot delete this Arazi: a registry exists against it. Remove the related registry first.');
         }
 
-        \Illuminate\Support\Facades\DB::transaction(function () use ($arazi) {
-            // Remove all plots belonging to this Arazi (by FK and by legacy code).
-            $plotQuery = Plot::query()->where('arazi_id', $arazi->id);
-            if ($arazi->legacy_arazi_code) {
-                $plotQuery->orWhere('arazi_code', $arazi->legacy_arazi_code);
-            }
-            $plotQuery->delete();
+        // Only allow removing an Arazi that has no plots. If plots exist,
+        // they must be removed first.
+        $hasPlots = Plot::where('arazi_id', $arazi->id)
+            ->when($code, fn ($q) => $q->orWhere('arazi_code', $code))
+            ->exists();
+        if ($hasPlots) {
+            return redirect()
+                ->route($this->resourceRouteName() . '.index')
+                ->with('error', 'Cannot delete this Arazi: plots exist against it. Remove all its plots first.');
+        }
 
-            $arazi->delete();
-        });
+        $arazi->delete();
 
         return redirect()
             ->route($this->resourceRouteName() . '.index')
-            ->with('success', $this->resourceTitle() . ' and its plots deleted successfully.');
+            ->with('success', $this->resourceTitle() . ' deleted successfully.');
     }
 
     protected function resourceAfterSave(Model $item, Request $request, array $validated, ?Model $original = null): void
