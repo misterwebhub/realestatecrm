@@ -18,7 +18,10 @@ class CustomerBondChequeController extends Controller
     {
         $user = auth()->user();
         if ($user && ! $user->isSuperAdmin()) {
-            $query->where('customer_bond_cheques.created_by', $user->getKey());
+            $canViewBondModule = $user->canAny(['cheques.view', 'customer_bonds.view', 'customer_payments.view', 'customer_ledger.view']);
+            if (! $canViewBondModule) {
+                $query->where('customer_bond_cheques.created_by', $user->getKey());
+            }
         }
 
         return $query;
@@ -31,9 +34,21 @@ class CustomerBondChequeController extends Controller
     protected function authorizeBondOwnership(CustomerBond $bond): void
     {
         $user = auth()->user();
-        if ($user && ! $user->isSuperAdmin()
-            && (string) $bond->getAttribute('created_by') !== (string) $user->getKey()) {
-            abort(404);
+        if (! $user) {
+            abort(403);
+        }
+
+        if ($user->isSuperAdmin()) {
+            return;
+        }
+
+        $bondOwner = $bond->getAttribute('created_by');
+        $hasDirectAccess = (string) $bondOwner === (string) $user->getKey()
+            || blank($bondOwner);
+        $hasModuleAccess = $user->canAny(['cheques.view', 'customer_bonds.view', 'customer_payments.view', 'customer_ledger.view']);
+
+        if (! $hasDirectAccess && ! $hasModuleAccess) {
+            abort(403);
         }
     }
 
@@ -150,7 +165,18 @@ class CustomerBondChequeController extends Controller
 
         // allow filtering by status (e.g., ?status=pending) so callers can request unpaid only
         if ($status = request()->query('status')) {
-            $query->where('status', $status);
+            // ?include_id=<id> always keeps a specific cheque in the result even if its
+            // status no longer matches (e.g. the cheque already tied to the payment
+            // being edited, which was marked "cleared" when the payment was saved).
+            // Without this, editing a cheque payment would reload a filtered dropdown
+            // that no longer contains its own cheque and silently unassign it on save.
+            $includeId = request()->query('include_id');
+            $query->where(function ($q) use ($status, $includeId) {
+                $q->where('status', $status);
+                if ($includeId) {
+                    $q->orWhere('id', $includeId);
+                }
+            });
         }
 
         $cheques = $query->get()->map(function ($c) {

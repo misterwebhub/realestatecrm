@@ -914,23 +914,32 @@
             if(customerPaymentBondSelect && hiddenArazi){
                 customerPaymentBondSelect.addEventListener('change', function(){
                     applyCustomerBondPaymentContext(this.value);
-                    // load cheques for selected bond
+                    // load cheques for selected bond; the user changed the bond, so don't
+                    // preselect a previous cheque — it belonged to the old bond.
                     loadChequesForBond(this.value);
                 });
                 if(customerPaymentBondSelect.value){
                     applyCustomerBondPaymentContext(customerPaymentBondSelect.value);
-                    loadChequesForBond(customerPaymentBondSelect.value);
+                    // Editing an existing payment: capture its persisted cheque id before the
+                    // dropdown gets rebuilt, so we can keep it selected even if the cheque is
+                    // no longer "pending" (it was marked cleared when the payment was saved).
+                    // Otherwise the select falls back to blank and saving unassigns the cheque.
+                    const existingChequeSelect = document.querySelector('select[name="customer_bond_cheque_id"]');
+                    const existingChequeId = existingChequeSelect ? existingChequeSelect.value : '';
+                    loadChequesForBond(customerPaymentBondSelect.value, existingChequeId);
                 }
             }
 
-            async function loadChequesForBond(bondId){
+            async function loadChequesForBond(bondId, preselectId){
                 const select = document.querySelector('select[name="customer_bond_cheque_id"]');
                 if(!select) return;
                 select.innerHTML = '<option value="">Select Cheque (optional)</option>';
                 if(!bondId) return;
                 try{
-                    // request only pending (unpaid) cheques by default
-                    const url = customerBondChequesUrl.replace('__BOND_ID__', encodeURIComponent(bondId)) + '?status=pending';
+                    // request only pending (unpaid) cheques by default, plus the payment's own
+                    // cheque (include_id) so it stays selectable even though it's now cleared.
+                    let url = customerBondChequesUrl.replace('__BOND_ID__', encodeURIComponent(bondId)) + '?status=pending';
+                    if(preselectId) url += '&include_id=' + encodeURIComponent(preselectId);
                     const res = await fetch(url);
                     if(!res.ok) return;
                     const data = await res.json();
@@ -943,6 +952,7 @@
                         opt.dataset.amount = (c.amount !== undefined && c.amount !== null) ? c.amount : '';
                         select.appendChild(opt);
                     });
+                    if(preselectId) select.value = String(preselectId);
                     if(window.jQuery && jQuery.fn.select2) jQuery(select).trigger('change.select2');
 
                     // when a cheque is selected, autofill amount and make it readonly
@@ -984,6 +994,8 @@
                             }
                         }
                     });
+
+                    if(preselectId) select.dispatchEvent(new Event('change'));
                 }catch(e){}
             }
 

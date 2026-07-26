@@ -187,6 +187,7 @@ class ReportsController extends Controller
         $deedNo        = $request->query('deed_no', '');
         $dateFrom      = $request->query('date_from', '');
         $dateTo        = $request->query('date_to', '');
+        $plotRegistry  = trim((string) $request->query('plot_registry', '')); // '', 'Y', 'N'
 
         $bondsQuery = CustomerBond::with(['customer', 'arazi', 'plots', 'broker', 'payments', 'cheques.connectedAccount'])
             ->when($customerId,    fn ($q) => $q->where('customer_id', $customerId))
@@ -210,6 +211,9 @@ class ReportsController extends Controller
             }
         }
 
+        // Plot ids that already have a registry record — drives the per-plot Y/N badge.
+        $plotIdsWithRegistry = Registry::whereNotNull('plot_id')->distinct()->pluck('plot_id')->flip()->all();
+
         $inRange = function ($date) use ($dateFrom, $dateTo) {
             if (! $date) return false;
             $d = $date instanceof \Carbon\Carbon ? $date->format('Y-m-d') : (string) $date;
@@ -229,6 +233,17 @@ class ReportsController extends Controller
             // Registry-derived filters.
             if ($partnerId !== '' && (! $reg || (string) $reg->partner_id !== (string) $partnerId)) continue;
             if ($deedNo !== '' && (! $reg || stripos((string) $reg->deed_no, $deedNo) === false)) continue;
+
+            $plotsData = $bond->plots->map(fn ($pl) => [
+                'label'    => $pl->title ?: ('Plot-' . $pl->id),
+                'gaz'      => (float) ($pl->area ?? 0),
+                'registry' => isset($plotIdsWithRegistry[$pl->id]) ? 'Y' : 'N',
+            ])->values()->all();
+
+            // Plot Registry filter — keep the bond only if one of its plots matches Y/N.
+            if ($plotRegistry !== '' && ! collect($plotsData)->contains(fn ($p) => $p['registry'] === $plotRegistry)) {
+                continue;
+            }
 
             // Payments: lifetime and within-period net paid.
             $paidAll = (float) $bond->payments->whereNotIn('entry_type', $debitTypes)->sum('amount')
@@ -271,10 +286,7 @@ class ReportsController extends Controller
                 'bond_date'      => optional($bond->bond_date)->format('d-m-Y'),
                 'customer'       => $bond->customer?->name ?? '—',
                 'arazi'          => $code,
-                'plots'          => $bond->plots->map(fn ($pl) => [
-                                        'label' => $pl->title ?: ('Plot-' . $pl->id),
-                                        'gaz'   => (float) ($pl->area ?? 0),
-                                    ])->values()->all(),
+                'plots'          => $plotsData,
                 'broker'         => $bond->broker?->name ?? '—',
                 'total'          => round($total, 2),
                 'paid'           => round($paidPeriod, 2),
@@ -311,6 +323,7 @@ class ReportsController extends Controller
                 'Method'    => $paymentMethod !== '' ? ucfirst($paymentMethod) : 'All',
                 'Broker'    => $brokerId ? optional(Agent::find($brokerId))->name : 'All',
                 'Partner'   => $partnerId ? optional(Partner::find($partnerId))->name : 'All',
+                'Plot Registry' => $plotRegistry !== '' ? ($plotRegistry === 'Y' ? 'Yes' : 'No') : 'All',
                 'Date From' => $dateFrom !== '' ? $dateFrom : 'All',
                 'Date To'   => $dateTo !== '' ? $dateTo : 'All',
             ];
@@ -339,7 +352,7 @@ class ReportsController extends Controller
                 ]);
 
                 foreach ($rows as $i => $r) {
-                    $plots = collect($r['plots'])->map(fn ($pl) => ($pl['label'] ?: '-') . ' (' . rtrim(rtrim(number_format($pl['gaz'], 2), '0'), '.') . ' gaz)')->implode('; ');
+                    $plots = collect($r['plots'])->map(fn ($pl) => ($pl['label'] ?: '-') . ' (' . rtrim(rtrim(number_format($pl['gaz'], 2), '0'), '.') . ' gaz, Registry: ' . $pl['registry'] . ')')->implode('; ');
                     fputcsv($out, [
                         $i + 1,
                         $r['bond_date'] ?: '-',
@@ -407,6 +420,7 @@ class ReportsController extends Controller
             'deedNo'        => $deedNo,
             'dateFrom'      => $dateFrom,
             'dateTo'        => $dateTo,
+            'plotRegistry'  => $plotRegistry,
             'g_total'         => round($gTotal, 2),
             'g_paid'          => round($gPaid, 2),
             'g_balance'       => round($gBalance, 2),

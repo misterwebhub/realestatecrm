@@ -81,7 +81,10 @@
                     @error('address')<div class="invalid-feedback">{{ $message }}</div>@enderror
                 </div>
 
-                {{-- Password --}}
+                {{-- Password (create: always shown & required. edit: Super Admin only —
+                     other users must use the account's own change-password flow, not
+                     silently overwrite another user's credentials here.) --}}
+                @if(!$item || auth()->user()?->isSuperAdmin())
                 <div class="col-md-6">
                     <label class="form-label fw-semibold">
                         Password @if($item) <span class="text-muted fw-normal" style="font-size:12px;">(leave blank to keep)</span> @else <span class="text-danger">*</span> @endif
@@ -98,6 +101,13 @@
                     <input type="password" name="password_confirmation" class="form-control"
                         placeholder="Repeat password" @if(!$item) required @endif>
                 </div>
+                @elseif($item)
+                <div class="col-12">
+                    <div class="alert alert-light border mb-0 py-2 px-3" style="font-size:13px;">
+                        Only a Super Admin can reset this user's password. Use the "Reset Password" action on the User Master list.
+                    </div>
+                </div>
+                @endif
 
                 {{-- Active toggle --}}
                 <div class="col-12">

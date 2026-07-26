@@ -173,6 +173,32 @@
                         value="" readonly placeholder="Auto-filled">
                 </div>
             </div>
+
+            {{-- ── Plot Sizes (editable — saved when the form is submitted) ── --}}
+            <div class="row mb-4 d-none" id="plotsSizeSection">
+                <div class="col-12">
+                    <label class="form-label small fw-semibold">
+                        Plot Sizes (gaz)
+                        <span class="text-muted fw-normal">— editing a value here updates that plot's area when you click Save</span>
+                    </label>
+                    <table class="table table-sm table-bordered mb-0 bg-white" id="plotsSizeTable">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Plot</th>
+                                <th style="width:160px;">Size (gaz)</th>
+                            </tr>
+                        </thead>
+                        <tbody id="plotsSizeBody"></tbody>
+                        <tfoot>
+                            <tr>
+                                <th>Total</th>
+                                <th id="plotsSizeTotal">0.00</th>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+            </div>
+
             <div class="row g-3 mb-2">
                 <div class="col-md-2">
                     <label class="form-label small fw-semibold">Registry Date <span class="text-danger">*</span></label>
@@ -465,6 +491,52 @@
         loadPartners(code);
     });
 
+    /* ── Plot Sizes table (editable — submitted with the form, saved on click Save) ── */
+    function recomputeLandSize(){
+        let total = 0;
+        $('plotsSizeBody')?.querySelectorAll('input.plot-size-input').forEach(inp => {
+            const v = parseFloat(inp.value);
+            if (!isNaN(v)) total += v;
+        });
+        const landSizeEl = document.querySelector('input[name="land_size"]');
+        if (landSizeEl) landSizeEl.value = total;
+        const totalEl = $('plotsSizeTotal');
+        if (totalEl) totalEl.textContent = fmt(total);
+    }
+
+    function renderPlotsSizeTable(plots){
+        const section = $('plotsSizeSection');
+        const body    = $('plotsSizeBody');
+        if (!section || !body) return;
+
+        if (!plots.length) {
+            section.classList.add('d-none');
+            body.innerHTML = '';
+            recomputeLandSize();
+            return;
+        }
+
+        body.innerHTML = plots.map(p => {
+            const locked = !!p.locked;
+            const area   = p.area !== null && p.area !== undefined ? p.area : '';
+            return `
+                <tr data-plot-id="${p.id}">
+                    <td>${p.title || ('Plot-'+p.id)}${locked ? ' <span class="text-muted small">(locked — registry done)</span>' : ''}</td>
+                    <td>
+                        <input type="number" step="0.01" min="0" class="form-control form-control-sm plot-size-input"
+                            name="plot_sizes[${p.id}]" value="${area}" ${locked ? 'disabled' : ''}>
+                    </td>
+                </tr>`;
+        }).join('');
+
+        section.classList.remove('d-none');
+        recomputeLandSize();
+
+        body.querySelectorAll('input.plot-size-input').forEach(inp => {
+            inp.addEventListener('input', recomputeLandSize);
+        });
+    }
+
     function applyBond(b){
         $('h_bond_id').value      = b.bond_id    || '';
         $('h_customer_id').value  = b.customer_id || '';
@@ -489,6 +561,8 @@
             // Store first plot id as the primary (informational — all visible above)
             $('h_plot_id').value = plots[0].id;
         }
+
+        renderPlotsSizeTable(plots);
 
         const plotLabel = plots.map(p => p.title).join(', ') || '-';
         $('b_plot').textContent = plotLabel;
@@ -623,6 +697,7 @@
         populateAraziOptions('');
         loadDeeds('');
         loadPartners('');
+        renderPlotsSizeTable([]);
         $('bondAppliedBanner').classList.add('d-none');
     });
 
@@ -675,6 +750,12 @@
         loadDeeds(presetArazi);
         populateAraziOptions(presetArazi);
         loadPartners(presetArazi);
+    }
+
+    // Edit mode: show the plot(s) already linked to this registry in the Plot Sizes table
+    const plotsForSize = @json($plotsForSize ?? []);
+    if (plotsForSize.length) {
+        renderPlotsSizeTable(plotsForSize);
     }
 
     /* ── Area Converter (UI only — nothing submitted) ── */

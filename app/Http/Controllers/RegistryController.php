@@ -468,6 +468,21 @@ class RegistryController extends Controller
                         ->all();
         $agents = Agent::orderBy('name')->pluck('name', 'id')->all();
 
+        // The plot already linked to this registry, for the editable "Plot
+        // Sizes" table. Exclude this registry's own record when checking
+        // whether the plot is "locked" — otherwise every edit would see its
+        // own registry row and always report the plot as locked.
+        $plotsForSize = [];
+        if ($item->plot) {
+            $plotsForSize[] = [
+                'id' => $item->plot->id,
+                'title' => $item->plot->title ?? ('Plot-' . $item->plot->id),
+                'area' => $item->plot->area !== null ? (float) $item->plot->area : null,
+                'locked' => $item->plot->status === 'registry'
+                    || Registry::where('plot_id', $item->plot->id)->where('id', '!=', $item->id)->exists(),
+            ];
+        }
+
         return view('registries.add', [
             'title'        => 'Edit ' . $this->resourceTitle(),
             'action'       => route($this->resourceRouteName() . '.update', $item),
@@ -477,6 +492,7 @@ class RegistryController extends Controller
             'customersJson'=> $customers->keyBy('id')->map(fn($c) => ['name'=>$c->name,'mobile'=>$c->mobile,'secondary_mobile'=>$c->secondary_mobile]),
             'arazis'       => $arazis,
             'agents'       => $agents,
+            'plotsForSize' => $plotsForSize,
         ]);
     }
 
@@ -552,6 +568,8 @@ class RegistryController extends Controller
     protected function resourceAfterSave(Model $item, Request $request, array $validated, ?Model $original = null): void
     {
         /** @var Registry $item */
+        $this->applyPlotSizeUpdates($request, $item->id);
+
         // handle uploaded registry document if present
         if ($request->hasFile('document')) {
             $file = $request->file('document');
@@ -595,6 +613,71 @@ class RegistryController extends Controller
                 'due_date' => $item->due_date ?? Carbon::now()->addDays(15),
             ])->save();
             $this->registryLifecycleService->markRegistryPending($item);
+        }
+    }
+
+    /**
+     * Apply edits made in the create/edit form's "Plot Sizes" table
+     * (input name="plot_sizes[<plot_id>]") on save. Enforces the same lock and
+     * saleable-area-cap rules as the regular Plot edit form; changes that would
+     * violate them are skipped and reported back via a flash message. The
+     * global audit log listener records the before/after area on each update.
+     */
+    private function applyPlotSizeUpdates(Request $request, ?int $currentRegistryId = null): void
+    {
+        $sizes = $request->input('plot_sizes', []);
+        if (!is_array($sizes) || empty($sizes)) {
+            return;
+        }
+
+        $skipped = [];
+
+        foreach ($sizes as $plotId => $rawValue) {
+            if ($rawValue === null || $rawValue === '' || !is_numeric($rawValue)) {
+                continue;
+            }
+            $value = (float) $rawValue;
+
+            $plot = \App\Models\Plot::find($plotId);
+            if (!$plot) {
+                continue;
+            }
+
+            // Unchanged — nothing to do.
+            if ((float) $plot->area === $value) {
+                continue;
+            }
+
+            // Exclude the current registry's own record — otherwise every edit-mode
+            // save would see its own row referencing this plot_id and incorrectly
+            // treat the plot as locked, silently skipping a legitimate size change.
+            $lockedByOtherRegistry = \App\Models\Registry::where('plot_id', $plot->id)
+                ->when($currentRegistryId, fn ($q) => $q->where('id', '!=', $currentRegistryId))
+                ->exists();
+
+            if ($plot->status === 'registry' || $lockedByOtherRegistry) {
+                $skipped[] = ($plot->title ?? ('Plot-' . $plot->id)) . ' (locked — registry done)';
+                continue;
+            }
+
+            $arazi = $plot->arazi_code ? Arazi::where('legacy_arazi_code', $plot->arazi_code)->first() : null;
+            if ($arazi) {
+                $existing = \App\Models\Plot::where('arazi_code', $plot->arazi_code)
+                    ->where('id', '!=', $plot->id)
+                    ->sum('area');
+                $allowed = $arazi->saleable_area - $existing;
+
+                if ($value > $allowed) {
+                    $skipped[] = ($plot->title ?? ('Plot-' . $plot->id)) . ' (exceeds available saleable area, remaining: ' . $allowed . ')';
+                    continue;
+                }
+            }
+
+            $plot->update(['area' => $value]);
+        }
+
+        if (!empty($skipped)) {
+            session()->flash('error', 'Some plot sizes were not updated: ' . implode('; ', $skipped));
         }
     }
 
@@ -655,7 +738,12 @@ class RegistryController extends Controller
                 'mobile'           => $bond->customer?->mobile ?? '',
                 'secondary_mobile' => $bond->customer?->secondary_mobile ?? '',
                 'arazi_code'       => $bond->arazi_code ?: ($bond->arazi?->legacy_arazi_code ?? ''),
-                'plots'            => $bond->plots->map(fn ($p) => ['id' => $p->id, 'title' => $p->title ?? ('Plot-'.$p->id)])->values(),
+                'plots'            => $bond->plots->map(fn ($p) => [
+                    'id' => $p->id,
+                    'title' => $p->title ?? ('Plot-'.$p->id),
+                    'area' => $p->area !== null ? (float) $p->area : null,
+                    'locked' => $p->status === 'registry' || \App\Models\Registry::where('plot_id', $p->id)->exists(),
+                ])->values(),
                 'bond_amount'      => $total,
                 'paid_amount'      => $netPaid,
                 'pending_amount'   => $pending,

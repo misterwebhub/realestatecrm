@@ -496,11 +496,20 @@ class CustomerBondPaymentController extends Controller
                 'name' => 'customer_bond_cheque_id',
                 'label' => 'Cheque (optional)',
                 'type' => 'select',
-                // only show unpaid/pending cheques for selection
+                // only show unpaid/pending cheques for selection, plus this payment's own
+                // cheque (which was marked "cleared" when the payment was saved) so editing
+                // doesn't drop it from the dropdown and unassign it on save.
                 'options' => ($item && $item->customer_bond_id)
-                    ? \App\Models\CustomerBondCheque::where('customer_bond_id', $item->customer_bond_id)->where('status', 'pending')->orderByDesc('id')->get()->mapWithKeys(function ($c) {
-                        return [$c->id => ($c->cheque_number ? $c->cheque_number . ' — ' : '') . '₹' . number_format((float)$c->amount, 2) . ' — ' . ucfirst($c->status)];
-                    })->all()
+                    ? \App\Models\CustomerBondCheque::where('customer_bond_id', $item->customer_bond_id)
+                        ->where(function ($q) use ($item) {
+                            $q->where('status', 'pending');
+                            if ($item->customer_bond_cheque_id) {
+                                $q->orWhere('id', $item->customer_bond_cheque_id);
+                            }
+                        })
+                        ->orderByDesc('id')->get()->mapWithKeys(function ($c) {
+                            return [$c->id => ($c->cheque_number ? $c->cheque_number . ' — ' : '') . '₹' . number_format((float)$c->amount, 2) . ' — ' . ucfirst($c->status)];
+                        })->all()
                     : [],
                 'value' => $item?->customer_bond_cheque_id,
             ],
@@ -568,7 +577,7 @@ class CustomerBondPaymentController extends Controller
                 }
             }],
             'entry_date' => ['required', 'date'],
-            'customer_bond_cheque_id' => ['nullable', 'exists:customer_bond_cheques,id', function ($attr, $value, $fail) {
+            'customer_bond_cheque_id' => ['nullable', 'exists:customer_bond_cheques,id', function ($attr, $value, $fail) use ($item) {
                 $bondId = request()->input('customer_bond_id');
                 if ($value && $bondId) {
                     $cheque = \App\Models\CustomerBondCheque::where('id', $value)->where('customer_bond_id', $bondId)->first();
@@ -577,7 +586,12 @@ class CustomerBondPaymentController extends Controller
                         return;
                     }
 
-                    if ($cheque->status !== 'pending') {
+                    // A cheque already tied to this payment was marked "cleared" when the
+                    // payment was first saved. Re-submitting the same cheque while editing
+                    // other fields (e.g. entry date) must not be rejected as "not pending".
+                    $isSameChequeAsBefore = $item && (int) $item->customer_bond_cheque_id === (int) $value;
+
+                    if ($cheque->status !== 'pending' && ! $isSameChequeAsBefore) {
                         $fail('Selected cheque is not unpaid (pending).');
                     }
                 }

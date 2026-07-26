@@ -95,6 +95,14 @@
             </select>
         </div>
         <div class="col-md-2 col-sm-4">
+            <label class="form-label small fw-semibold mb-1">Plot Registry</label>
+            <select name="plot_registry" class="form-select form-select-sm js-select2">
+                <option value="">All</option>
+                <option value="Y" @selected($plotRegistry === 'Y')>Yes</option>
+                <option value="N" @selected($plotRegistry === 'N')>No</option>
+            </select>
+        </div>
+        <div class="col-md-2 col-sm-4">
             <label class="form-label small fw-semibold mb-1">Date From</label>
             <input type="date" name="date_from" value="{{ $dateFrom }}" class="form-control form-control-sm">
         </div>
@@ -107,6 +115,74 @@
             <a href="{{ route('reports.bonds-cumulative') }}" class="btn btn-outline-secondary btn-sm">Clear</a>
         </div>
     </form>
+
+    {{-- Cumulative summary of the filtered result set --}}
+    <div class="row g-2 mb-3">
+        <div class="col-6 col-md-3">
+            <div class="card shadow-sm border-start border-4 border-secondary h-100">
+                <div class="card-body py-2">
+                    <div class="small text-muted text-uppercase">Bonds</div>
+                    <div class="fs-6 fw-bold">{{ number_format(count($rows)) }}</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-md-3">
+            <div class="card shadow-sm border-start border-4 border-primary h-100">
+                <div class="card-body py-2">
+                    <div class="small text-muted text-uppercase">Bond Amount</div>
+                    <div class="fs-6 fw-bold text-primary">₹{{ number_format($g_total,2) }}</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-md-3">
+            <div class="card shadow-sm border-start border-4 border-success h-100">
+                <div class="card-body py-2">
+                    <div class="small text-muted text-uppercase">Paid (cash)</div>
+                    <div class="fs-6 fw-bold text-success">₹{{ number_format($g_paid,2) }}</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-md-3">
+            <div class="card shadow-sm border-start border-4 border-success h-100">
+                <div class="card-body py-2">
+                    <div class="small text-muted text-uppercase">Paid Cheque <span class="text-muted">(cleared)</span></div>
+                    <div class="fs-6 fw-bold text-success">₹{{ number_format($g_cheque_paid,2) }}</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-md-3">
+            <div class="card shadow-sm border-start border-4 border-warning h-100">
+                <div class="card-body py-2">
+                    <div class="small text-muted text-uppercase">Pending Cheque</div>
+                    <div class="fs-6 fw-bold text-warning-emphasis">₹{{ number_format($g_cheque_balance,2) }}</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-md-3">
+            <div class="card shadow-sm border-start border-4 border-info h-100">
+                <div class="card-body py-2">
+                    <div class="small text-muted text-uppercase">Cheque Total</div>
+                    <div class="fs-6 fw-bold text-info-emphasis">₹{{ number_format($g_cheque_total,2) }}</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-md-3">
+            <div class="card shadow-sm border-start border-4 border-success h-100">
+                <div class="card-body py-2">
+                    <div class="small text-muted text-uppercase">Total Paid <span class="text-muted">(all)</span></div>
+                    <div class="fs-6 fw-bold text-success">₹{{ number_format($g_paid_all,2) }}</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-md-3">
+            <div class="card shadow-sm border-start border-4 border-danger h-100">
+                <div class="card-body py-2">
+                    <div class="small text-muted text-uppercase">Total Balance <span class="text-muted">(all)</span></div>
+                    <div class="fs-6 fw-bold {{ $g_balance > 0 ? 'text-danger' : 'text-success' }}">₹{{ number_format($g_balance,2) }}</div>
+                </div>
+            </div>
+        </div>
+    </div>
 
     <div class="card">
         <div class="table-responsive">
@@ -147,20 +223,29 @@
                                         <thead>
                                             <tr style="background:#1a3a6b;">
                                                 <th style="padding:1px 5px;color:rgba(255,255,255,.8);font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:.3px;border-right:1px solid rgba(255,255,255,.12);text-align:left;">Plot</th>
-                                                <th style="padding:1px 5px;color:rgba(255,255,255,.8);font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:.3px;text-align:right;">Gaz</th>
+                                                <th style="padding:1px 5px;color:rgba(255,255,255,.8);font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:.3px;border-right:1px solid rgba(255,255,255,.12);text-align:right;">Gaz</th>
+                                                <th style="padding:1px 5px;color:rgba(255,255,255,.8);font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:.3px;text-align:center;">Registry</th>
                                             </tr>
                                         </thead>
                                         <tbody>
                                             @foreach($r['plots'] as $j => $pl)
                                                 <tr style="background:{{ $j % 2 === 0 ? '#fff' : '#f6f9ff' }};border-bottom:1px solid #e4ecf7;">
                                                     <td style="padding:1px 5px;border-right:1px solid #e4ecf7;font-weight:600;color:#1a3a6b;white-space:nowrap;">{{ $pl['label'] ?: '—' }}</td>
-                                                    <td style="padding:1px 5px;text-align:right;color:#374151;white-space:nowrap;">{{ rtrim(rtrim(number_format($pl['gaz'],2),'0'),'.') }}</td>
+                                                    <td style="padding:1px 5px;border-right:1px solid #e4ecf7;text-align:right;color:#374151;white-space:nowrap;">{{ rtrim(rtrim(number_format($pl['gaz'],2),'0'),'.') }}</td>
+                                                    <td style="padding:1px 5px;text-align:center;white-space:nowrap;">
+                                                        @if($pl['registry'] === 'Y')
+                                                            <span style="color:#15803d;font-weight:700;">Y</span>
+                                                        @else
+                                                            <span style="color:#dc2626;font-weight:700;">N</span>
+                                                        @endif
+                                                    </td>
                                                 </tr>
                                             @endforeach
                                             @if(count($r['plots']) > 1)
                                                 <tr style="background:#eef4ff;border-top:1px solid #d0ddf0;">
                                                     <td style="padding:1px 5px;border-right:1px solid #e4ecf7;font-weight:700;color:#15803d;text-align:right;">Total</td>
-                                                    <td style="padding:1px 5px;text-align:right;font-weight:700;color:#15803d;white-space:nowrap;">{{ rtrim(rtrim(number_format($plotTotal,2),'0'),'.') }}</td>
+                                                    <td style="padding:1px 5px;border-right:1px solid #e4ecf7;text-align:right;font-weight:700;color:#15803d;white-space:nowrap;">{{ rtrim(rtrim(number_format($plotTotal,2),'0'),'.') }}</td>
+                                                    <td></td>
                                                 </tr>
                                             @endif
                                         </tbody>
@@ -232,14 +317,35 @@
                 <tfoot class="table-light">
                     <tr class="fw-bold">
                         <td colspan="7" class="text-end">GRAND TOTAL</td>
-                        <td class="text-end">{{ number_format($g_total,2) }}</td>
-                        <td class="text-end text-success">{{ number_format($g_paid,2) }}</td>
-                        <td class="text-end text-success">{{ number_format($g_cheque_paid,2) }}</td>
-                        <td class="text-end">{{ number_format($g_cheque_balance,2) }}</td>
+                        <td class="text-end">
+                            <div class="small text-muted fw-normal text-uppercase" style="font-size:9px;">Bond Amount</div>
+                            <div>{{ number_format($g_total,2) }}</div>
+                        </td>
+                        <td class="text-end text-success">
+                            <div class="small text-muted fw-normal text-uppercase" style="font-size:9px;">Paid (cash)</div>
+                            <div>{{ number_format($g_paid,2) }}</div>
+                        </td>
+                        <td class="text-end text-success">
+                            <div class="small text-muted fw-normal text-uppercase" style="font-size:9px;">Paid Cheque</div>
+                            <div>{{ number_format($g_cheque_paid,2) }}</div>
+                        </td>
+                        <td class="text-end">
+                            <div class="small text-muted fw-normal text-uppercase" style="font-size:9px;">Pending Cheque</div>
+                            <div>{{ number_format($g_cheque_balance,2) }}</div>
+                        </td>
                         <td></td>
-                        <td class="text-center">{{ number_format($g_cheque_total,2) }}</td>
-                        <td class="text-end">{{ number_format($g_paid_all,2) }}</td>
-                        <td class="text-end text-danger">{{ number_format($g_balance,2) }}</td>
+                        <td class="text-center">
+                            <div class="small text-muted fw-normal text-uppercase" style="font-size:9px;">Cheque Total</div>
+                            <div>{{ number_format($g_cheque_total,2) }}</div>
+                        </td>
+                        <td class="text-end">
+                            <div class="small text-muted fw-normal text-uppercase" style="font-size:9px;">Total Paid (all)</div>
+                            <div>{{ number_format($g_paid_all,2) }}</div>
+                        </td>
+                        <td class="text-end text-danger">
+                            <div class="small text-muted fw-normal text-uppercase" style="font-size:9px;">Total Balance (all)</div>
+                            <div>{{ number_format($g_balance,2) }}</div>
+                        </td>
                     </tr>
                 </tfoot>
                 @endif

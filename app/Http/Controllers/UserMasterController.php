@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\User;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rules\Password;
 
@@ -40,6 +41,9 @@ class UserMasterController extends Controller
             'is_active'        => ['nullable', 'boolean'],
         ]);
 
+        // Keep a reversible copy alongside the one-way hash so it can be
+        // revealed later from the User Master list (Super Admin only).
+        $validated['password_encrypted'] = Crypt::encryptString($validated['password']);
         $validated['password']  = Hash::make($validated['password']);
         $validated['is_active'] = $request->boolean('is_active', true);
         $validated['role']      = $this->legacyRoleFor($validated['role_id']);
@@ -63,19 +67,30 @@ class UserMasterController extends Controller
 
     public function update(Request $request, User $userMaster)
     {
-        $validated = $request->validate([
+        // Only a Super Admin may change another user's password from the edit
+        // form. Anyone else with access to this controller must not be able
+        // to silently reset someone else's credentials, so the field is
+        // ignored entirely (even if somehow submitted) for non-Super-Admins.
+        $isSuperAdmin = (bool) auth()->user()?->isSuperAdmin();
+
+        $rules = [
             'name'             => ['required', 'string', 'max:150'],
             'username'         => ['required', 'string', 'max:50', 'unique:users,username,' . $userMaster->id],
             'email'            => ['nullable', 'email', 'max:150', 'unique:users,email,' . $userMaster->id],
             'mobile'           => ['required', 'string', 'max:20'],
             'secondary_mobile' => ['nullable', 'string', 'max:20'],
             'address'          => ['nullable', 'string', 'max:300'],
-            'password'         => ['nullable', 'string', 'min:6', 'confirmed'],
             'role_id'          => ['required', 'exists:roles,id'],
             'is_active'        => ['nullable', 'boolean'],
-        ]);
+        ];
+        if ($isSuperAdmin) {
+            $rules['password'] = ['nullable', 'string', 'min:6', 'confirmed'];
+        }
 
-        if (!empty($validated['password'])) {
+        $validated = $request->validate($rules);
+
+        if ($isSuperAdmin && !empty($validated['password'])) {
+            $validated['password_encrypted'] = Crypt::encryptString($validated['password']);
             $validated['password'] = Hash::make($validated['password']);
         } else {
             unset($validated['password']);
@@ -86,6 +101,56 @@ class UserMasterController extends Controller
         $userMaster->update($validated);
 
         return redirect()->route('user-master.index')->with('success', 'User updated successfully.');
+    }
+
+    /**
+     * Super-Admin-only quick password reset from the User Master list —
+     * lets a Super Admin set a new password for any user without going
+     * through the full edit form.
+     */
+    public function resetPassword(Request $request, User $userMaster)
+    {
+        if (! auth()->user()?->isSuperAdmin()) {
+            abort(403);
+        }
+
+        $validated = $request->validate([
+            'password' => ['required', 'string', 'min:6', 'confirmed'],
+        ]);
+
+        $userMaster->update([
+            'password'           => Hash::make($validated['password']),
+            'password_encrypted' => Crypt::encryptString($validated['password']),
+        ]);
+
+        return redirect()->route('user-master.index')->with('success', "Password reset for {$userMaster->name}.");
+    }
+
+    /**
+     * Reveal a user's password on the User Master list (eye-icon toggle).
+     * Restricted to Super Admins — anyone with plain `auth` access to this
+     * controller must NOT be able to read other users' passwords.
+     */
+    public function password(User $userMaster)
+    {
+        if (! auth()->user()?->isSuperAdmin()) {
+            abort(403);
+        }
+
+        if (empty($userMaster->password_encrypted)) {
+            return response()->json([
+                'available' => false,
+                'message'   => 'Not available — set/reset this user\'s password to enable reveal.',
+            ]);
+        }
+
+        try {
+            $plain = Crypt::decryptString($userMaster->password_encrypted);
+        } catch (\Throwable $e) {
+            return response()->json(['available' => false, 'message' => 'Unable to decrypt password.']);
+        }
+
+        return response()->json(['available' => true, 'password' => $plain]);
     }
 
     public function destroy(User $userMaster)

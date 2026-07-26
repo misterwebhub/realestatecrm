@@ -319,11 +319,14 @@
             return plot.label || ('Plot-' + plot.id);
         }
 
+        const unavailablePlotStatuses = ['booked', 'booked_advance', 'hold', 'blacklist'];
+
         function renderAvailablePlots(){
             plotSelect.innerHTML = '<option value="">--Select Plot--</option>';
 
             availablePlots
                 .filter(plot => !selectedPlots.has(String(plot.id)))
+                .filter(plot => !unavailablePlotStatuses.includes(plot.status) || selectedPlotIds.includes(String(plot.id)))
                 .forEach(function(plot){
                     const opt = document.createElement('option');
                     opt.value = plot.id;

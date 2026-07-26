@@ -161,6 +161,8 @@ Route::middleware('auth')->group(function () {
     Route::get('user-master/list', [UserMasterController::class, 'list'])->name('user-master.list');
     Route::get('user-master/report', [UserMasterController::class, 'report'])->name('user-master.report');
     Route::get('user-master/{userMaster}/receipts', [UserMasterController::class, 'receipts'])->name('user-master.receipts');
+    Route::get('user-master/{userMaster}/password', [UserMasterController::class, 'password'])->name('user-master.password');
+    Route::post('user-master/{userMaster}/reset-password', [UserMasterController::class, 'resetPassword'])->name('user-master.reset-password');
     Route::resource('user-master', UserMasterController::class)->except(['show'])->parameters(['user-master' => 'userMaster']);
 
     // Roles & Permissions (managed by users with the 'roles' permission; Super Admin always allowed)

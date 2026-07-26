@@ -75,11 +75,39 @@ class CustomerBondController extends Controller
                 }
             }],
             'plot_ids' => ['nullable', 'array'],
-            'plot_ids.*' => ['required', 'distinct', 'exists:plots,id', function ($attribute, $value, $fail) {
+            'plot_ids.*' => ['required', 'distinct', 'exists:plots,id', function ($attribute, $value, $fail) use ($item) {
                 $plots = Arazi::plotsForCode((string) request()->input('arazi_code'));
 
                 if ($plots->isNotEmpty() && ! $plots->contains('id', (int) $value)) {
                     $fail('Selected plot does not belong to the selected Arazi.');
+                    return;
+                }
+
+                $plot = Plot::find($value);
+                if (! $plot) {
+                    return;
+                }
+
+                // Plots on hold or blacklisted must never be attached to a bond,
+                // regardless of which bond is submitting the request.
+                $status = strtolower((string) ($plot->status ?? ''));
+                if (in_array($status, ['hold', 'blacklist'], true)) {
+                    $fail('Plot "' . ($plot->title ?? $plot->id) . '" is ' . $status . ' and cannot be booked.');
+                    return;
+                }
+
+                // A plot must not be booked under more than one bond. When editing
+                // a bond, its own existing plot rows are excluded from this check.
+                $duplicate = \Illuminate\Support\Facades\DB::table('customer_bond_plot')
+                    ->join('customer_bonds', 'customer_bonds.id', '=', 'customer_bond_plot.customer_bond_id')
+                    ->where('customer_bond_plot.plot_id', $value)
+                    ->when($item, fn ($q) => $q->where('customer_bond_plot.customer_bond_id', '!=', $item->id))
+                    ->select('customer_bonds.bond_no')
+                    ->first();
+
+                if ($duplicate) {
+                    $bondLabel = $duplicate->bond_no ?: 'another bond';
+                    $fail('Plot "' . ($plot->title ?? $plot->id) . '" is already booked under bond "' . $bondLabel . '".');
                 }
             }],
             'plot_amounts' => ['nullable', 'array'],
