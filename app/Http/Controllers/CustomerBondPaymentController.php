@@ -126,12 +126,13 @@ class CustomerBondPaymentController extends Controller
             $query->whereIn('entry_type', ['return', 'discount']);
         }
 
-        // Filter by creation date range
+        // Filter by payment entry date (never created_at — created_at is
+        // when the record was saved, entry_date is the actual payment date).
         if ($dateFrom !== '') {
-            $query->whereDate('created_at', '>=', $dateFrom);
+            $query->whereDate('entry_date', '>=', $dateFrom);
         }
         if ($dateTo !== '') {
-            $query->whereDate('created_at', '<=', $dateTo);
+            $query->whereDate('entry_date', '<=', $dateTo);
         }
 
         $records   = $query->get();

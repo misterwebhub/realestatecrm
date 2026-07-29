@@ -253,6 +253,14 @@ class ReportsController extends Controller
             $periodPayments = ($dateFrom === '' && $dateTo === '')
                 ? $bond->payments
                 : $bond->payments->filter(fn ($p) => $inRange($p->entry_date));
+
+            // Date filter is based on the customer payment entry date: when a
+            // date range is applied, only bonds that actually have a payment
+            // entry inside that range should appear in the report.
+            if (($dateFrom !== '' || $dateTo !== '') && $periodPayments->isEmpty()) {
+                continue;
+            }
+
             $cashPayments = $periodPayments->filter(fn ($p) => strtolower((string) $p->payment_method) === 'cash');
             $paidPeriod = (float) $cashPayments->whereNotIn('entry_type', $debitTypes)->sum('amount')
                         - (float) $cashPayments->whereIn('entry_type', $debitTypes)->sum('amount');
@@ -744,8 +752,8 @@ class ReportsController extends Controller
         $bondAgg = $this->ownScope(CustomerBond::query())
             ->selectRaw('broker_id, COUNT(*) as cnt, COALESCE(SUM(total_amount),0) as total, COALESCE(SUM(broker_payment),0) as commission, COALESCE(SUM(broker_paid),0) as paid, COALESCE(SUM(broker_balance),0) as balance')
             ->whereNotNull('broker_id')
-            ->when($dateFrom, fn ($q) => $q->whereDate('created_at', '>=', $dateFrom))
-            ->when($dateTo,   fn ($q) => $q->whereDate('created_at', '<=', $dateTo))
+            ->when($dateFrom, fn ($q) => $q->whereDate('bond_date', '>=', $dateFrom))
+            ->when($dateTo,   fn ($q) => $q->whereDate('bond_date', '<=', $dateTo))
             ->groupBy('broker_id')->get()->keyBy('broker_id');
 
         $regAgg = $this->ownScope(Registry::query())

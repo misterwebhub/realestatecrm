@@ -603,6 +603,10 @@ class RegistryController extends Controller
             }
         }
 
+        // A registry existing at all — regardless of its payment status —
+        // means the plot is committed to registry, so lock the plot first.
+        $this->registryLifecycleService->markPlotRegistryDone($item);
+
         if ($item->status === 'completed' || $item->payment_status === 'completed') {
             $this->registryLifecycleService->markRegistryPaid($item);
             return;

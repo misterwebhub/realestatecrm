@@ -204,6 +204,7 @@
                         <th class="text-center">Cheque / Account</th>
                         <th class="text-end">Total Paid <span class="text-muted">(all)</span></th>
                         <th class="text-end">Total Balance <span class="text-muted">(all)</span></th>
+                        <th class="text-center no-print">Entries</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -308,9 +309,28 @@
                                    title="View payments for this bond">{{ number_format($r['paid_all'],2) }}</a>
                             </td>
                             <td class="text-end fw-bold {{ $r['balance'] > 0 ? 'text-danger' : '' }}">{{ number_format($r['balance'],2) }}</td>
+                            <td class="text-center no-print">
+                                @php
+                                    $entriesUrl = url('/customer-bond-payments') . '?' . http_build_query([
+                                        'q'            => '',
+                                        'bond'         => $r['bond_no'],
+                                        'arazi_code'   => '',
+                                        'plot'         => '',
+                                        'entry_type'   => '',
+                                        'credit_debit' => '',
+                                        'date_from'    => $dateFrom,
+                                        'date_to'      => $dateTo,
+                                    ]);
+                                @endphp
+                                <a href="{{ $entriesUrl }}" target="_blank" rel="noopener"
+                                   class="btn btn-outline-primary btn-sm py-0 px-2"
+                                   title="View all payment entries for {{ $r['bond_no'] }}">
+                                    All Entries
+                                </a>
+                            </td>
                         </tr>
                     @empty
-                        <tr><td colspan="15" class="text-center text-muted py-4">No bonds found.</td></tr>
+                        <tr><td colspan="16" class="text-center text-muted py-4">No bonds found.</td></tr>
                     @endforelse
                 </tbody>
                 @if(count($rows))
@@ -346,11 +366,29 @@
                             <div class="small text-muted fw-normal text-uppercase" style="font-size:9px;">Total Balance (all)</div>
                             <div>{{ number_format($g_balance,2) }}</div>
                         </td>
+                        <td class="no-print"></td>
                     </tr>
                 </tfoot>
                 @endif
             </table>
         </div>
+    </div>
+
+    <div class="d-flex justify-content-end mt-3 no-print">
+        @php
+            $paymentsQuery = array_filter([
+                'date_from'   => $dateFrom !== '' ? $dateFrom : null,
+                'date_to'     => $dateTo !== '' ? $dateTo : null,
+                'customer_id' => $customerId !== '' ? $customerId : null,
+                'bond_id'     => $bondId !== '' ? $bondId : null,
+                'arazi_code'  => $araziCode !== '' ? $araziCode : null,
+            ], fn ($v) => $v !== null && $v !== '');
+        @endphp
+        <a href="{{ url('/customer-bond-payments') }}?{{ http_build_query($paymentsQuery) }}"
+           target="_blank" rel="noopener"
+           class="btn btn-primary btn-sm">
+            <i class="bi bi-list-check"></i> View All Payment Entries
+        </a>
     </div>
 </div>
 
