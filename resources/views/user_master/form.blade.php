@@ -81,6 +81,93 @@
                     @error('address')<div class="invalid-feedback">{{ $message }}</div>@enderror
                 </div>
 
+                {{-- Office Location & Hours --}}
+                <div class="col-12">
+                    <hr class="my-1">
+                    <h6 class="fw-bold mb-1">Office Location &amp; Hours</h6>
+                    <div class="form-text mb-2">
+                        Used to restrict this user's login to a GPS radius and/or a daily working-hours window.
+                        Leave all fields blank to skip these restrictions for this user. Super Admin / Admin
+                        accounts are always exempt, regardless of these settings.
+                    </div>
+                </div>
+
+                @php
+                    $effectiveLat = $item ? $item->effectiveOfficeLatitude() : \App\Models\AppSetting::get(\App\Models\AppSetting::DEFAULT_OFFICE_LATITUDE);
+                    $effectiveLng = $item ? $item->effectiveOfficeLongitude() : \App\Models\AppSetting::get(\App\Models\AppSetting::DEFAULT_OFFICE_LONGITUDE);
+                    $effectiveRadius = $item ? $item->effectiveAllowedRadiusMeters() : \App\Models\AppSetting::get(\App\Models\AppSetting::DEFAULT_ALLOWED_RADIUS_METERS);
+                    $isOwnLocationOverride = $item && $item->office_latitude !== null && $item->office_longitude !== null && $item->allowed_radius_meters !== null;
+                    $radiusGloballyEnabled = \App\Models\User::radiusLoginGloballyEnabled();
+                @endphp
+                <div class="col-md-8">
+                    <label class="form-label">Login Location &amp; Radius</label>
+                    <div class="form-control-plaintext border rounded bg-light px-2 py-1">
+                        @if(! $radiusGloballyEnabled)
+                            <span class="text-muted">Radius login is currently disabled globally (see Settings).</span>
+                        @elseif($effectiveLat !== null && $effectiveLng !== null && $effectiveRadius !== null)
+                            {{ $effectiveLat }}, {{ $effectiveLng }} &middot; {{ $effectiveRadius }} m
+                            @if($isOwnLocationOverride)
+                                <span class="text-muted" style="font-size:12px;">(set specifically for this user)</span>
+                            @else
+                                <span class="text-muted" style="font-size:12px;">(company default)</span>
+                            @endif
+                        @else
+                            <span class="text-muted">Not configured</span>
+                        @endif
+                    </div>
+                    <div class="form-text">
+                        Login location/radius is managed company-wide from
+                        <a href="{{ route('settings.index') }}" target="_blank">Settings</a> and is not editable per-user here.
+                    </div>
+                </div>
+
+                <div class="col-12">
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" name="disable_radius_login" id="disable_radius_login" value="1"
+                            {{ old('disable_radius_login', $item?->disable_radius_login ?? false) ? 'checked' : '' }}>
+                        <label class="form-check-label fw-semibold" for="disable_radius_login">Disable Radius Login for this user</label>
+                    </div>
+                    <div class="form-text">When enabled, this user can log in from any location, regardless of the company default radius.</div>
+                </div>
+
+                @php
+                    $effectiveStart = $item
+                        ? $item->effectiveOfficeStartTime()
+                        : \App\Models\AppSetting::get(\App\Models\AppSetting::DEFAULT_OFFICE_START_TIME);
+                    $effectiveEnd = $item
+                        ? $item->effectiveOfficeEndTime()
+                        : \App\Models\AppSetting::get(\App\Models\AppSetting::DEFAULT_OFFICE_END_TIME);
+                    $isOwnOverride = $item && ! empty($item->office_start_time) && ! empty($item->office_end_time);
+                @endphp
+                <div class="col-md-8">
+                    <label class="form-label">Office Hours</label>
+                    <div class="form-control-plaintext border rounded bg-light px-2 py-1">
+                        @if($effectiveStart && $effectiveEnd)
+                            {{ substr($effectiveStart, 0, 5) }} – {{ substr($effectiveEnd, 0, 5) }}
+                            @if($isOwnOverride)
+                                <span class="text-muted" style="font-size:12px;">(set specifically for this user)</span>
+                            @else
+                                <span class="text-muted" style="font-size:12px;">(company default)</span>
+                            @endif
+                        @else
+                            <span class="text-muted">Not configured</span>
+                        @endif
+                    </div>
+                    <div class="form-text">
+                        Office hours are managed company-wide from
+                        <a href="{{ route('settings.index') }}" target="_blank">Settings</a> and are not editable per-user here.
+                    </div>
+                </div>
+
+                <div class="col-12">
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" name="allow_after_hours" id="allow_after_hours" value="1"
+                            {{ old('allow_after_hours', $item?->allow_after_hours ?? false) ? 'checked' : '' }}>
+                        <label class="form-check-label fw-semibold" for="allow_after_hours">Allow After Office Hours</label>
+                    </div>
+                    <div class="form-text">When enabled, this user may continue working past their office closing time without being logged out.</div>
+                </div>
+
                 {{-- Password (create: always shown & required. edit: Super Admin only —
                      other users must use the account's own change-password flow, not
                      silently overwrite another user's credentials here.) --}}

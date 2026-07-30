@@ -67,5 +67,6 @@ class Kernel extends HttpKernel
         'verified' => \Illuminate\Auth\Middleware\EnsureEmailIsVerified::class,
         'role' => \App\Http\Middleware\CheckRole::class,
         'permission' => \App\Http\Middleware\CheckPermission::class,
+        'office-hours' => \App\Http\Middleware\EnforceOfficeHours::class,
     ];
 }

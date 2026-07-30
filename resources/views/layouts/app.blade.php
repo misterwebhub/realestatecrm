@@ -67,6 +67,11 @@
                                 </small>
                             </span>
                         </li>
+                        <li>
+                            <a class="dropdown-item" href="{{ route('settings.index') }}">
+                                <i class="bi bi-gear me-2"></i> Settings
+                            </a>
+                        </li>
                         <li><hr class="dropdown-divider"></li>
                         <li>
                             <form method="POST" action="{{ route('logout') }}">
@@ -437,6 +442,85 @@
         }catch(e){ /* ignore */ }
     })();
 </script>
+
+@auth
+@php
+    $__ohUser = auth()->user();
+    $__ohApplies = $__ohUser
+        && ! $__ohUser->isExemptFromRestrictions()
+        && $__ohUser->hasOfficeHoursRestriction()
+        && ! $__ohUser->allow_after_hours;
+    $__ohWindow = $__ohApplies ? $__ohUser->currentOfficeWindow() : null;
+    $__ohDeadline = $__ohApplies ? $__ohUser->officeHoursGraceDeadline() : null;
+@endphp
+@if($__ohApplies && $__ohWindow && $__ohDeadline)
+<script>
+    window.__officeHours = {
+        serverNowMs: {{ now()->valueOf() }},
+        windowEndMs: {{ $__ohWindow[1]->valueOf() }},
+        graceDeadlineMs: {{ $__ohDeadline->valueOf() }},
+        autoLogoutUrl: @json(route('session.auto-logout')),
+        csrfToken: @json(csrf_token())
+    };
+</script>
+<script>
+    // Office-hours reminder + auto-logout countdown (see EnforceOfficeHours
+    // middleware for the server-side safety net covering the same deadline).
+    // "Shown only once per session" is enforced via sessionStorage, so the
+    // warning doesn't reappear on every page navigation within the same tab.
+    (function () {
+        var cfg = window.__officeHours;
+        if (!cfg) return;
+
+        var clockOffsetMs = cfg.serverNowMs - Date.now();
+        function nowOnServer() { return Date.now() + clockOffsetMs; }
+
+        function autoLogoutNow() {
+            fetch(cfg.autoLogoutUrl, {
+                method: 'POST',
+                headers: { 'X-CSRF-TOKEN': cfg.csrfToken, 'Accept': 'application/json' }
+            }).finally(function () {
+                window.location.href = '/login';
+            });
+        }
+
+        function showReminderBanner(minutesLeft) {
+            var div = document.createElement('div');
+            div.className = 'alert alert-warning shadow-lg';
+            div.style.cssText = 'position:fixed;top:75px;right:20px;z-index:2000;max-width:380px;';
+            div.innerHTML = '<strong>Office hours ended.</strong> You will be automatically logged out in '
+                + minutesLeft + ' minutes. Please save your work.'
+                + '<button type="button" class="btn-close float-end" aria-label="Close"></button>';
+            div.querySelector('.btn-close').addEventListener('click', function () { div.remove(); });
+            document.body.appendChild(div);
+        }
+
+        function enterGracePeriod() {
+            var remainingMs = cfg.graceDeadlineMs - nowOnServer();
+            if (remainingMs <= 0) {
+                autoLogoutNow();
+                return;
+            }
+
+            if (!sessionStorage.getItem('office_hours_reminder_shown')) {
+                sessionStorage.setItem('office_hours_reminder_shown', '1');
+                showReminderBanner(Math.max(1, Math.ceil(remainingMs / 60000)));
+            }
+
+            setTimeout(autoLogoutNow, remainingMs);
+        }
+
+        var untilEndMs = cfg.windowEndMs - nowOnServer();
+        if (untilEndMs <= 0) {
+            enterGracePeriod();
+        } else {
+            setTimeout(enterGracePeriod, untilEndMs);
+        }
+    })();
+</script>
+@endif
+@endauth
+
 @stack('scripts')
 </body>
 </html>

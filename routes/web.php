@@ -24,17 +24,25 @@ use App\Http\Controllers\PartnerController;
 use App\Http\Controllers\PaymentController;
 use App\Http\Controllers\PlotController;
 use App\Http\Controllers\RegistryController;
+use App\Http\Controllers\SettingsController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/login', [AuthController::class, 'showLogin'])->name('login');
 Route::post('/login', [AuthController::class, 'login'])->name('login.post');
 Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
 
-Route::middleware('auth')->group(function () {
+Route::middleware(['auth', 'office-hours'])->group(function () {
     Route::redirect('/', '/dashboard');
 
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
     Route::get('/quick-access', [\App\Http\Controllers\QuickAccessController::class, 'index'])->name('quick-access');
+
+    Route::get('/settings', [SettingsController::class, 'index'])->name('settings.index');
+    Route::post('/settings/password', [SettingsController::class, 'updatePassword'])->name('settings.password');
+    Route::post('/settings/office-hours', [SettingsController::class, 'updateOfficeHours'])->name('settings.office-hours');
+    Route::post('/settings/location-defaults', [SettingsController::class, 'updateLocationDefaults'])->name('settings.location-defaults');
+
+    Route::post('/session/auto-logout', [AuthController::class, 'autoLogout'])->name('session.auto-logout');
 
     Route::resource('kisans', KisanController::class)->except(['show']);
     // AJAX endpoints to support modal creation of Kisan from other forms

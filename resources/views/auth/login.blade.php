@@ -16,13 +16,16 @@
             <div class="alert alert-danger">{{ $errors->first() }}</div>
         @endif
 
-        <form method="POST" action="{{ route('login.post') }}" autocomplete="off">
+        <form method="POST" action="{{ route('login.post') }}" autocomplete="off" id="loginForm">
             @csrf
             {{-- Decoy fields: some browsers ignore autocomplete="off" and fill the
                  first visible username/password inputs on the page anyway. These
                  absorb that autofill instead of the real fields below. --}}
             <input type="text" name="fake-username" style="position:absolute;left:-9999px;width:1px;height:1px;opacity:0;" tabindex="-1" autocomplete="off">
             <input type="password" name="fake-password" style="position:absolute;left:-9999px;width:1px;height:1px;opacity:0;" tabindex="-1" autocomplete="new-password">
+            <input type="hidden" name="latitude" id="latitude" value="">
+            <input type="hidden" name="longitude" id="longitude" value="">
+            <input type="hidden" name="geo_status" id="geo_status" value="pending">
             <div class="mb-3">
                 <label class="form-label">Email</label>
                 <input type="email" name="email" value="{{ old('email') }}" class="form-control" required autofocus autocomplete="off" readonly onfocus="this.removeAttribute('readonly')">
@@ -35,12 +38,53 @@
                 <input type="checkbox" name="remember" class="form-check-input" id="remember">
                 <label class="form-check-label" for="remember">Remember me</label>
             </div>
+            <div id="geo-note" class="form-text mb-2" style="display:none;">Checking your location…</div>
             <div class="d-grid">
-                <button class="btn btn-primary">Login</button>
+                <button class="btn btn-primary" id="loginSubmitBtn">Login</button>
             </div>
         </form>
     </div>
 </div>
+<script>
+    // Capture GPS location (if the browser/user allows it) before the login
+    // form is actually submitted, so the server can validate it against the
+    // user's assigned office radius. If location is unavailable/denied, the
+    // form still submits — the server decides whether that user actually
+    // requires a location check.
+    (function () {
+        var form = document.getElementById('loginForm');
+        var geoStatus = document.getElementById('geo_status');
+        var geoNote = document.getElementById('geo-note');
+        var submitBtn = document.getElementById('loginSubmitBtn');
+
+        form.addEventListener('submit', function (e) {
+            if (geoStatus.value !== 'pending') {
+                return; // already resolved (or gave up) — let it submit normally
+            }
+
+            e.preventDefault();
+
+            if (!navigator.geolocation) {
+                geoStatus.value = 'unsupported';
+                form.submit();
+                return;
+            }
+
+            geoNote.style.display = 'block';
+            if (submitBtn) submitBtn.disabled = true;
+
+            navigator.geolocation.getCurrentPosition(function (pos) {
+                document.getElementById('latitude').value = pos.coords.latitude;
+                document.getElementById('longitude').value = pos.coords.longitude;
+                geoStatus.value = 'resolved';
+                form.submit();
+            }, function () {
+                geoStatus.value = 'denied';
+                form.submit();
+            }, { enableHighAccuracy: true, timeout: 8000, maximumAge: 0 });
+        });
+    })();
+</script>
 <script>
     // Belt-and-suspenders: some browsers autofill asynchronously, after the
     // readonly/autocomplete tricks above have already run. Wipe anything that

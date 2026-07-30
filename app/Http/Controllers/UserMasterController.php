@@ -39,6 +39,13 @@ class UserMasterController extends Controller
             'password'         => ['required', 'string', 'min:6', 'confirmed'],
             'role_id'          => ['required', 'exists:roles,id'],
             'is_active'        => ['nullable', 'boolean'],
+            'office_latitude'       => ['nullable', 'numeric', 'between:-90,90', 'required_with:office_longitude,allowed_radius_meters'],
+            'office_longitude'      => ['nullable', 'numeric', 'between:-180,180', 'required_with:office_latitude,allowed_radius_meters'],
+            'allowed_radius_meters' => ['nullable', 'integer', 'min:1', 'max:200000', 'required_with:office_latitude,office_longitude'],
+            'office_start_time'     => ['nullable', 'date_format:H:i', 'required_with:office_end_time'],
+            'office_end_time'       => ['nullable', 'date_format:H:i', 'required_with:office_start_time'],
+            'allow_after_hours'     => ['nullable', 'boolean'],
+            'disable_radius_login'  => ['nullable', 'boolean'],
         ]);
 
         // Keep a reversible copy alongside the one-way hash so it can be
@@ -46,6 +53,8 @@ class UserMasterController extends Controller
         $validated['password_encrypted'] = Crypt::encryptString($validated['password']);
         $validated['password']  = Hash::make($validated['password']);
         $validated['is_active'] = $request->boolean('is_active', true);
+        $validated['allow_after_hours'] = $request->boolean('allow_after_hours', false);
+        $validated['disable_radius_login'] = $request->boolean('disable_radius_login', false);
         $validated['role']      = $this->legacyRoleFor($validated['role_id']);
         if (empty($validated['email'])) unset($validated['email']);
 
@@ -82,6 +91,13 @@ class UserMasterController extends Controller
             'address'          => ['nullable', 'string', 'max:300'],
             'role_id'          => ['required', 'exists:roles,id'],
             'is_active'        => ['nullable', 'boolean'],
+            'office_latitude'       => ['nullable', 'numeric', 'between:-90,90', 'required_with:office_longitude,allowed_radius_meters'],
+            'office_longitude'      => ['nullable', 'numeric', 'between:-180,180', 'required_with:office_latitude,allowed_radius_meters'],
+            'allowed_radius_meters' => ['nullable', 'integer', 'min:1', 'max:200000', 'required_with:office_latitude,office_longitude'],
+            'office_start_time'     => ['nullable', 'date_format:H:i', 'required_with:office_end_time'],
+            'office_end_time'       => ['nullable', 'date_format:H:i', 'required_with:office_start_time'],
+            'allow_after_hours'     => ['nullable', 'boolean'],
+            'disable_radius_login'  => ['nullable', 'boolean'],
         ];
         if ($isSuperAdmin) {
             $rules['password'] = ['nullable', 'string', 'min:6', 'confirmed'];
@@ -96,6 +112,8 @@ class UserMasterController extends Controller
             unset($validated['password']);
         }
         $validated['is_active'] = $request->boolean('is_active', true);
+        $validated['allow_after_hours'] = $request->boolean('allow_after_hours', false);
+        $validated['disable_radius_login'] = $request->boolean('disable_radius_login', false);
         $validated['role']      = $this->legacyRoleFor($validated['role_id']);
 
         $userMaster->update($validated);
