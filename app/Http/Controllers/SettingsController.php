@@ -28,6 +28,8 @@ class SettingsController extends Controller
             'defaultOfficeLongitude'    => AppSetting::get(AppSetting::DEFAULT_OFFICE_LONGITUDE),
             'defaultAllowedRadius'      => AppSetting::get(AppSetting::DEFAULT_ALLOWED_RADIUS_METERS),
             'radiusLoginEnabled'        => \App\Models\User::radiusLoginGloballyEnabled(),
+            'installmentReminderDays'   => AppSetting::get(AppSetting::INSTALLMENT_REMINDER_DAYS),
+            'installmentOverdueDays'    => AppSetting::get(AppSetting::INSTALLMENT_OVERDUE_DAYS),
         ]);
     }
 
@@ -83,6 +85,31 @@ class SettingsController extends Controller
         AppSetting::set(AppSetting::RADIUS_LOGIN_ENABLED, $request->boolean('radius_login_enabled', false) ? '1' : '0');
 
         return back()->with('success', 'Default login location/radius updated for all users.');
+    }
+
+    /**
+     * Super-Admin-only: set the company-wide installment reminder/overdue
+     * day counts used by the "Pending Installments" report. Reminder days
+     * controls how many days before an installment's due date it should be
+     * flagged as an upcoming reminder; overdue days controls how many days
+     * past the due date an installment is treated as "Overdue" rather than
+     * "Pending".
+     */
+    public function updateInstallmentSettings(Request $request)
+    {
+        if (! auth()->user()?->isSuperAdmin()) {
+            abort(403);
+        }
+
+        $validated = $request->validate([
+            'installment_reminder_days' => ['nullable', 'integer', 'min:0', 'max:365'],
+            'installment_overdue_days'  => ['nullable', 'integer', 'min:0', 'max:365'],
+        ]);
+
+        AppSetting::set(AppSetting::INSTALLMENT_REMINDER_DAYS, $validated['installment_reminder_days'] ?? null);
+        AppSetting::set(AppSetting::INSTALLMENT_OVERDUE_DAYS, $validated['installment_overdue_days'] ?? null);
+
+        return back()->with('success', 'Installment reminder/overdue settings updated.');
     }
 
     public function updatePassword(Request $request)

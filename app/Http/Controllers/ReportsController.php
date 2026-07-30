@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Agent;
+use App\Models\AppSetting;
 use App\Models\Arazi;
 use App\Models\CustomerBond;
 use App\Models\CustomerBondPayment;
@@ -436,6 +437,237 @@ class ReportsController extends Controller
             'g_cheque_balance'=> round($gChequeBal, 2),
             'g_cheque_total'  => round($gChequeTotal, 2),
             'g_paid_all'      => round($gPaidAll, 2),
+        ]);
+    }
+
+    /**
+     * Pending Installments report: one row per bond that has an installment
+     * due date (last_date) and a remaining balance, broken down by how much
+     * has been paid via cheque, cash, and any other method — plus the
+     * balance, the installment amount, and an Overdue/Pending status
+     * computed from the company-wide "installment overdue days" setting
+     * (AppSetting::INSTALLMENT_OVERDUE_DAYS) compared against last_date.
+     * Bonds with a zero/negative balance are fully paid and are excluded.
+     */
+    public function pendingInstallments(Request $request)
+    {
+        $customerId = $request->query('customer_id', '');
+        $bondId     = $request->query('bond_id', '');
+        $araziCode  = $request->query('arazi_code', '');
+        $status     = $request->query('status', ''); // overdue|pending
+        $dateFrom   = $request->query('date_from', '');
+        $dateTo     = $request->query('date_to', '');
+
+        $overdueDays  = (int) (AppSetting::get(AppSetting::INSTALLMENT_OVERDUE_DAYS) ?? 0);
+        $reminderDays = (int) (AppSetting::get(AppSetting::INSTALLMENT_REMINDER_DAYS) ?? 0);
+
+        $bondsQuery = CustomerBond::with(['customer', 'arazi', 'plots', 'payments'])
+            ->whereNotNull('last_date')
+            ->when($customerId, fn ($q) => $q->where('customer_id', $customerId))
+            ->when($bondId,     fn ($q) => $q->where('id', $bondId))
+            ->when($araziCode,  fn ($q) => $q->where('arazi_code', $araziCode))
+            ->when($dateFrom,   fn ($q) => $q->whereDate('last_date', '>=', $dateFrom))
+            ->when($dateTo,     fn ($q) => $q->whereDate('last_date', '<=', $dateTo))
+            ->orderBy('last_date');
+
+        // Non-admins only see their own bonds; admins see everything.
+        $bonds = $this->ownScope($bondsQuery)->get();
+
+        // Plot ids that already have a registry record — drives the per-plot Y/N badge.
+        $plotIdsWithRegistry = Registry::whereNotNull('plot_id')->distinct()->pluck('plot_id')->flip()->all();
+
+        $debitTypes = ['return', 'discount'];
+        $today = now()->startOfDay();
+
+        $sumByMethod = function ($payments, string $bucket) use ($debitTypes) {
+            $matching = $payments->filter(function ($p) use ($bucket) {
+                $m = strtolower(trim((string) $p->payment_method));
+                if ($bucket === 'cash') return $m === 'cash';
+                if ($bucket === 'cheque') return $m === 'cheque';
+                // "other" bucket = everything else, including rtgs/imps/upi/other and blank/null.
+                return $m !== 'cash' && $m !== 'cheque';
+            });
+
+            return (float) $matching->whereNotIn('entry_type', $debitTypes)->sum('amount')
+                 - (float) $matching->whereIn('entry_type', $debitTypes)->sum('amount');
+        };
+
+        $rows = [];
+        $gTotal = $gPaidCash = $gPaidCheque = $gPaidOther = $gBalance = $gInstallment = 0;
+
+        foreach ($bonds as $bond) {
+            $payments = $bond->payments;
+
+            $paidAll = (float) $payments->whereNotIn('entry_type', $debitTypes)->sum('amount')
+                     - (float) $payments->whereIn('entry_type', $debitTypes)->sum('amount');
+
+            $total   = (float) ($bond->total_amount ?? $bond->bond_amount ?? 0);
+            $balance = round($total - $paidAll, 2);
+
+            // "Pending Installments" only makes sense for bonds still owed money.
+            if ($balance <= 0.009) {
+                continue;
+            }
+
+            $dueDate = $bond->last_date instanceof \Carbon\Carbon
+                ? $bond->last_date
+                : \Carbon\Carbon::parse($bond->last_date)->startOfDay();
+
+            // Days past the installment due date; negative means not yet due.
+            $daysPastDue = $dueDate->lessThan($today)
+                ? $dueDate->diffInDays($today)
+                : -$dueDate->diffInDays($today);
+
+            $isOverdue = $daysPastDue > $overdueDays;
+            $rowStatus = $isOverdue ? 'Overdue' : 'Pending';
+
+            if ($status === 'overdue' && ! $isOverdue) continue;
+            if ($status === 'pending' && $isOverdue) continue;
+
+            // Upcoming-reminder flag (informational only — not a filter option):
+            // due within the configured reminder window and not yet overdue.
+            $isReminder = ! $isOverdue && $daysPastDue >= -$reminderDays;
+
+            $paidCash   = $sumByMethod($payments, 'cash');
+            $paidCheque = $sumByMethod($payments, 'cheque');
+            $paidOther  = $sumByMethod($payments, 'other');
+
+            $code = $bond->arazi_code ?: ($bond->arazi?->legacy_arazi_code ?? '-');
+            $plotsData = $bond->plots->map(fn ($pl) => [
+                'label'    => $pl->title ?: ('Plot-' . $pl->id),
+                'gaz'      => (float) ($pl->area ?? 0),
+                'registry' => isset($plotIdsWithRegistry[$pl->id]) ? 'Y' : 'N',
+            ])->values()->all();
+
+            // `installment_amount` is a legacy misnomer — it actually stores the
+            // number of installments (months) the bond is split into, not a rupee
+            // amount. The real per-installment due amount is the bond total spread
+            // evenly across that many installments.
+            $noOfInstallments = (int) $bond->installment_amount;
+            $dueAmount = $noOfInstallments > 0 ? round($total / $noOfInstallments, 2) : null;
+
+            $rows[] = [
+                'bond_id'             => $bond->id,
+                'bond_no'             => $bond->bond_no ?? ('BOND-' . $bond->id),
+                'bond_date'           => optional($bond->bond_date)->format('d-m-Y'),
+                'customer'            => $bond->customer?->name ?? '—',
+                'customer_mobile'     => $bond->customer?->mobile ?? '—',
+                'arazi'               => $code,
+                'plots'               => $plotsData,
+                'last_date'           => $dueDate->format('d-m-Y'),
+                'days_past_due'       => $daysPastDue,
+                'no_of_installments'  => $bond->installment_amount,
+                'due_amount'          => $dueAmount,
+                'total'               => round($total, 2),
+                'paid_cheque'         => round($paidCheque, 2),
+                'paid_cash'           => round($paidCash, 2),
+                'paid_other'          => round($paidOther, 2),
+                'balance'             => $balance,
+                'status'              => $rowStatus,
+                'is_reminder'         => $isReminder,
+            ];
+
+            $gTotal += $total;
+            $gPaidCash += $paidCash;
+            $gPaidCheque += $paidCheque;
+            $gPaidOther += $paidOther;
+            $gBalance += $balance;
+            $gInstallment += (float) $bond->installment_amount;
+        }
+
+        if (strtolower((string) $request->query('export')) === 'csv') {
+            $filters = [
+                'Customer'      => $customerId ? optional(\App\Models\Customer::find($customerId))->name : 'All',
+                'Bond'          => $bondId ? optional(CustomerBond::find($bondId))->bond_no : 'All',
+                'Arazi'         => $araziCode !== '' ? $araziCode : 'All',
+                'Status'        => $status !== '' ? ucfirst($status) : 'All',
+                'Due Date From' => $dateFrom !== '' ? $dateFrom : 'All',
+                'Due Date To'   => $dateTo !== '' ? $dateTo : 'All',
+                'Overdue After (days)'  => $overdueDays,
+                'Reminder Before (days)'=> $reminderDays,
+            ];
+
+            $filename = 'pending-installments-' . now()->format('Ymd-His') . '.csv';
+
+            return response()->streamDownload(function () use ($rows, $filters, $gTotal, $gPaidCheque, $gPaidCash, $gPaidOther, $gBalance, $gInstallment) {
+                $out = fopen('php://output', 'w');
+                fwrite($out, "\xEF\xBB\xBF");
+
+                fputcsv($out, ['Pending Installments Report']);
+                fputcsv($out, ['Generated', now()->format('d-m-Y H:i')]);
+                fputcsv($out, []);
+                fputcsv($out, ['Filters Applied']);
+                foreach ($filters as $label => $value) {
+                    fputcsv($out, [$label, $value !== '' && $value !== null ? $value : 'All']);
+                }
+                fputcsv($out, []);
+
+                fputcsv($out, [
+                    '#', 'Bond', 'Bond Date', 'Customer', 'Mobile', 'Arazi', 'Plots',
+                    'Installment Due Date', 'Days Past Due', 'Bond Amount',
+                    'No. of Installments', 'Due Amount',
+                    'Paid (Cheque)', 'Paid (Cash)', 'Paid (Other)', 'Balance', 'Status',
+                ]);
+
+                foreach ($rows as $i => $r) {
+                    $plots = collect($r['plots'])->map(fn ($pl) => ($pl['label'] ?: '-') . ' (' . rtrim(rtrim(number_format($pl['gaz'], 2), '0'), '.') . ' gaz, Registry: ' . $pl['registry'] . ')')->implode('; ');
+                    fputcsv($out, [
+                        $i + 1,
+                        $r['bond_no'],
+                        $r['bond_date'] ?: '-',
+                        $r['customer'],
+                        $r['customer_mobile'],
+                        $r['arazi'],
+                        $plots,
+                        $r['last_date'],
+                        $r['days_past_due'],
+                        number_format($r['total'], 2, '.', ''),
+                        $r['no_of_installments'],
+                        $r['due_amount'] !== null ? number_format($r['due_amount'], 2, '.', '') : '-',
+                        number_format($r['paid_cheque'], 2, '.', ''),
+                        number_format($r['paid_cash'], 2, '.', ''),
+                        number_format($r['paid_other'], 2, '.', ''),
+                        number_format($r['balance'], 2, '.', ''),
+                        $r['status'],
+                    ]);
+                }
+
+                fputcsv($out, []);
+                fputcsv($out, [
+                    'GRAND TOTAL', '', '', '', '', '', '', '', '',
+                    number_format($gTotal, 2, '.', ''),
+                    '', '',
+                    number_format($gPaidCheque, 2, '.', ''),
+                    number_format($gPaidCash, 2, '.', ''),
+                    number_format($gPaidOther, 2, '.', ''),
+                    number_format($gBalance, 2, '.', ''),
+                    '',
+                ]);
+
+                fclose($out);
+            }, $filename, ['Content-Type' => 'text/csv; charset=UTF-8']);
+        }
+
+        return view('reports.pending_installments', [
+            'title'         => 'Pending Installments Report',
+            'rows'          => $rows,
+            'customers'     => \App\Models\Customer::orderBy('name')->get(['id', 'name']),
+            'bondsList'     => CustomerBond::whereNotNull('last_date')->orderBy('bond_no')->get(['id', 'bond_no']),
+            'araziCodes'    => CustomerBond::whereNotNull('arazi_code')->where('arazi_code', '!=', '')->distinct()->orderBy('arazi_code')->pluck('arazi_code'),
+            'customerId'    => $customerId,
+            'bondId'        => $bondId,
+            'araziCode'     => $araziCode,
+            'status'        => $status,
+            'dateFrom'      => $dateFrom,
+            'dateTo'        => $dateTo,
+            'overdueDays'   => $overdueDays,
+            'reminderDays'  => $reminderDays,
+            'g_total'       => round($gTotal, 2),
+            'g_paid_cheque' => round($gPaidCheque, 2),
+            'g_paid_cash'   => round($gPaidCash, 2),
+            'g_paid_other'  => round($gPaidOther, 2),
+            'g_balance'     => round($gBalance, 2),
+            'g_installment' => round($gInstallment, 2),
         ]);
     }
 

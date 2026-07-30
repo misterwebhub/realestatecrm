@@ -41,6 +41,7 @@ Route::middleware(['auth', 'office-hours'])->group(function () {
     Route::post('/settings/password', [SettingsController::class, 'updatePassword'])->name('settings.password');
     Route::post('/settings/office-hours', [SettingsController::class, 'updateOfficeHours'])->name('settings.office-hours');
     Route::post('/settings/location-defaults', [SettingsController::class, 'updateLocationDefaults'])->name('settings.location-defaults');
+    Route::post('/settings/installment-settings', [SettingsController::class, 'updateInstallmentSettings'])->name('settings.installment-settings');
 
     Route::post('/session/auto-logout', [AuthController::class, 'autoLogout'])->name('session.auto-logout');
 
@@ -208,6 +209,7 @@ Route::middleware(['auth', 'office-hours'])->group(function () {
     Route::get('reports/registries', [\App\Http\Controllers\ReportsController::class, 'registries'])->name('reports.registries');
     Route::get('reports/payments', [\App\Http\Controllers\ReportsController::class, 'payments'])->name('reports.payments');
     Route::get('reports/sales', [\App\Http\Controllers\ReportsController::class, 'sales'])->name('reports.sales');
+    Route::get('reports/pending-installments', [\App\Http\Controllers\ReportsController::class, 'pendingInstallments'])->name('reports.pending-installments');
 
     // Arazis Map index: list folders under project root `arazis-map` and link to their index.php
     // Serve legacy map PHP files through Laravel to ensure environment variables (DB_*) are available.

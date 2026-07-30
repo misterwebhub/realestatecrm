@@ -181,6 +181,45 @@
             </div>
         </div>
     </div>
+
+    <div class="col-lg-6">
+        <div class="card card-outline card-warning">
+            <div class="card-header">
+                <h5 class="card-title mb-0 fw-bold">Installment Reminder &amp; Overdue Settings</h5>
+            </div>
+            <div class="card-body">
+                <div class="form-text mb-3">
+                    Used by the "Pending Installments" report. Reminder days controls how many days
+                    before an installment's due date it should be flagged as an upcoming reminder.
+                    Overdue days controls how many days past the due date an installment is treated
+                    as <strong>Overdue</strong> instead of <strong>Pending</strong>.
+                </div>
+
+                <form method="POST" action="{{ route('settings.installment-settings') }}">
+                    @csrf
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Reminder Days (before due date)</label>
+                            <input type="number" name="installment_reminder_days" min="0" max="365"
+                                class="form-control @error('installment_reminder_days') is-invalid @enderror"
+                                value="{{ old('installment_reminder_days', $installmentReminderDays) }}" placeholder="e.g. 7">
+                            @error('installment_reminder_days')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Overdue After (days past due date)</label>
+                            <input type="number" name="installment_overdue_days" min="0" max="365"
+                                class="form-control @error('installment_overdue_days') is-invalid @enderror"
+                                value="{{ old('installment_overdue_days', $installmentOverdueDays) }}" placeholder="e.g. 0">
+                            @error('installment_overdue_days')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                        </div>
+                    </div>
+                    <div class="mt-3">
+                        <button type="submit" class="btn btn-warning px-4">Save Installment Settings</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
     @endif
 </div>
 

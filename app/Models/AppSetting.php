@@ -29,6 +29,14 @@ class AppSetting extends Model
     // working the same way unless someone explicitly disables the feature.
     public const RADIUS_LOGIN_ENABLED = 'radius_login_enabled';
 
+    // Company-wide installment reminder/overdue settings, used by the
+    // "Pending Installments" report. Reminder days = how many days before an
+    // installment's due date (CustomerBond.last_date) to start flagging it as
+    // an upcoming reminder. Overdue days = how many days past the due date
+    // before an installment is treated as "Overdue" instead of "Pending".
+    public const INSTALLMENT_REMINDER_DAYS = 'installment_reminder_days';
+    public const INSTALLMENT_OVERDUE_DAYS = 'installment_overdue_days';
+
     public static function get(string $key, $default = null)
     {
         $row = static::query()->where('key', $key)->first();
