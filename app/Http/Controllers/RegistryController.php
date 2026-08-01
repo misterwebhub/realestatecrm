@@ -185,15 +185,10 @@ class RegistryController extends Controller
                         return;
                     }
 
-                    // Area of the registry being saved (plot area, else land_size).
-                    $plotId  = request()->input('plot_id');
-                    $newArea = 0.0;
-                    if ($plotId) {
-                        $newArea = (float) (\App\Models\Plot::whereKey($plotId)->value('area') ?? 0);
-                    }
-                    if ($newArea <= 0) {
-                        $newArea = (float) request()->input('land_size', 0);
-                    }
+                    // Area of the registry being saved. When multiple plots are
+                    // submitted (Plot Sizes table), sum all of their areas —
+                    // otherwise fall back to the single plot/land_size.
+                    $newArea = $this->computeSubmittedArea();
 
                     // Area already registered for this partner across these arazi codes
                     // (excluding this record when editing).
@@ -244,15 +239,10 @@ class RegistryController extends Controller
                         return;
                     }
 
-                    // Area of the registry being saved (its plot's area, falling back to land_size).
-                    $plotId  = request()->input('plot_id');
-                    $newArea = 0.0;
-                    if ($plotId) {
-                        $newArea = (float) (\App\Models\Plot::whereKey($plotId)->value('area') ?? 0);
-                    }
-                    if ($newArea <= 0) {
-                        $newArea = (float) request()->input('land_size', 0);
-                    }
+                    // Area of the registry being saved. When multiple plots are
+                    // submitted (Plot Sizes table), sum all of their areas —
+                    // otherwise fall back to the single plot/land_size.
+                    $newArea = $this->computeSubmittedArea();
 
                     // Sum of area already registered for this arazi + deed (excluding self on edit).
                     $existing = (float) Registry::query()
@@ -320,6 +310,42 @@ class RegistryController extends Controller
         return $payload;
     }
 
+    /**
+     * Total area being submitted for this registry. If the create/edit form's
+     * "Plot Sizes" table (input name="plot_sizes[<plot_id>]") has entries —
+     * i.e. a bond with multiple plots was applied — sum all of their areas
+     * (using the submitted value, falling back to the plot's stored area for
+     * any row without a numeric override). Otherwise fall back to the single
+     * plot_id's area, then to the raw land_size input.
+     */
+    private function computeSubmittedArea(): float
+    {
+        $sizes = request()->input('plot_sizes', []);
+        if (is_array($sizes) && !empty($sizes)) {
+            $total = 0.0;
+            foreach ($sizes as $plotId => $rawValue) {
+                if (is_numeric($rawValue)) {
+                    $total += (float) $rawValue;
+                } else {
+                    $total += (float) (\App\Models\Plot::whereKey($plotId)->value('area') ?? 0);
+                }
+            }
+            if ($total > 0) {
+                return $total;
+            }
+        }
+
+        $plotId = request()->input('plot_id');
+        if ($plotId) {
+            $area = (float) (\App\Models\Plot::whereKey($plotId)->value('area') ?? 0);
+            if ($area > 0) {
+                return $area;
+            }
+        }
+
+        return (float) request()->input('land_size', 0);
+    }
+
     private function nextRegistryCode(): string
     {
         $prefix = 'RGC';
@@ -343,9 +369,106 @@ class RegistryController extends Controller
     public function store(Request $request)
     {
         $this->authorizeCrud('create');
-        $request->validate($this->resourceRules());
+        $validated = $request->validate($this->resourceRules());
+
+        // When the applied bond has multiple plots, the create form's "Plot
+        // Sizes" table submits one plot_sizes[<plot_id>] entry per still-open
+        // plot. In that case every plot needs its own Registry row (a Registry
+        // belongs to exactly one plot) instead of only the first plot getting
+        // registered.
+        $plotSizes = $request->input('plot_sizes', []);
+        $plotIds = is_array($plotSizes) ? array_keys($plotSizes) : [];
+
+        if (count($plotIds) > 1) {
+            return $this->storeForMultiplePlots($request, $validated, $plotIds);
+        }
 
         return $this->crudStore($request);
+    }
+
+    /**
+     * Create one Registry row per plot in a multi-plot bond submission, so
+     * that every plot gets its registry completed (not just the first one).
+     *
+     * The submitted registry_amount/advance_amount are split across the
+     * created rows proportionally to each plot's area share (the last plot
+     * absorbs any rounding remainder), so the sum across all created rows
+     * matches the original submitted totals — this avoids inflating reports
+     * that sum registry_amount (e.g. Registry Report, Dashboard totals).
+     * Every field other than plot_id/land_size/registry_amount/advance_amount
+     * (customer, arazi, deed, witnesses, document, etc.) is shared as-is
+     * across all rows since they describe the one transaction covering all
+     * of this bond's plots.
+     */
+    protected function storeForMultiplePlots(Request $request, array $validated, array $plotIds): \Illuminate\Http\RedirectResponse
+    {
+        $plots = \App\Models\Plot::whereIn('id', $plotIds)->get()->keyBy('id');
+
+        // Keep submission order; drop any ids that don't resolve to a real plot.
+        $orderedPlotIds = array_values(array_filter($plotIds, fn ($id) => $plots->has($id)));
+
+        if (count($orderedPlotIds) <= 1) {
+            // Nothing usable beyond a single plot — fall back to the normal flow.
+            return $this->crudStore($request);
+        }
+
+        $sizesInput = $request->input('plot_sizes', []);
+        $areas = [];
+        $totalArea = 0.0;
+        foreach ($orderedPlotIds as $plotId) {
+            $raw  = $sizesInput[$plotId] ?? null;
+            $area = is_numeric($raw) ? (float) $raw : (float) ($plots[$plotId]->area ?? 0);
+            $areas[$plotId] = $area;
+            $totalArea += $area;
+        }
+
+        $basePayload = $this->resourcePrepareData($validated, $request);
+
+        $totalRegistryAmount = (float) ($basePayload['registry_amount'] ?? 0);
+        $totalAdvanceAmount  = (float) ($basePayload['advance_amount'] ?? 0);
+
+        $count = count($orderedPlotIds);
+        $registryAmountRunning = 0.0;
+        $advanceAmountRunning  = 0.0;
+        $created = [];
+
+        foreach ($orderedPlotIds as $index => $plotId) {
+            $isLast = $index === $count - 1;
+            $share  = $totalArea > 0 ? ($areas[$plotId] / $totalArea) : (1 / $count);
+
+            $payload = $basePayload;
+            $payload['plot_id']   = $plotId;
+            $payload['land_size'] = $areas[$plotId];
+
+            if ($isLast) {
+                $payload['registry_amount'] = round($totalRegistryAmount - $registryAmountRunning, 2);
+                $payload['advance_amount']  = round($totalAdvanceAmount - $advanceAmountRunning, 2);
+            } else {
+                $payload['registry_amount'] = round($totalRegistryAmount * $share, 2);
+                $payload['advance_amount']  = round($totalAdvanceAmount * $share, 2);
+                $registryAmountRunning += $payload['registry_amount'];
+                $advanceAmountRunning  += $payload['advance_amount'];
+            }
+
+            // registry_code / receipt_no must be unique per row — the base
+            // payload's values (generated once for the whole submission) are
+            // only valid for the first plot; every plot after that needs a
+            // freshly generated code/number. customer_reg_no is a legacy
+            // single-value reference, so it's kept on the first row only.
+            if ($index > 0) {
+                $payload['registry_code'] = $this->nextRegistryCode();
+                $payload['receipt_no']    = $this->nextRegistryNumber();
+                unset($payload['customer_reg_no']);
+            }
+
+            $item = Registry::create($payload);
+            $this->resourceAfterSave($item, $request, $validated);
+            $created[] = $item;
+        }
+
+        return redirect()
+            ->route($this->resourceRouteName() . '.index')
+            ->with('success', count($created) . ' Registries created successfully — all ' . count($created) . ' plots in this bond are now registered.');
     }
 
     public function update(Request $request, $id)

@@ -74,7 +74,7 @@ class QuickAccessController extends Controller
                     ['icon' => 'bi-diagram-3',            'color' => 'purple',   'title' => 'Partners',             'desc' => 'Business partners and revenue splits',       'url' => route('partners.index'),            'add_url' => route('partners.create')],
                     ['icon' => 'bi-hourglass-split',      'color' => 'warning',  'title' => 'Waiting Payments',     'desc' => 'Registry payments pending clearance',        'url' => route('registries.waiting-payments'),'add_url' => null],
                     ['icon' => 'bi-bar-chart-line',       'color' => 'info',     'title' => 'Plot Details Report',  'desc' => 'Detailed report by arazi / plot',            'url' => route('reports.plot.details'),      'add_url' => null],
-                    ['icon' => 'bi-alarm',                'color' => 'danger',   'title' => 'Pending Installments',  'desc' => 'Overdue/pending installments by bond & customer', 'url' => route('reports.pending-installments'), 'add_url' => null],
+                    ['icon' => 'bi-alarm',                'color' => 'danger',   'title' => 'Pending Installments',  'desc' => 'Dynamic EMI report with auto status: On Time/Partial/Ahead/Overdue/Fully Paid', 'url' => route('reports.pending-installments'), 'add_url' => null],
                 ],
             ];
         }

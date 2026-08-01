@@ -12,6 +12,8 @@ use App\Models\Partner;
 use App\Models\Plot;
 use App\Models\Registry;
 use App\Models\User;
+use App\Services\EmiCalculator;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 
 class ReportsController extends Controller
@@ -441,138 +443,137 @@ class ReportsController extends Controller
     }
 
     /**
-     * Pending Installments report: one row per bond that has an installment
-     * due date (last_date) and a remaining balance, broken down by how much
-     * has been paid via cheque, cash, and any other method — plus the
-     * balance, the installment amount, and an Overdue/Pending status
-     * computed from the company-wide "installment overdue days" setting
-     * (AppSetting::INSTALLMENT_OVERDUE_DAYS) compared against last_date.
-     * Bonds with a zero/negative balance are fully paid and are excluded.
+     * Pending Installments / EMI report: one row per bond with a valid EMI
+     * schedule (installment count + first due date). Everything — Finance
+     * Amount, Monthly EMI, Expected-till-date, Outstanding, Credit, last/next
+     * EMI — is derived dynamically from the bond's payment history via
+     * EmiCalculator. No individual installment rows are stored anywhere, so
+     * partial payments, bulk/multi-month payments, and large advance
+     * payments are all handled automatically without manual adjustment.
+     * Fully paid bonds are hidden unless explicitly filtered for.
      */
     public function pendingInstallments(Request $request)
     {
         $customerId = $request->query('customer_id', '');
         $bondId     = $request->query('bond_id', '');
         $araziCode  = $request->query('arazi_code', '');
-        $status     = $request->query('status', ''); // overdue|pending
-        $dateFrom   = $request->query('date_from', '');
-        $dateTo     = $request->query('date_to', '');
+        $status     = $request->query('status', ''); // overdue|partial|ahead|on_time|fully_paid
+        $dateFromRaw = $request->query('date_from', '');
+        $dateToRaw   = $request->query('date_to', '');
 
         $overdueDays  = (int) (AppSetting::get(AppSetting::INSTALLMENT_OVERDUE_DAYS) ?? 0);
         $reminderDays = (int) (AppSetting::get(AppSetting::INSTALLMENT_REMINDER_DAYS) ?? 0);
 
-        $bondsQuery = CustomerBond::with(['customer', 'arazi', 'plots', 'payments'])
+        $today = now()->startOfDay();
+
+        // Default "Due Date From/To" window (per Settings → Installment
+        // Reminder & Overdue Settings): From = today, To = today + Reminder
+        // Days, so the report surfaces installments due now through the
+        // upcoming reminder window out of the box. Bonds that are already
+        // unpaid past their due date (Partial/Overdue — governed by the
+        // Overdue Days setting) always show regardless of this window; the
+        // user can widen/narrow the window manually via the filter form.
+        $dateFrom = $dateFromRaw !== '' ? $dateFromRaw : $today->format('Y-m-d');
+        $dateTo   = $dateToRaw !== '' ? $dateToRaw : $today->copy()->addDays($reminderDays)->format('Y-m-d');
+
+        try {
+            $dateFromC = Carbon::parse($dateFrom)->startOfDay();
+        } catch (\Throwable $e) {
+            $dateFromC = $today->copy();
+        }
+        try {
+            $dateToC = Carbon::parse($dateTo)->endOfDay();
+        } catch (\Throwable $e) {
+            $dateToC = $today->copy()->addDays($reminderDays)->endOfDay();
+        }
+
+        $bondsQuery = CustomerBond::with(['customer', 'arazi', 'payments'])
             ->whereNotNull('last_date')
+            ->where('installment_amount', '>', 0)
             ->when($customerId, fn ($q) => $q->where('customer_id', $customerId))
             ->when($bondId,     fn ($q) => $q->where('id', $bondId))
             ->when($araziCode,  fn ($q) => $q->where('arazi_code', $araziCode))
-            ->when($dateFrom,   fn ($q) => $q->whereDate('last_date', '>=', $dateFrom))
-            ->when($dateTo,     fn ($q) => $q->whereDate('last_date', '<=', $dateTo))
             ->orderBy('last_date');
 
         // Non-admins only see their own bonds; admins see everything.
         $bonds = $this->ownScope($bondsQuery)->get();
 
-        // Plot ids that already have a registry record — drives the per-plot Y/N badge.
-        $plotIdsWithRegistry = Registry::whereNotNull('plot_id')->distinct()->pluck('plot_id')->flip()->all();
-
-        $debitTypes = ['return', 'discount'];
-        $today = now()->startOfDay();
-
-        $sumByMethod = function ($payments, string $bucket) use ($debitTypes) {
-            $matching = $payments->filter(function ($p) use ($bucket) {
-                $m = strtolower(trim((string) $p->payment_method));
-                if ($bucket === 'cash') return $m === 'cash';
-                if ($bucket === 'cheque') return $m === 'cheque';
-                // "other" bucket = everything else, including rtgs/imps/upi/other and blank/null.
-                return $m !== 'cash' && $m !== 'cheque';
-            });
-
-            return (float) $matching->whereNotIn('entry_type', $debitTypes)->sum('amount')
-                 - (float) $matching->whereIn('entry_type', $debitTypes)->sum('amount');
-        };
-
         $rows = [];
-        $gTotal = $gPaidCash = $gPaidCheque = $gPaidOther = $gBalance = $gInstallment = 0;
+        $gBondAmount = $gAdvance = $gFinance = $gExpected = $gPaid = $gOutstanding = $gCredit = $gRemaining = 0.0;
 
         foreach ($bonds as $bond) {
-            $payments = $bond->payments;
+            $emi = EmiCalculator::calculate($bond, $today, $overdueDays);
 
-            $paidAll = (float) $payments->whereNotIn('entry_type', $debitTypes)->sum('amount')
-                     - (float) $payments->whereIn('entry_type', $debitTypes)->sum('amount');
-
-            $total   = (float) ($bond->total_amount ?? $bond->bond_amount ?? 0);
-            $balance = round($total - $paidAll, 2);
-
-            // "Pending Installments" only makes sense for bonds still owed money.
-            if ($balance <= 0.009) {
+            // This is a "pending" report — hide bonds that are fully paid off
+            // unless the user explicitly asks to see the Fully Paid bucket.
+            if ($emi['is_fully_paid'] && $status !== EmiCalculator::STATUS_FULLY_PAID) {
                 continue;
             }
 
-            $dueDate = $bond->last_date instanceof \Carbon\Carbon
-                ? $bond->last_date
-                : \Carbon\Carbon::parse($bond->last_date)->startOfDay();
+            if ($status !== '' && $emi['status'] !== $status) {
+                continue;
+            }
 
-            // Days past the installment due date; negative means not yet due.
-            $daysPastDue = $dueDate->lessThan($today)
-                ? $dueDate->diffInDays($today)
-                : -$dueDate->diffInDays($today);
+            // The Due Date From/To window filters *upcoming* next-EMI dates
+            // (On Time / Ahead of Schedule bonds). Anything already unpaid
+            // past its due date (Partial/Overdue) is an "overdue" condition
+            // governed solely by the Overdue Days setting, so it always
+            // surfaces regardless of the date window.
+            $hasOutstanding = $emi['outstanding'] > 0.009;
+            if (! $hasOutstanding && $emi['next_due_date']) {
+                if ($emi['next_due_date']->lt($dateFromC) || $emi['next_due_date']->gt($dateToC)) {
+                    continue;
+                }
+            }
 
-            $isOverdue = $daysPastDue > $overdueDays;
-            $rowStatus = $isOverdue ? 'Overdue' : 'Pending';
+            $meta = EmiCalculator::statusMeta($emi['status']);
 
-            if ($status === 'overdue' && ! $isOverdue) continue;
-            if ($status === 'pending' && $isOverdue) continue;
-
-            // Upcoming-reminder flag (informational only — not a filter option):
-            // due within the configured reminder window and not yet overdue.
-            $isReminder = ! $isOverdue && $daysPastDue >= -$reminderDays;
-
-            $paidCash   = $sumByMethod($payments, 'cash');
-            $paidCheque = $sumByMethod($payments, 'cheque');
-            $paidOther  = $sumByMethod($payments, 'other');
-
-            $code = $bond->arazi_code ?: ($bond->arazi?->legacy_arazi_code ?? '-');
-            $plotsData = $bond->plots->map(fn ($pl) => [
-                'label'    => $pl->title ?: ('Plot-' . $pl->id),
-                'gaz'      => (float) ($pl->area ?? 0),
-                'registry' => isset($plotIdsWithRegistry[$pl->id]) ? 'Y' : 'N',
-            ])->values()->all();
-
-            // `installment_amount` is a legacy misnomer — it actually stores the
-            // number of installments (months) the bond is split into, not a rupee
-            // amount. The real per-installment due amount is the bond total spread
-            // evenly across that many installments.
-            $noOfInstallments = (int) $bond->installment_amount;
-            $dueAmount = $noOfInstallments > 0 ? round($total / $noOfInstallments, 2) : null;
+            // Reminder flag: next EMI falls due within the configured reminder
+            // window and the bond isn't already behind on anything.
+            $isReminder = false;
+            if ($emi['next_due_date'] && in_array($emi['status'], [EmiCalculator::STATUS_ON_TIME, EmiCalculator::STATUS_AHEAD], true)) {
+                $daysToNextDue = $today->diffInDays($emi['next_due_date'], false);
+                $isReminder = $daysToNextDue >= 0 && $daysToNextDue <= $reminderDays;
+            }
 
             $rows[] = [
-                'bond_id'             => $bond->id,
-                'bond_no'             => $bond->bond_no ?? ('BOND-' . $bond->id),
-                'bond_date'           => optional($bond->bond_date)->format('d-m-Y'),
-                'customer'            => $bond->customer?->name ?? '—',
-                'customer_mobile'     => $bond->customer?->mobile ?? '—',
-                'arazi'               => $code,
-                'plots'               => $plotsData,
-                'last_date'           => $dueDate->format('d-m-Y'),
-                'days_past_due'       => $daysPastDue,
-                'no_of_installments'  => $bond->installment_amount,
-                'due_amount'          => $dueAmount,
-                'total'               => round($total, 2),
-                'paid_cheque'         => round($paidCheque, 2),
-                'paid_cash'           => round($paidCash, 2),
-                'paid_other'          => round($paidOther, 2),
-                'balance'             => $balance,
-                'status'              => $rowStatus,
-                'is_reminder'         => $isReminder,
+                'bond_id'            => $bond->id,
+                'bond_no'            => $bond->bond_no ?? ('BOND-' . $bond->id),
+                'bond_date'          => optional($bond->bond_date)->format('d-m-Y'),
+                'customer'           => $bond->customer?->name ?? '—',
+                'customer_mobile'    => $bond->customer?->mobile ?? '—',
+                'bond_amount'        => $emi['bond_amount'],
+                'advance_amount'     => $emi['advance_amount'],
+                'finance_amount'     => $emi['finance_amount'],
+                'total_installments' => $emi['total_installments'],
+                'monthly_emi'        => $emi['monthly_emi'],
+                'expected_till_date' => $emi['expected_till_date'],
+                'total_paid'         => $emi['total_paid'],
+                'outstanding'        => $emi['outstanding'],
+                'credit'             => $emi['credit'],
+                'remaining_balance'  => $emi['remaining_balance'],
+                'last_emi_number'    => $emi['last_emi_number'],
+                'last_emi_amount'    => $emi['last_emi_amount'],
+                'last_emi_date'      => $emi['last_emi_date']?->format('d-m-Y'),
+                'next_emi_number'    => $emi['next_emi_number'],
+                'next_emi_amount'    => $emi['next_emi_amount'],
+                'next_due_date'      => $emi['next_due_date']?->format('d-m-Y'),
+                'overdue_human'      => $emi['overdue_human'],
+                'is_reminder'        => $isReminder,
+                'status'             => $emi['status'],
+                'status_label'       => $meta['label'],
+                'status_emoji'       => $meta['emoji'],
+                'status_badge'       => $meta['badge'],
             ];
 
-            $gTotal += $total;
-            $gPaidCash += $paidCash;
-            $gPaidCheque += $paidCheque;
-            $gPaidOther += $paidOther;
-            $gBalance += $balance;
-            $gInstallment += (float) $bond->installment_amount;
+            $gBondAmount  += $emi['bond_amount'];
+            $gAdvance     += $emi['advance_amount'];
+            $gFinance     += $emi['finance_amount'];
+            $gExpected    += $emi['expected_till_date'];
+            $gPaid        += $emi['total_paid'];
+            $gOutstanding += $emi['outstanding'];
+            $gCredit      += $emi['credit'];
+            $gRemaining   += $emi['remaining_balance'];
         }
 
         if (strtolower((string) $request->query('export')) === 'csv') {
@@ -580,7 +581,7 @@ class ReportsController extends Controller
                 'Customer'      => $customerId ? optional(\App\Models\Customer::find($customerId))->name : 'All',
                 'Bond'          => $bondId ? optional(CustomerBond::find($bondId))->bond_no : 'All',
                 'Arazi'         => $araziCode !== '' ? $araziCode : 'All',
-                'Status'        => $status !== '' ? ucfirst($status) : 'All',
+                'Status'        => $status !== '' ? EmiCalculator::statusMeta($status)['label'] : 'All',
                 'Due Date From' => $dateFrom !== '' ? $dateFrom : 'All',
                 'Due Date To'   => $dateTo !== '' ? $dateTo : 'All',
                 'Overdue After (days)'  => $overdueDays,
@@ -589,11 +590,11 @@ class ReportsController extends Controller
 
             $filename = 'pending-installments-' . now()->format('Ymd-His') . '.csv';
 
-            return response()->streamDownload(function () use ($rows, $filters, $gTotal, $gPaidCheque, $gPaidCash, $gPaidOther, $gBalance, $gInstallment) {
+            return response()->streamDownload(function () use ($rows, $filters, $gBondAmount, $gAdvance, $gFinance, $gExpected, $gPaid, $gOutstanding, $gCredit, $gRemaining) {
                 $out = fopen('php://output', 'w');
                 fwrite($out, "\xEF\xBB\xBF");
 
-                fputcsv($out, ['Pending Installments Report']);
+                fputcsv($out, ['Pending Installments / EMI Report']);
                 fputcsv($out, ['Generated', now()->format('d-m-Y H:i')]);
                 fputcsv($out, []);
                 fputcsv($out, ['Filters Applied']);
@@ -603,45 +604,56 @@ class ReportsController extends Controller
                 fputcsv($out, []);
 
                 fputcsv($out, [
-                    '#', 'Bond', 'Bond Date', 'Customer', 'Mobile', 'Arazi', 'Plots',
-                    'Installment Due Date', 'Days Past Due', 'Bond Amount',
-                    'No. of Installments', 'Due Amount',
-                    'Paid (Cheque)', 'Paid (Cash)', 'Paid (Other)', 'Balance', 'Status',
+                    '#', 'Bond', 'Bond Date', 'Customer', 'Mobile',
+                    'Bond Amount', 'Advance', 'Finance Amount', 'No. of Installments', 'Monthly EMI',
+                    'Expected Till Date', 'Total Paid', 'Outstanding', 'Credit', 'Remaining Balance',
+                    'Last EMI #', 'Last EMI Date', 'Last EMI Amount',
+                    'Next EMI #', 'Next Due Date', 'Next EMI Amount',
+                    'Overdue', 'Status',
                 ]);
 
                 foreach ($rows as $i => $r) {
-                    $plots = collect($r['plots'])->map(fn ($pl) => ($pl['label'] ?: '-') . ' (' . rtrim(rtrim(number_format($pl['gaz'], 2), '0'), '.') . ' gaz, Registry: ' . $pl['registry'] . ')')->implode('; ');
                     fputcsv($out, [
                         $i + 1,
                         $r['bond_no'],
                         $r['bond_date'] ?: '-',
                         $r['customer'],
                         $r['customer_mobile'],
-                        $r['arazi'],
-                        $plots,
-                        $r['last_date'],
-                        $r['days_past_due'],
-                        number_format($r['total'], 2, '.', ''),
-                        $r['no_of_installments'],
-                        $r['due_amount'] !== null ? number_format($r['due_amount'], 2, '.', '') : '-',
-                        number_format($r['paid_cheque'], 2, '.', ''),
-                        number_format($r['paid_cash'], 2, '.', ''),
-                        number_format($r['paid_other'], 2, '.', ''),
-                        number_format($r['balance'], 2, '.', ''),
-                        $r['status'],
+                        number_format($r['bond_amount'], 2, '.', ''),
+                        number_format($r['advance_amount'], 2, '.', ''),
+                        number_format($r['finance_amount'], 2, '.', ''),
+                        $r['total_installments'],
+                        number_format($r['monthly_emi'], 2, '.', ''),
+                        number_format($r['expected_till_date'], 2, '.', ''),
+                        number_format($r['total_paid'], 2, '.', ''),
+                        number_format($r['outstanding'], 2, '.', ''),
+                        number_format($r['credit'], 2, '.', ''),
+                        number_format($r['remaining_balance'], 2, '.', ''),
+                        $r['last_emi_number'] ?? '-',
+                        $r['last_emi_date'] ?? '-',
+                        $r['last_emi_amount'] !== null ? number_format($r['last_emi_amount'], 2, '.', '') : '-',
+                        $r['next_emi_number'] ?? '-',
+                        $r['next_due_date'] ?? '-',
+                        $r['next_emi_amount'] !== null ? number_format($r['next_emi_amount'], 2, '.', '') : '-',
+                        $r['overdue_human'] ?? '-',
+                        $r['status_label'],
                     ]);
                 }
 
                 fputcsv($out, []);
                 fputcsv($out, [
-                    'GRAND TOTAL', '', '', '', '', '', '', '', '',
-                    number_format($gTotal, 2, '.', ''),
-                    '', '',
-                    number_format($gPaidCheque, 2, '.', ''),
-                    number_format($gPaidCash, 2, '.', ''),
-                    number_format($gPaidOther, 2, '.', ''),
-                    number_format($gBalance, 2, '.', ''),
+                    'GRAND TOTAL', '', '', '', '',
+                    number_format($gBondAmount, 2, '.', ''),
+                    number_format($gAdvance, 2, '.', ''),
+                    number_format($gFinance, 2, '.', ''),
                     '',
+                    '',
+                    number_format($gExpected, 2, '.', ''),
+                    number_format($gPaid, 2, '.', ''),
+                    number_format($gOutstanding, 2, '.', ''),
+                    number_format($gCredit, 2, '.', ''),
+                    number_format($gRemaining, 2, '.', ''),
+                    '', '', '', '', '', '', '', '',
                 ]);
 
                 fclose($out);
@@ -649,7 +661,7 @@ class ReportsController extends Controller
         }
 
         return view('reports.pending_installments', [
-            'title'         => 'Pending Installments Report',
+            'title'         => 'Pending Installments / EMI Report',
             'rows'          => $rows,
             'customers'     => \App\Models\Customer::orderBy('name')->get(['id', 'name']),
             'bondsList'     => CustomerBond::whereNotNull('last_date')->orderBy('bond_no')->get(['id', 'bond_no']),
@@ -662,12 +674,98 @@ class ReportsController extends Controller
             'dateTo'        => $dateTo,
             'overdueDays'   => $overdueDays,
             'reminderDays'  => $reminderDays,
-            'g_total'       => round($gTotal, 2),
-            'g_paid_cheque' => round($gPaidCheque, 2),
-            'g_paid_cash'   => round($gPaidCash, 2),
-            'g_paid_other'  => round($gPaidOther, 2),
-            'g_balance'     => round($gBalance, 2),
-            'g_installment' => round($gInstallment, 2),
+            'g_bond_amount' => round($gBondAmount, 2),
+            'g_advance'     => round($gAdvance, 2),
+            'g_finance'     => round($gFinance, 2),
+            'g_expected'    => round($gExpected, 2),
+            'g_paid'        => round($gPaid, 2),
+            'g_outstanding' => round($gOutstanding, 2),
+            'g_credit'      => round($gCredit, 2),
+            'g_remaining'   => round($gRemaining, 2),
+        ]);
+    }
+
+    /**
+     * Customer/Bond EMI Detail screen: full financial summary for one bond
+     * plus a dynamically-computed payment-history ledger (running total,
+     * outstanding, and credit as of each transaction's own date). Nothing
+     * here is read from stored installment rows — it's all recomputed from
+     * EmiCalculator + the bond's raw payment history every time.
+     */
+    public function emiDetail(CustomerBond $customerBond)
+    {
+        $customerBond->load([
+            'customer',
+            'arazi',
+            'payments' => fn ($q) => $q->orderBy('entry_date')->orderBy('id'),
+        ]);
+
+        $overdueDays = (int) (AppSetting::get(AppSetting::INSTALLMENT_OVERDUE_DAYS) ?? 0);
+        $today = now()->startOfDay();
+
+        $emi = EmiCalculator::calculate($customerBond, $today, $overdueDays);
+        $meta = EmiCalculator::statusMeta($emi['status']);
+
+        $dueDate = $emi['due_date'];
+        $monthlyEmi = $emi['monthly_emi'];
+        $totalInstallments = $emi['total_installments'];
+
+        $history = [];
+        $runningEmiTotal = 0.0;
+
+        foreach ($customerBond->payments as $p) {
+            $isAdvance = in_array($p->entry_type, EmiCalculator::ADVANCE_TYPES, true);
+            $isDebit   = in_array($p->entry_type, EmiCalculator::DEBIT_TYPES, true);
+            $amount    = (float) $p->amount;
+
+            $entryDate = $p->entry_date instanceof \Carbon\Carbon ? $p->entry_date : \Carbon\Carbon::parse($p->entry_date);
+
+            $runningTotal = null;
+            $outstandingAtDate = null;
+            $creditAtDate = null;
+            $remarks = trim((string) $p->remarks);
+
+            if ($isAdvance) {
+                $remarks = trim(($remarks !== '' ? $remarks . ' — ' : '') . 'Booking/Advance amount — excluded from EMI schedule');
+            } else {
+                $runningEmiTotal += $isDebit ? -$amount : $amount;
+                $runningEmiTotal = max($runningEmiTotal, 0.0);
+                $runningTotal = round($runningEmiTotal, 2);
+
+                $emisDueAtDate = 0;
+                if ($dueDate && $totalInstallments > 0 && ! $dueDate->greaterThan($entryDate)) {
+                    $emisDueAtDate = min($dueDate->diffInMonths($entryDate) + 1, $totalInstallments);
+                }
+                $expectedAtDate = round($emisDueAtDate * $monthlyEmi, 2);
+                $outstandingAtDate = round(max($expectedAtDate - $runningEmiTotal, 0), 2);
+                $creditAtDate = round(max($runningEmiTotal - $expectedAtDate, 0), 2);
+
+                if ($isDebit) {
+                    $remarks = trim(($remarks !== '' ? $remarks . ' — ' : '') . ucfirst($p->entry_type) . ' (deducted)');
+                }
+            }
+
+            $history[] = [
+                'date'          => $entryDate->format('d-m-Y'),
+                'amount'        => $amount,
+                'is_debit'      => $isDebit,
+                'is_advance'    => $isAdvance,
+                'type'          => ucfirst($p->entry_type ?: 'payment'),
+                'mode'          => $p->payment_method ?: '—',
+                'running_total' => $runningTotal,
+                'outstanding'   => $outstandingAtDate,
+                'credit'        => $creditAtDate,
+                'remarks'       => $remarks !== '' ? $remarks : '—',
+            ];
+        }
+
+        return view('reports.emi_detail', [
+            'title'       => 'EMI Detail — ' . ($customerBond->bond_no ?? ('BOND-' . $customerBond->id)),
+            'bond'        => $customerBond,
+            'emi'         => $emi,
+            'meta'        => $meta,
+            'history'     => array_reverse($history),
+            'overdueDays' => $overdueDays,
         ]);
     }
 
