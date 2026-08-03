@@ -172,6 +172,15 @@
                     </div>
                 </div>
 
+                <div class="col-12">
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" name="allow_backdated_payments" id="allow_backdated_payments" value="1"
+                            {{ old('allow_backdated_payments', $item?->allow_backdated_payments ?? false) ? 'checked' : '' }}>
+                        <label class="form-check-label fw-semibold" for="allow_backdated_payments">Allow Back-Dated Payment Entries</label>
+                    </div>
+                    <div class="form-text">When enabled, this user may set a Customer Payment's Entry Date to a date earlier than today. Everyone else is restricted to today or a future date.</div>
+                </div>
+
                 {{-- Password (create: always shown & required. edit: Super Admin only —
                      other users must use the account's own change-password flow, not
                      silently overwrite another user's credentials here.) --}}

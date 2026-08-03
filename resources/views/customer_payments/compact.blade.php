@@ -18,7 +18,11 @@
                     <div class="row g-3 mb-3">
                         <div class="col-md-6">
                             <label class="form-label">Entry Date</label>
-                            <input type="date" id="entry_date" name="entry_date" class="form-control" value="{{ now()->format('Y-m-d') }}">
+                            <input type="date" id="entry_date" name="entry_date" class="form-control" value="{{ now()->format('Y-m-d') }}"
+                                @unless(auth()->user()?->canBackdatePayments()) min="{{ now()->format('Y-m-d') }}" @endunless>
+                            @unless(auth()->user()?->canBackdatePayments())
+                                <div class="form-text">You are not allowed to enter a back-dated (past) Entry Date.</div>
+                            @endunless
                         </div>
                         <div class="col-md-6">
                             <label class="form-label">Entry Type</label>
@@ -484,7 +488,16 @@
                 amountInput.removeAttribute('readonly'); amountInput.classList.remove('bg-light');
                 toggleMtrField();
             } else {
-                alert('Save failed: ' + (json.error || 'Unknown error'));
+                // Laravel validation failures (422) return {message, errors:{field:[...]}},
+                // while our own store() catch block returns {error: '...'}. Prefer the
+                // specific field message (e.g. the back-dated Entry Date rejection) over
+                // a generic fallback so the user sees the real reason.
+                let msg = json.error;
+                if(!msg && json.errors){
+                    const firstField = Object.keys(json.errors)[0];
+                    msg = firstField ? json.errors[firstField][0] : null;
+                }
+                alert('Save failed: ' + (msg || json.message || 'Unknown error'));
             }
         }catch(e){ alert('Save failed.'); }
         finally { submitBtn.disabled = false; submitBtn.textContent = 'Save Payment'; }

@@ -37,6 +37,7 @@ class User extends Authenticatable
         'office_end_time',
         'allow_after_hours',
         'disable_radius_login',
+        'allow_backdated_payments',
     ];
 
     /**
@@ -63,6 +64,7 @@ class User extends Authenticatable
         'allowed_radius_meters' => 'integer',
         'allow_after_hours' => 'boolean',
         'disable_radius_login' => 'boolean',
+        'allow_backdated_payments' => 'boolean',
     ];
 
     public function payments()
@@ -109,6 +111,17 @@ class User extends Authenticatable
     public function isExemptFromRestrictions(): bool
     {
         return $this->isSuperAdmin();
+    }
+
+    /**
+     * True when this user is allowed to set a Customer Payment's Entry Date
+     * to a date earlier than today (a "back entry"). Super Admin can always
+     * back-date; everyone else needs the per-user toggle explicitly enabled
+     * from User Master.
+     */
+    public function canBackdatePayments(): bool
+    {
+        return $this->isSuperAdmin() || (bool) $this->allow_backdated_payments;
     }
 
     /**

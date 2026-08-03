@@ -387,10 +387,15 @@
                                     value="{{ $value }}"
                                     class="form-control"
                                     @if(isset($field['step'])) step="{{ $field['step'] }}" @endif
+                                    @if(isset($field['min'])) min="{{ $field['min'] }}" @endif
+                                    @if(isset($field['max'])) max="{{ $field['max'] }}" @endif
                                     @if(isset($field['placeholder'])) placeholder="{{ $field['placeholder'] }}" @endif
                                     @if(!empty($field['required'])) required @endif
                                     @if(!empty($field['readonly'])) readonly @endif
                                 >
+                            @endif
+                            @if(!empty($field['help']) && ($field['type'] ?? 'text') !== 'readonly_text')
+                                <div class="form-text">{{ $field['help'] }}</div>
                             @endif
 
                             <!-- @if(($field['name'] ?? '') === 'sale_amount_per_gaz')

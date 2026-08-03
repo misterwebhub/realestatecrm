@@ -106,11 +106,13 @@
                     <div class="col-md-auto">
                         <button type="submit" class="btn btn-success btn-sm px-4"><i class="bi bi-check2-circle me-1"></i>Assign Selected</button>
                     </div>
+                    @can('cheques.delete')
                     <div class="col-md-auto">
                         <button type="submit" formaction="{{ route('customer-bond-cheques.bulk-delete') }}" formnovalidate
                             onclick="return confirm('Delete the selected cheque(s)? This cannot be undone.');"
                             class="btn btn-danger btn-sm px-4"><i class="bi bi-trash me-1"></i>Delete Selected</button>
                     </div>
+                    @endcan
                 </div>
 
                 <div class="row g-2 align-items-center mb-2">

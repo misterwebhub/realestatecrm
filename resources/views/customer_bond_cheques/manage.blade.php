@@ -218,7 +218,11 @@
                                     </select>
                                 </td>
                                 <td><input name="cheques[{{ $i }}][notes]" class="form-control form-control-sm" value="{{ $c->notes }}"></td>
-                                <td class="text-center"><button type="button" class="btn btn-danger btn-sm btn-remove px-2">✕</button></td>
+                                <td class="text-center">
+                                    @can('cheques.delete')
+                                        <button type="button" class="btn btn-danger btn-sm btn-remove px-2">✕</button>
+                                    @endcan
+                                </td>
                             </tr>
                         @endforeach
                     </tbody>
@@ -333,6 +337,11 @@
 
 <script>
     (function(){
+        // Defense in depth: even if a remove button somehow renders for a saved
+        // row, only a user with the "cheques.delete" permission may actually
+        // queue it for deletion. The backend (storeBulk/destroy/bulkDelete)
+        // enforces this independently either way.
+        const canDeleteCheques = @json(auth()->user()?->can('cheques.delete') ?? false);
         const table  = document.getElementById('chequesTable').querySelector('tbody');
         const tpl    = document.getElementById('rowTemplate').innerHTML;
         const addBtn = document.getElementById('addRow');
@@ -371,6 +380,10 @@
             if(!btn) return;
             const tr = btn.closest('tr');
             const existingId = tr?.getAttribute('data-id');
+            if(existingId && !canDeleteCheques){
+                alert('You are not allowed to delete cheques.');
+                return;
+            }
             if(existingId){
                 const hidden = document.createElement('input');
                 hidden.type = 'hidden'; hidden.name = 'deleted_ids[]'; hidden.value = existingId;
