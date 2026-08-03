@@ -75,6 +75,7 @@ class CustomerBondPaymentController extends Controller
         $bondQ       = trim((string) $request->input('bond', ''));
         $araziCode   = trim((string) $request->input('arazi_code', ''));
         $plotQ       = trim((string) $request->input('plot', ''));
+        $brokerQ     = trim((string) $request->input('broker', ''));
         $entryType   = trim((string) $request->input('entry_type', ''));
         $creditDebit = trim((string) $request->input('credit_debit', ''));
         $dateFrom    = trim((string) $request->input('date_from', ''));
@@ -111,6 +112,13 @@ class CustomerBondPaymentController extends Controller
         if ($plotQ !== '') {
             $query->whereHas('plot', fn($p) =>
                 $p->where('title', $plotQ) // exact — plot title behaves like a plot number, never LIKE
+            );
+        }
+
+        // Search by broker name (the bond's assigned broker/agent)
+        if ($brokerQ !== '') {
+            $query->whereHas('customerBond.broker', fn($b) =>
+                $b->where('name', 'like', '%'.$brokerQ.'%')
             );
         }
 
@@ -171,6 +179,7 @@ class CustomerBondPaymentController extends Controller
             'cp_bond'                => $bondQ,
             'cp_arazi'               => $araziCode,
             'cp_plot'                => $plotQ,
+            'cp_broker'              => $brokerQ,
             'cp_entry_type'          => $entryType,
             'cp_credit_debit'        => $creditDebit,
             'cp_date_from'           => $dateFrom,
@@ -455,7 +464,7 @@ class CustomerBondPaymentController extends Controller
 
     protected function resourceColumns(): array
     {
-        return ['Entry No', 'Bond Date', 'Bond', 'Customer', 'Arazi', 'Plot', 'Land Size', 'Entry Date', 'Type', 'Credit', 'Debit', 'Method', 'MTR / Cheque No', 'Payee Name / Account Name', 'Taken By', 'Created'];
+        return ['Entry No', 'Bond Date', 'Bond', 'Customer', 'Arazi / Plot / Broker', 'Land Size', 'Entry Date', 'Type', 'Credit', 'Debit', 'Method', 'MTR / Cheque No', 'Payee Name / Account Name', 'Taken By', 'Created'];
     }
 
     protected function resourceFields(?Model $item = null): array
@@ -709,7 +718,7 @@ class CustomerBondPaymentController extends Controller
     protected function resourceQuery()
     {
         return $this->applyOwnershipScope(
-            CustomerBondPayment::with(['customerBond.customer', 'customer', 'arazi', 'plot', 'takenByUser', 'cheque.connectedAccount'])
+            CustomerBondPayment::with(['customerBond.customer', 'customerBond.broker', 'customerBond.plots', 'customer', 'arazi', 'plot', 'takenByUser', 'cheque.connectedAccount'])
                 ->whereNotNull('customer_bond_id')
                 ->latest()
         );
@@ -718,14 +727,36 @@ class CustomerBondPaymentController extends Controller
     protected function resourceRow(Model $item): array
     {
         /** @var CustomerBondPayment $item */
+        $bond = $item->customerBond;
+
+        // Prefer every plot on the bond (so the merged column shows the full
+        // picture even if this particular payment entry is only tied to one
+        // plot_id); fall back to just this payment's own plot.
+        $plotSource = $bond && $bond->relationLoaded('plots') && $bond->plots->isNotEmpty()
+            ? $bond->plots
+            : collect($item->plot ? [$item->plot] : []);
+
+        $plotRows = $plotSource->map(fn($p) => [
+            'title' => $p->title ?? ('Plot-'.$p->id),
+            'area'  => $p->area ? $p->area.' gaz' : '-',
+        ])->all();
+
         return [
             'cells' => [
                 $item->entry_no,
-                optional($item->customerBond?->bond_date)->format('d-m-Y') ?? '-',
-                $item->customerBond?->bond_no ?? '-',
-                $item->customer?->name ?? $item->customerBond?->customer?->name ?? '-',
-                $item->arazi?->legacy_arazi_code ?? '-',
-                $item->plot?->title ?? '-',
+                optional($bond?->bond_date)->format('d-m-Y') ?? '-',
+                $bond?->bond_no ?? '-',
+                $item->customer?->name ?? $bond?->customer?->name ?? '-',
+                [
+                    'type'   => 'arazi_plot_broker',
+                    'arazi'  => $item->arazi?->legacy_arazi_code ?? '-',
+                    'plots'  => $plotRows,
+                    'broker' => $bond?->broker?->name ?? '-',
+                    // flat text fallback used by CSV export (see ManagesCrud::exportCsv)
+                    'csv'    => 'Arazi: ' . ($item->arazi?->legacy_arazi_code ?? '-')
+                        . ' | Plot: ' . ($plotRows ? collect($plotRows)->map(fn ($p) => $p['title'] . ' (' . $p['area'] . ')')->implode(', ') : '-')
+                        . ' | Broker: ' . ($bond?->broker?->name ?? '-'),
+                ],
                 (string) ($item->land_size ?? '-'),
                 optional($item->entry_date)->format('d-m-Y') ?? '-',
                 ucfirst($item->entry_type),

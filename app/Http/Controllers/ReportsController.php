@@ -215,7 +215,11 @@ class ReportsController extends Controller
         }
 
         // Plot ids that already have a registry record — drives the per-plot Y/N badge.
-        $plotIdsWithRegistry = Registry::whereNotNull('plot_id')->distinct()->pluck('plot_id')->flip()->all();
+        // Includes both the legacy singular plot_id column and every plot attached
+        // via the registry_plot pivot (multi-plot registries).
+        $plotIdsWithRegistry = Registry::whereNotNull('plot_id')->distinct()->pluck('plot_id')
+            ->merge(\Illuminate\Support\Facades\DB::table('registry_plot')->distinct()->pluck('plot_id'))
+            ->unique()->flip()->all();
 
         $inRange = function ($date) use ($dateFrom, $dateTo) {
             if (! $date) return false;

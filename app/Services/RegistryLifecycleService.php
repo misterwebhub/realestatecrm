@@ -12,7 +12,7 @@ class RegistryLifecycleService
         $expiredCount = 0;
 
         Registry::query()
-            ->with('arazi')
+            ->with(['arazi', 'plot', 'plots'])
             ->where('status', 'pending')
             ->whereNotNull('due_date')
             ->whereDate('due_date', '<', Carbon::today())
@@ -27,10 +27,13 @@ class RegistryLifecycleService
                     $registry->arazi->forceFill(['status' => 'available'])->save();
                 }
 
-                // Registry expired without completion — release the plot back
-                // to available (only if it was locked as 'registry' by us).
-                if ($registry->plot && $registry->plot->status === 'registry') {
-                    $registry->plot->forceFill(['status' => 'available'])->save();
+                // Registry expired without completion — release every plot it
+                // covers back to available (only if it was locked as
+                // 'registry' by us).
+                foreach ($registry->allPlots() as $plot) {
+                    if ($plot->status === 'registry') {
+                        $plot->forceFill(['status' => 'available'])->save();
+                    }
                 }
 
                 $expiredCount++;
@@ -72,14 +75,16 @@ class RegistryLifecycleService
     }
 
     /**
-     * Whenever a registry is created/confirmed for a plot, the plot(s) it
-     * covers should automatically be marked as "Registry" (locked) so they
-     * no longer show up as available/booked elsewhere in the app.
+     * Whenever a registry is created/confirmed, every plot it covers should
+     * automatically be marked as "Registry" (locked) so none of them show up
+     * as available/booked elsewhere in the app — not just the first plot.
      */
     public function markPlotRegistryDone(Registry $registry): void
     {
-        if ($registry->plot && $registry->plot->status !== 'registry') {
-            $registry->plot->forceFill(['status' => 'registry'])->save();
+        foreach ($registry->allPlots() as $plot) {
+            if ($plot->status !== 'registry') {
+                $plot->forceFill(['status' => 'registry'])->save();
+            }
         }
     }
 }

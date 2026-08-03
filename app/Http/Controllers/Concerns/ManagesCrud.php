@@ -158,6 +158,11 @@ trait ManagesCrud
                     if (is_int($cell) || is_float($cell)) {
                         return $cell;
                     }
+                    if (is_array($cell)) {
+                        // Structured cells (e.g. the Arazi/Plot/Broker combo column)
+                        // carry a flat 'csv' string for export; fall back to empty.
+                        $cell = $cell['csv'] ?? '';
+                    }
 
                     return preg_replace('/\s+/', ' ', trim(strip_tags((string) $cell)));
                 }, $row['cells'] ?? []);
