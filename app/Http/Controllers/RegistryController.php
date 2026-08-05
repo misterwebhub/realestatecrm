@@ -185,24 +185,21 @@ class RegistryController extends Controller
                         return;
                     }
 
-                    // Area of the registry being saved (plot area, else land_size).
-                    $plotId  = request()->input('plot_id');
-                    $newArea = 0.0;
-                    if ($plotId) {
-                        $newArea = (float) (\App\Models\Plot::whereKey($plotId)->value('area') ?? 0);
-                    }
-                    if ($newArea <= 0) {
-                        $newArea = (float) request()->input('land_size', 0);
-                    }
+                    // Area of the registry being saved. When multiple plots are
+                    // submitted (Plot Sizes table), sum all of their areas —
+                    // otherwise fall back to the single plot/land_size.
+                    $newArea = $this->computeSubmittedArea();
 
                     // Area already registered for this partner across these arazi codes
-                    // (excluding this record when editing).
-                    $existing = (float) Registry::query()
-                        ->where('registries.partner_id', $partnerId)
-                        ->whereIn('registries.arazi_code', $codes)
-                        ->when($item?->id, fn ($q) => $q->where('registries.id', '!=', $item->id))
-                        ->leftJoin('plots', 'plots.id', '=', 'registries.plot_id')
-                        ->sum(\Illuminate\Support\Facades\DB::raw('COALESCE(plots.area, registries.land_size, 0)'));
+                    // (excluding this record when editing). Multi-plot registries
+                    // store their per-plot area in the registry_plot pivot, so sum
+                    // that instead of relying on the single legacy plot_id/land_size.
+                    $existing = (float) $this->sumRegisteredArea(
+                        Registry::query()
+                            ->where('registries.partner_id', $partnerId)
+                            ->whereIn('registries.arazi_code', $codes)
+                            ->when($item?->id, fn ($q) => $q->where('registries.id', '!=', $item->id))
+                    );
 
                     $total = $existing + $newArea;
 
@@ -244,23 +241,18 @@ class RegistryController extends Controller
                         return;
                     }
 
-                    // Area of the registry being saved (its plot's area, falling back to land_size).
-                    $plotId  = request()->input('plot_id');
-                    $newArea = 0.0;
-                    if ($plotId) {
-                        $newArea = (float) (\App\Models\Plot::whereKey($plotId)->value('area') ?? 0);
-                    }
-                    if ($newArea <= 0) {
-                        $newArea = (float) request()->input('land_size', 0);
-                    }
+                    // Area of the registry being saved. When multiple plots are
+                    // submitted (Plot Sizes table), sum all of their areas —
+                    // otherwise fall back to the single plot/land_size.
+                    $newArea = $this->computeSubmittedArea();
 
                     // Sum of area already registered for this arazi + deed (excluding self on edit).
-                    $existing = (float) Registry::query()
-                        ->where('registries.arazi_code', $araziCode)
-                        ->where('registries.deed_no', $deedNo)
-                        ->when($item?->id, fn ($q) => $q->where('registries.id', '!=', $item->id))
-                        ->leftJoin('plots', 'plots.id', '=', 'registries.plot_id')
-                        ->sum(\Illuminate\Support\Facades\DB::raw('COALESCE(plots.area, registries.land_size, 0)'));
+                    $existing = (float) $this->sumRegisteredArea(
+                        Registry::query()
+                            ->where('registries.arazi_code', $araziCode)
+                            ->where('registries.deed_no', $deedNo)
+                            ->when($item?->id, fn ($q) => $q->where('registries.id', '!=', $item->id))
+                    );
 
                     $total = $existing + $newArea;
 
@@ -320,6 +312,70 @@ class RegistryController extends Controller
         return $payload;
     }
 
+    /**
+     * Total area being submitted for this registry. If the create/edit form's
+     * "Plot Sizes" table (input name="plot_sizes[<plot_id>]") has entries —
+     * i.e. a bond with multiple plots was applied — sum all of their areas
+     * (using the submitted value, falling back to the plot's stored area for
+     * any row without a numeric override). Otherwise fall back to the single
+     * plot_id's area, then to the raw land_size input.
+     */
+    private function computeSubmittedArea(): float
+    {
+        $sizes = request()->input('plot_sizes', []);
+        if (is_array($sizes) && !empty($sizes)) {
+            $total = 0.0;
+            foreach ($sizes as $plotId => $rawValue) {
+                if (is_numeric($rawValue)) {
+                    $total += (float) $rawValue;
+                } else {
+                    $total += (float) (\App\Models\Plot::whereKey($plotId)->value('area') ?? 0);
+                }
+            }
+            if ($total > 0) {
+                return $total;
+            }
+        }
+
+        $plotId = request()->input('plot_id');
+        if ($plotId) {
+            $area = (float) (\App\Models\Plot::whereKey($plotId)->value('area') ?? 0);
+            if ($area > 0) {
+                return $area;
+            }
+        }
+
+        return (float) request()->input('land_size', 0);
+    }
+
+    /**
+     * Sum the registered area for a set of matched Registry rows, counting
+     * every plot each registry covers (registry_plot pivot for multi-plot
+     * registries, falling back to the legacy plot_id/land_size for
+     * single-plot ones) — never just the primary plot_id column, which would
+     * under-count multi-plot registries.
+     */
+    private function sumRegisteredArea(\Illuminate\Database\Eloquent\Builder $query): float
+    {
+        return (float) $query->with(['plots', 'plot'])->get()->sum(function (Registry $registry) {
+            $plots = $registry->allPlots();
+
+            if ($plots->isEmpty()) {
+                return (float) ($registry->land_size ?? 0);
+            }
+
+            $usesPivot = $registry->relationLoaded('plots') && $registry->plots->isNotEmpty();
+
+            return (float) $plots->sum(function ($plot) use ($usesPivot) {
+                if ($usesPivot && $plot->pivot && $plot->pivot->area !== null) {
+                    return (float) $plot->pivot->area;
+                }
+
+                return (float) ($plot->area ?? 0);
+            });
+        });
+    }
+
     private function nextRegistryCode(): string
     {
         $prefix = 'RGC';
@@ -337,15 +393,80 @@ class RegistryController extends Controller
 
     protected function resourceQuery()
     {
-        return $this->applyOwnershipScope(Registry::with(['customer', 'arazi', 'agent'])->latest());
+        return $this->applyOwnershipScope(Registry::with(['customer', 'arazi', 'agent', 'plot', 'plots'])->latest());
     }
 
     public function store(Request $request)
     {
         $this->authorizeCrud('create');
-        $request->validate($this->resourceRules());
+        $validated = $request->validate($this->resourceRules());
 
-        return $this->crudStore($request);
+        return $this->createRegistryWithPlots($request, $validated);
+    }
+
+    /**
+     * Create a single Registry row covering every plot submitted in the
+     * create form's "Plot Sizes" table (input name="plot_sizes[<plot_id>]").
+     * When a bond has multiple plots, all of them are attached to the new
+     * registry_plot pivot (each with its own area) — matching how a
+     * CustomerBond covers multiple plots via customer_bond_plot — instead of
+     * creating a separate Registry row per plot. registry_amount/advance_amount
+     * are kept as the single submitted total (one row = one transaction, no
+     * splitting needed). plot_id keeps pointing at the primary (first) plot
+     * for backward compatibility with code that only reads that column.
+     */
+    protected function createRegistryWithPlots(Request $request, array $validated): \Illuminate\Http\RedirectResponse
+    {
+        $sizesInput = $request->input('plot_sizes', []);
+        $plotIds = is_array($sizesInput) ? array_keys($sizesInput) : [];
+
+        $plots = \App\Models\Plot::whereIn('id', $plotIds)->get()->keyBy('id');
+        $orderedPlotIds = array_values(array_filter($plotIds, fn ($id) => $plots->has($id)));
+
+        // Plot Sizes table wasn't used (e.g. registry created without
+        // applying a bond) — fall back to the single plot_id field.
+        if (empty($orderedPlotIds) && !empty($validated['plot_id'])) {
+            $fallbackPlot = \App\Models\Plot::find($validated['plot_id']);
+            if ($fallbackPlot) {
+                $orderedPlotIds = [$fallbackPlot->id];
+                $plots = collect([$fallbackPlot->id => $fallbackPlot]);
+            }
+        }
+
+        $areas = [];
+        $totalArea = 0.0;
+        foreach ($orderedPlotIds as $plotId) {
+            $raw  = $sizesInput[$plotId] ?? null;
+            $area = is_numeric($raw) ? (float) $raw : (float) ($plots[$plotId]->area ?? 0);
+            $areas[$plotId] = $area;
+            $totalArea += $area;
+        }
+
+        $payload = $this->resourcePrepareData($validated, $request);
+
+        if (!empty($orderedPlotIds)) {
+            $payload['plot_id']   = $orderedPlotIds[0];
+            $payload['land_size'] = $totalArea > 0 ? $totalArea : ($payload['land_size'] ?? 0);
+        }
+
+        $item = Registry::create($payload);
+
+        if (!empty($orderedPlotIds)) {
+            $item->plots()->attach(collect($orderedPlotIds)->mapWithKeys(fn ($plotId) => [
+                $plotId => ['area' => $areas[$plotId]],
+            ])->all());
+        }
+
+        $this->resourceAfterSave($item, $request, $validated);
+
+        $plotCount = count($orderedPlotIds);
+        $message = $plotCount > 1
+            ? "Registry created successfully — all {$plotCount} plots in this bond are now registered."
+            : 'Registry created successfully.';
+
+        return redirect()
+            ->route($this->resourceRouteName() . '.index')
+            ->with('success', $message);
     }
 
     public function update(Request $request, $id)
@@ -361,7 +482,7 @@ class RegistryController extends Controller
     // Override index to support search filters for plot registry listing
     public function index(Request $request)
     {
-        $q = $this->applyOwnershipScope(Registry::with(['customer', 'arazi', 'agent', 'plot']));
+        $q = $this->applyOwnershipScope(Registry::with(['customer', 'arazi', 'agent', 'plot', 'plots']));
 
         $filterAraziCode = trim((string) $request->input('arazi_code', ''));
         $filterPlotId    = $request->input('plot_id');
@@ -373,7 +494,7 @@ class RegistryController extends Controller
         }
 
         if ($filterPlotId) {
-            $q->where('plot_id', $filterPlotId);
+            $q->forPlot($filterPlotId);
         }
 
         if ($filterRegNo !== '') {
@@ -468,18 +589,22 @@ class RegistryController extends Controller
                         ->all();
         $agents = Agent::orderBy('name')->pluck('name', 'id')->all();
 
-        // The plot already linked to this registry, for the editable "Plot
-        // Sizes" table. Exclude this registry's own record when checking
-        // whether the plot is "locked" — otherwise every edit would see its
-        // own registry row and always report the plot as locked.
+        // Every plot already linked to this registry (registry_plot pivot for
+        // multi-plot registries, falling back to the legacy singular plot_id
+        // for older ones), for the editable "Plot Sizes" table. Exclude this
+        // registry's own record when checking whether a plot is "locked" —
+        // otherwise every edit would see its own registry row and always
+        // report the plot as locked.
         $plotsForSize = [];
-        if ($item->plot) {
+        foreach ($item->allPlots() as $plot) {
+            $pivotArea = ($plot->relationLoaded('pivot') || isset($plot->pivot)) ? $plot->pivot->area ?? null : null;
+
             $plotsForSize[] = [
-                'id' => $item->plot->id,
-                'title' => $item->plot->title ?? ('Plot-' . $item->plot->id),
-                'area' => $item->plot->area !== null ? (float) $item->plot->area : null,
-                'locked' => $item->plot->status === 'registry'
-                    || Registry::where('plot_id', $item->plot->id)->where('id', '!=', $item->id)->exists(),
+                'id' => $plot->id,
+                'title' => $plot->title ?? ('Plot-' . $plot->id),
+                'area' => $pivotArea !== null ? (float) $pivotArea : ($plot->area !== null ? (float) $plot->area : null),
+                'locked' => $plot->status === 'registry'
+                    || Registry::forPlot($plot->id)->where('id', '!=', $item->id)->exists(),
             ];
         }
 
@@ -547,13 +672,15 @@ class RegistryController extends Controller
     protected function resourceRow(Model $item): array
     {
         /** @var Registry $item */
+        $bondPlot = $item->allPlots()->first();
+
         return [
             'cells' => [
                 $item->registry_code ?? '-',
                 $item->customer?->name ?? '-',
-                $item->plot?->arazi_code ?: '-',
+                $bondPlot?->arazi_code ?: '-',
                 $item->arazi_code ?: '-',
-                $item->plot?->title ?? '-',
+                $item->plotTitlesLabel(),
                 strtoupper((string) $item->booking_mode),
                 optional($item->registry_date)->format('d-m-Y') ?? '-',
                 $item->deed_no ?? '—',
@@ -655,7 +782,7 @@ class RegistryController extends Controller
             // Exclude the current registry's own record — otherwise every edit-mode
             // save would see its own row referencing this plot_id and incorrectly
             // treat the plot as locked, silently skipping a legitimate size change.
-            $lockedByOtherRegistry = \App\Models\Registry::where('plot_id', $plot->id)
+            $lockedByOtherRegistry = \App\Models\Registry::forPlot($plot->id)
                 ->when($currentRegistryId, fn ($q) => $q->where('id', '!=', $currentRegistryId))
                 ->exists();
 
@@ -746,7 +873,7 @@ class RegistryController extends Controller
                     'id' => $p->id,
                     'title' => $p->title ?? ('Plot-'.$p->id),
                     'area' => $p->area !== null ? (float) $p->area : null,
-                    'locked' => $p->status === 'registry' || \App\Models\Registry::where('plot_id', $p->id)->exists(),
+                    'locked' => $p->status === 'registry' || \App\Models\Registry::forPlot($p->id)->exists(),
                 ])->values(),
                 'bond_amount'      => $total,
                 'paid_amount'      => $netPaid,

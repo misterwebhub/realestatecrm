@@ -333,7 +333,7 @@ class AraziController extends Controller
             }
 
             if ($status === null || $status === 'available') {
-                $hasRegistry = \App\Models\Registry::where('plot_id', $p->id)
+                $hasRegistry = \App\Models\Registry::forPlot($p->id)
                     ->where(function($q){ $q->where('status', 'completed')->orWhere('payment_status', 'completed')->orWhereNull('status'); })
                     ->exists();
 
@@ -475,7 +475,7 @@ class AraziController extends Controller
             // If no explicit status or it's 'available', compute derived status from registry/booking
             if ($status === null || $status === 'available') {
                 // Prefer explicit Registry records: if a registry exists for this plot mark as 'registry'
-                $hasRegistry = \App\Models\Registry::where('plot_id', $p->id)
+                $hasRegistry = \App\Models\Registry::forPlot($p->id)
                     ->where(function($q){ $q->where('status', 'completed')->orWhere('payment_status', 'completed')->orWhereNull('status'); })
                     ->exists();
 

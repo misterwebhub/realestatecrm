@@ -20,8 +20,8 @@
                         <i class="bi bi-signpost-split-fill"></i>
                     </span>
                     <div>
-                        <div class="fw-semibold text-dark" style="font-size:13.5px;">How installment status is determined</div>
-                        <div class="text-muted" style="font-size:11.5px;">Based on days relative to each bond's installment due date</div>
+                        <div class="fw-semibold text-dark" style="font-size:13.5px;">How EMI status is determined</div>
+                        <div class="text-muted" style="font-size:11.5px;">Calculated dynamically from payment history — no manual reconciliation</div>
                     </div>
                 </div>
                 <a href="{{ route('settings.index') }}" target="_blank"
@@ -31,24 +31,25 @@
             </div>
 
             <div class="d-flex align-items-stretch gap-2 flex-wrap">
-                <div class="flex-fill text-center py-2 px-2 rounded" style="min-width:150px;background:#fff8ea;border:1px solid #ffe3a3;">
-                    <div class="fw-bold text-warning-emphasis" style="font-size:12.5px;"><i class="bi bi-hourglass-split me-1"></i>Pending</div>
-                    <div class="text-muted" style="font-size:11px;">before the due date</div>
+                <div class="flex-fill text-center py-2 px-2 rounded" style="min-width:140px;background:#eafaf0;border:1px solid #a3e4bb;">
+                    <div class="fw-bold text-success" style="font-size:12.5px;">🟢 On Time</div>
+                    <div class="text-muted" style="font-size:11px;">no outstanding, no credit</div>
                 </div>
-                <div class="d-flex align-items-center text-muted"><i class="bi bi-arrow-right"></i></div>
-                <div class="flex-fill text-center py-2 px-2 rounded" style="min-width:170px;background:#eaf7fb;border:1px solid #a6e0f0;">
-                    <div class="fw-bold text-info-emphasis" style="font-size:12.5px;"><i class="bi bi-bell-fill me-1"></i>Reminder</div>
-                    <div class="text-muted" style="font-size:11px;">within <strong>{{ $reminderDays }}</strong> day(s) of the due date</div>
+                <div class="flex-fill text-center py-2 px-2 rounded" style="min-width:140px;background:#fff8ea;border:1px solid #ffe3a3;">
+                    <div class="fw-bold text-warning-emphasis" style="font-size:12.5px;">🟡 Partial Payment</div>
+                    <div class="text-muted" style="font-size:11px;">outstanding, within grace period</div>
                 </div>
-                <div class="d-flex align-items-center text-muted"><i class="bi bi-arrow-right"></i></div>
-                <div class="flex-fill text-center py-2 px-2 rounded" style="min-width:170px;background:#eef2ff;border:1px solid #c7d2fe;">
-                    <div class="fw-bold" style="font-size:12.5px;color:#4338ca;"><i class="bi bi-calendar-event-fill me-1"></i>Due Date</div>
-                    <div class="text-muted" style="font-size:11px;">day the installment is due</div>
+                <div class="flex-fill text-center py-2 px-2 rounded" style="min-width:140px;background:#eaf3fb;border:1px solid #a6c8e0;">
+                    <div class="fw-bold" style="font-size:12.5px;color:#0d6efd;">🔵 Ahead of Schedule</div>
+                    <div class="text-muted" style="font-size:11px;">total paid exceeds expected till date</div>
                 </div>
-                <div class="d-flex align-items-center text-muted"><i class="bi bi-arrow-right"></i></div>
-                <div class="flex-fill text-center py-2 px-2 rounded" style="min-width:170px;background:#fdecec;border:1px solid #f3b8b8;">
-                    <div class="fw-bold text-danger" style="font-size:12.5px;"><i class="bi bi-exclamation-octagon-fill me-1"></i>Overdue</div>
-                    <div class="text-muted" style="font-size:11px;">more than <strong>{{ $overdueDays }}</strong> day(s) past due</div>
+                <div class="flex-fill text-center py-2 px-2 rounded" style="min-width:140px;background:#fdecec;border:1px solid #f3b8b8;">
+                    <div class="fw-bold text-danger" style="font-size:12.5px;">🔴 Overdue</div>
+                    <div class="text-muted" style="font-size:11px;">outstanding beyond <strong>{{ $overdueDays }}</strong> day(s) grace</div>
+                </div>
+                <div class="flex-fill text-center py-2 px-2 rounded" style="min-width:140px;background:#f3ecfa;border:1px solid #d3b8f3;">
+                    <div class="fw-bold" style="font-size:12.5px;color:#7e22ce;">🟣 Fully Paid</div>
+                    <div class="text-muted" style="font-size:11px;">finance amount fully repaid</div>
                 </div>
             </div>
         </div>
@@ -87,8 +88,11 @@
             <label class="form-label small fw-semibold mb-1">Status</label>
             <select name="status" class="form-select form-select-sm js-select2">
                 <option value="">All</option>
-                <option value="pending" @selected($status === 'pending')>Pending</option>
-                <option value="overdue" @selected($status === 'overdue')>Overdue</option>
+                <option value="on_time" @selected($status === 'on_time')>🟢 On Time</option>
+                <option value="partial" @selected($status === 'partial')>🟡 Partial Payment</option>
+                <option value="ahead" @selected($status === 'ahead')>🔵 Ahead of Schedule</option>
+                <option value="overdue" @selected($status === 'overdue')>🔴 Overdue</option>
+                <option value="fully_paid" @selected($status === 'fully_paid')>🟣 Fully Paid</option>
             </select>
         </div>
         <div class="col-md-2 col-sm-4">
@@ -102,6 +106,13 @@
         <div class="col-auto d-flex gap-2">
             <button class="btn btn-primary btn-sm">Apply</button>
             <a href="{{ route('reports.pending-installments') }}" class="btn btn-outline-secondary btn-sm">Clear</a>
+        </div>
+        <div class="col-12">
+            <div class="text-muted" style="font-size:11px;">
+                <i class="bi bi-info-circle"></i>
+                Due Date defaults to <strong>today → today + Reminder Days ({{ $reminderDays }})</strong> from Settings, showing installments due now or coming up soon.
+                Bonds already unpaid past their due date (Partial/Overdue, per the Overdue Days setting = {{ $overdueDays }}) always show regardless of this window. Adjust the dates above to widen or narrow the view.
+            </div>
         </div>
     </form>
 
@@ -118,40 +129,48 @@
         <div class="col-6 col-md">
             <div class="card shadow-sm border-start border-4 border-primary h-100">
                 <div class="card-body py-2">
-                    <div class="small text-muted text-uppercase">Total Bond Amount</div>
-                    <div class="fs-6 fw-bold text-primary">₹{{ number_format($g_total,2) }}</div>
+                    <div class="small text-muted text-uppercase">Finance Amount</div>
+                    <div class="fs-6 fw-bold text-primary">₹{{ number_format($g_finance,2) }}</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-md">
+            <div class="card shadow-sm border-start border-4 border-dark h-100">
+                <div class="card-body py-2">
+                    <div class="small text-muted text-uppercase">Expected Till Date</div>
+                    <div class="fs-6 fw-bold">₹{{ number_format($g_expected,2) }}</div>
                 </div>
             </div>
         </div>
         <div class="col-6 col-md">
             <div class="card shadow-sm border-start border-4 border-success h-100">
                 <div class="card-body py-2">
-                    <div class="small text-muted text-uppercase">Paid Cheque</div>
-                    <div class="fs-6 fw-bold text-success">₹{{ number_format($g_paid_cheque,2) }}</div>
-                </div>
-            </div>
-        </div>
-        <div class="col-6 col-md">
-            <div class="card shadow-sm border-start border-4 border-success h-100">
-                <div class="card-body py-2">
-                    <div class="small text-muted text-uppercase">Paid Cash</div>
-                    <div class="fs-6 fw-bold text-success">₹{{ number_format($g_paid_cash,2) }}</div>
-                </div>
-            </div>
-        </div>
-        <div class="col-6 col-md">
-            <div class="card shadow-sm border-start border-4 border-info h-100">
-                <div class="card-body py-2">
-                    <div class="small text-muted text-uppercase">Paid Other</div>
-                    <div class="fs-6 fw-bold text-info-emphasis">₹{{ number_format($g_paid_other,2) }}</div>
+                    <div class="small text-muted text-uppercase">Total Paid</div>
+                    <div class="fs-6 fw-bold text-success">₹{{ number_format($g_paid,2) }}</div>
                 </div>
             </div>
         </div>
         <div class="col-6 col-md">
             <div class="card shadow-sm border-start border-4 border-danger h-100">
                 <div class="card-body py-2">
-                    <div class="small text-muted text-uppercase">Total Balance</div>
-                    <div class="fs-6 fw-bold text-danger">₹{{ number_format($g_balance,2) }}</div>
+                    <div class="small text-muted text-uppercase">Outstanding</div>
+                    <div class="fs-6 fw-bold text-danger">₹{{ number_format($g_outstanding,2) }}</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-md">
+            <div class="card shadow-sm border-start border-4 border-info h-100">
+                <div class="card-body py-2">
+                    <div class="small text-muted text-uppercase">Credit</div>
+                    <div class="fs-6 fw-bold text-info-emphasis">₹{{ number_format($g_credit,2) }}</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-md">
+            <div class="card shadow-sm border-start border-4 border-warning h-100">
+                <div class="card-body py-2">
+                    <div class="small text-muted text-uppercase">Remaining Balance</div>
+                    <div class="fs-6 fw-bold text-warning-emphasis">₹{{ number_format($g_remaining,2) }}</div>
                 </div>
             </div>
         </div>
@@ -159,23 +178,24 @@
 
     <div class="card">
         <div class="table-responsive">
-            <table class="table table-sm table-hover align-middle mb-0" style="font-size:12px;">
+            <table class="table table-sm table-hover align-middle mb-0" style="font-size:11.5px;">
                 <thead class="table-light">
                     <tr>
                         <th>#</th>
                         <th>Bond</th>
-                        <th>Bond Date</th>
                         <th>Customer</th>
-                        <th>Mobile</th>
-                        <th>Arazi / Plots</th>
-                        <th>Installment Due Date</th>
-                        <th class="text-end">Total Bond Amount</th>
-                        <th class="text-end">No. of Installments</th>
-                        <th class="text-end">Due Amount</th>
-                        <th class="text-end">Paid Cheque</th>
-                        <th class="text-end">Paid Cash</th>
-                        <th class="text-end">Paid Other</th>
-                        <th class="text-end">Balance</th>
+                        <th class="text-end">Bond Amount</th>
+                        <th class="text-end">Advance</th>
+                        <th class="text-end">Finance Amount</th>
+                        <th class="text-end">Monthly EMI</th>
+                        <th class="text-end">Expected Till Date</th>
+                        <th class="text-end">Total Paid</th>
+                        <th class="text-end">Outstanding</th>
+                        <th class="text-end">Credit</th>
+                        <th class="text-end">Remaining Balance</th>
+                        <th>Last EMI Paid</th>
+                        <th>Next EMI Due</th>
+                        <th>Overdue</th>
                         <th class="text-center">Status</th>
                     </tr>
                 </thead>
@@ -183,92 +203,73 @@
                     @forelse($rows as $i => $r)
                         <tr>
                             <td>{{ $i + 1 }}</td>
-                            <td class="fw-semibold">{{ $r['bond_no'] }}</td>
-                            <td class="text-muted" style="white-space:nowrap;">{{ $r['bond_date'] ?: '—' }}</td>
-                            <td>{{ $r['customer'] }}</td>
-                            <td>{{ $r['customer_mobile'] }}</td>
-                            <td style="min-width:150px;">
-                                <span class="badge bg-primary-subtle text-primary-emphasis mb-1">{{ $r['arazi'] }}</span>
-                                @if(count($r['plots']) === 0)
-                                    <div class="text-muted" style="font-size:11px;">No plots</div>
+                            <td class="fw-semibold" style="white-space:nowrap;">
+                                <a href="{{ route('reports.emi-detail', $r['bond_id']) }}" target="_blank">{{ $r['bond_no'] }}</a>
+                                <div class="text-muted" style="font-size:10.5px;">{{ $r['bond_date'] ?: '—' }}</div>
+                            </td>
+                            <td>
+                                {{ $r['customer'] }}
+                                <div class="text-muted" style="font-size:10.5px;">{{ $r['customer_mobile'] }}</div>
+                            </td>
+                            <td class="text-end">{{ number_format($r['bond_amount'],2) }}</td>
+                            <td class="text-end">{{ number_format($r['advance_amount'],2) }}</td>
+                            <td class="text-end fw-semibold">{{ number_format($r['finance_amount'],2) }}</td>
+                            <td class="text-end">{{ number_format($r['monthly_emi'],2) }}</td>
+                            <td class="text-end">{{ number_format($r['expected_till_date'],2) }}</td>
+                            <td class="text-end text-success">{{ number_format($r['total_paid'],2) }}</td>
+                            <td class="text-end {{ $r['outstanding'] > 0.009 ? 'text-danger fw-bold' : '' }}">{{ number_format($r['outstanding'],2) }}</td>
+                            <td class="text-end {{ $r['credit'] > 0.009 ? 'text-info-emphasis fw-bold' : '' }}">{{ number_format($r['credit'],2) }}</td>
+                            <td class="text-end">{{ number_format($r['remaining_balance'],2) }}</td>
+                            <td style="white-space:nowrap;">
+                                @if($r['last_emi_number'])
+                                    <div>EMI #{{ $r['last_emi_number'] }}</div>
+                                    <div class="text-muted" style="font-size:10.5px;">{{ $r['last_emi_date'] ?: '—' }} · ₹{{ number_format($r['last_emi_amount'],2) }}</div>
                                 @else
-                                    @php $plotTotal = collect($r['plots'])->sum('gaz'); @endphp
-                                    <table style="width:100%;border-collapse:collapse;font-size:10px;border:1px solid #d0ddf0;border-radius:4px;overflow:hidden;">
-                                        <thead>
-                                            <tr style="background:#1a3a6b;">
-                                                <th style="padding:1px 5px;color:rgba(255,255,255,.8);font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:.3px;border-right:1px solid rgba(255,255,255,.12);text-align:left;">Plot</th>
-                                                <th style="padding:1px 5px;color:rgba(255,255,255,.8);font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:.3px;border-right:1px solid rgba(255,255,255,.12);text-align:right;">Gaz</th>
-                                                <th style="padding:1px 5px;color:rgba(255,255,255,.8);font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:.3px;text-align:center;">Registry</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            @foreach($r['plots'] as $j => $pl)
-                                                <tr style="background:{{ $j % 2 === 0 ? '#fff' : '#f6f9ff' }};border-bottom:1px solid #e4ecf7;">
-                                                    <td style="padding:1px 5px;border-right:1px solid #e4ecf7;font-weight:600;color:#1a3a6b;white-space:nowrap;">{{ $pl['label'] ?: '—' }}</td>
-                                                    <td style="padding:1px 5px;border-right:1px solid #e4ecf7;text-align:right;color:#374151;white-space:nowrap;">{{ rtrim(rtrim(number_format($pl['gaz'],2),'0'),'.') }}</td>
-                                                    <td style="padding:1px 5px;text-align:center;white-space:nowrap;">
-                                                        @if($pl['registry'] === 'Y')
-                                                            <span style="color:#15803d;font-weight:700;">Y</span>
-                                                        @else
-                                                            <span style="color:#dc2626;font-weight:700;">N</span>
-                                                        @endif
-                                                    </td>
-                                                </tr>
-                                            @endforeach
-                                            @if(count($r['plots']) > 1)
-                                                <tr style="background:#eef4ff;border-top:1px solid #d0ddf0;">
-                                                    <td style="padding:1px 5px;border-right:1px solid #e4ecf7;font-weight:700;color:#15803d;text-align:right;">Total</td>
-                                                    <td style="padding:1px 5px;border-right:1px solid #e4ecf7;text-align:right;font-weight:700;color:#15803d;white-space:nowrap;">{{ rtrim(rtrim(number_format($plotTotal,2),'0'),'.') }}</td>
-                                                    <td></td>
-                                                </tr>
-                                            @endif
-                                        </tbody>
-                                    </table>
+                                    <span class="text-muted">—</span>
                                 @endif
                             </td>
                             <td style="white-space:nowrap;">
-                                {{ $r['last_date'] }}
-                                @if($r['days_past_due'] > 0)
-                                    <div class="text-muted" style="font-size:11px;">{{ $r['days_past_due'] }} day(s) past due</div>
-                                @elseif($r['days_past_due'] < 0)
-                                    <div class="text-muted" style="font-size:11px;">due in {{ abs($r['days_past_due']) }} day(s)</div>
+                                @if($r['next_emi_number'])
+                                    <div>EMI #{{ $r['next_emi_number'] }}</div>
+                                    <div class="text-muted" style="font-size:10.5px;">{{ $r['next_due_date'] ?: '—' }} · ₹{{ number_format($r['next_emi_amount'],2) }}</div>
                                 @else
-                                    <div class="text-muted" style="font-size:11px;">due today</div>
+                                    <span class="text-muted">—</span>
                                 @endif
                             </td>
-                            <td class="text-end fw-semibold">{{ number_format($r['total'],2) }}</td>
-                            <td class="text-end">{{ $r['no_of_installments'] ?? '—' }}</td>
-                            <td class="text-end">{{ $r['due_amount'] !== null ? number_format($r['due_amount'],2) : '—' }}</td>
-                            <td class="text-end text-success">{{ number_format($r['paid_cheque'],2) }}</td>
-                            <td class="text-end text-success">{{ number_format($r['paid_cash'],2) }}</td>
-                            <td class="text-end text-info-emphasis">{{ number_format($r['paid_other'],2) }}</td>
-                            <td class="text-end fw-bold text-danger">{{ number_format($r['balance'],2) }}</td>
-                            <td class="text-center">
-                                @if($r['status'] === 'Overdue')
-                                    <span class="badge bg-danger">Overdue</span>
+                            <td style="white-space:nowrap;">
+                                @if($r['overdue_human'])
+                                    <span class="text-danger fw-semibold">{{ $r['overdue_human'] }}</span>
                                 @else
-                                    <span class="badge bg-warning text-dark">Pending</span>
+                                    <span class="text-muted">—</span>
                                 @endif
+                            </td>
+                            <td class="text-center" style="white-space:nowrap;">
+                                <span class="badge {{ $r['status_badge'] }}">{{ $r['status_emoji'] }} {{ $r['status_label'] }}</span>
                                 @if($r['is_reminder'])
                                     <div class="badge bg-info-subtle text-info-emphasis mt-1">Reminder</div>
                                 @endif
                             </td>
                         </tr>
                     @empty
-                        <tr><td colspan="15" class="text-center text-muted py-4">No pending installments found.</td></tr>
+                        <tr><td colspan="16" class="text-center text-muted py-4">No bonds match the selected filters.</td></tr>
                     @endforelse
                 </tbody>
                 @if(count($rows))
                 <tfoot class="table-light">
                     <tr class="fw-bold">
-                        <td colspan="7" class="text-end">GRAND TOTAL</td>
-                        <td class="text-end">{{ number_format($g_total,2) }}</td>
+                        <td colspan="3" class="text-end">GRAND TOTAL</td>
+                        <td class="text-end">{{ number_format($g_bond_amount,2) }}</td>
+                        <td class="text-end">{{ number_format($g_advance,2) }}</td>
+                        <td class="text-end">{{ number_format($g_finance,2) }}</td>
+                        <td></td>
+                        <td class="text-end">{{ number_format($g_expected,2) }}</td>
+                        <td class="text-end text-success">{{ number_format($g_paid,2) }}</td>
+                        <td class="text-end text-danger">{{ number_format($g_outstanding,2) }}</td>
+                        <td class="text-end text-info-emphasis">{{ number_format($g_credit,2) }}</td>
+                        <td class="text-end">{{ number_format($g_remaining,2) }}</td>
                         <td></td>
                         <td></td>
-                        <td class="text-end text-success">{{ number_format($g_paid_cheque,2) }}</td>
-                        <td class="text-end text-success">{{ number_format($g_paid_cash,2) }}</td>
-                        <td class="text-end text-info-emphasis">{{ number_format($g_paid_other,2) }}</td>
-                        <td class="text-end text-danger">{{ number_format($g_balance,2) }}</td>
+                        <td></td>
                         <td></td>
                     </tr>
                 </tfoot>

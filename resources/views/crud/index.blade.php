@@ -101,6 +101,11 @@
                                class="form-control form-control-sm" placeholder="Plot title…">
                     </div>
                     <div class="col-md-2">
+                        <label class="form-label small fw-semibold mb-1">Broker</label>
+                        <input type="text" name="broker" value="{{ $cp_broker ?? '' }}"
+                               class="form-control form-control-sm" placeholder="Broker name…">
+                    </div>
+                    <div class="col-md-2">
                         <label class="form-label small fw-semibold mb-1">Type</label>
                         <select name="entry_type" class="form-select form-select-sm">
                             <option value="">All Types</option>
@@ -552,9 +557,42 @@
                                           data-bs-placement="top" data-bs-content="{{ $cell }}"
                                           title="Customer">{{ \Illuminate\Support\Str::limit($cell, 15) }}</span>
                                 </td>
-                            @elseif(!empty($isCustomerPaymentIndex) && $colIndex === 9 && $cell !== '—')
+                            @elseif(is_array($cell) && ($cell['type'] ?? null) === 'arazi_plot_broker')
+                                {{-- Merged Arazi / Plot / Broker column --}}
+                                <td style="padding:8px;min-width:220px;">
+                                    <div class="d-flex flex-wrap gap-1 mb-1">
+                                        <span style="background:#1a3a6b;color:#fff;border-radius:4px;padding:2px 8px;font-size:11px;font-weight:700;letter-spacing:.3px;white-space:nowrap;">
+                                            Arazi: {{ $cell['arazi'] }}
+                                        </span>
+                                        <span style="background:#6b4f1a;color:#fff;border-radius:4px;padding:2px 8px;font-size:11px;font-weight:700;letter-spacing:.3px;white-space:nowrap;">
+                                            Broker: {{ $cell['broker'] }}
+                                        </span>
+                                    </div>
+                                    @if(empty($cell['plots']))
+                                        <span class="text-muted px-2" style="font-size:12px;">No plots</span>
+                                    @else
+                                        <table style="width:100%;border-collapse:collapse;font-size:12px;border:1px solid #d0ddf0;border-radius:6px;overflow:hidden;box-shadow:0 1px 4px rgba(26,58,107,.09);">
+                                            <thead>
+                                                <tr style="background:linear-gradient(90deg,#1a3a6b,#2a52a0);">
+                                                    <th style="padding:4px 8px;color:rgba(255,255,255,.75);font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;border-right:1px solid rgba(255,255,255,.12);">Plot</th>
+                                                    <th style="padding:4px 8px;color:rgba(255,255,255,.75);font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;">Area</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                @foreach($cell['plots'] as $pi => $plot)
+                                                    <tr style="background:{{ $pi % 2 === 0 ? '#fff' : '#f6f9ff' }};border-bottom:1px solid #e4ecf7;"
+                                                        onmouseover="this.style.background='#edf3ff'" onmouseout="this.style.background='{{ $pi % 2 === 0 ? '#fff' : '#f6f9ff' }}'">
+                                                        <td style="padding:4px 8px;font-weight:600;color:#1a3a6b;border-right:1px solid #e4ecf7;white-space:nowrap;">{{ $plot['title'] }}</td>
+                                                        <td style="padding:4px 8px;color:#374151;white-space:nowrap;">{{ $plot['area'] }}</td>
+                                                    </tr>
+                                                @endforeach
+                                            </tbody>
+                                        </table>
+                                    @endif
+                                </td>
+                            @elseif(!empty($isCustomerPaymentIndex) && $colIndex === 8 && $cell !== '—')
                                 <td class="text-success fw-semibold">{{ $cell }}</td>
-                            @elseif(!empty($isCustomerPaymentIndex) && $colIndex === 10 && $cell !== '—')
+                            @elseif(!empty($isCustomerPaymentIndex) && $colIndex === 9 && $cell !== '—')
                                 <td class="text-danger fw-semibold">{{ $cell }}</td>
                             @else
                                 <td style="{{ $hasBondArazi ? 'padding:10px 8px;' : '' }}">{{ $cell }}</td>

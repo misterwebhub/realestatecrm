@@ -39,7 +39,7 @@ class PlotController extends Controller
 
     protected function resourceFields(?Model $item = null): array
     {
-        $registryExists = $item && \App\Models\Registry::where('plot_id', $item->id)->exists();
+        $registryExists = $item && \App\Models\Registry::forPlot($item->id)->exists();
         // When the plot's status is 'registry', lock all detail fields except status.
         $detailsLocked = $item && $item->status === 'registry';
         $lockNote = $detailsLocked ? ' (locked — registry done)' : '';

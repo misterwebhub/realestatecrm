@@ -46,6 +46,7 @@ class UserMasterController extends Controller
             'office_end_time'       => ['nullable', 'date_format:H:i', 'required_with:office_start_time'],
             'allow_after_hours'     => ['nullable', 'boolean'],
             'disable_radius_login'  => ['nullable', 'boolean'],
+            'allow_backdated_payments' => ['nullable', 'boolean'],
         ]);
 
         // Keep a reversible copy alongside the one-way hash so it can be
@@ -55,6 +56,7 @@ class UserMasterController extends Controller
         $validated['is_active'] = $request->boolean('is_active', true);
         $validated['allow_after_hours'] = $request->boolean('allow_after_hours', false);
         $validated['disable_radius_login'] = $request->boolean('disable_radius_login', false);
+        $validated['allow_backdated_payments'] = $request->boolean('allow_backdated_payments', false);
         $validated['role']      = $this->legacyRoleFor($validated['role_id']);
         if (empty($validated['email'])) unset($validated['email']);
 
@@ -98,6 +100,7 @@ class UserMasterController extends Controller
             'office_end_time'       => ['nullable', 'date_format:H:i', 'required_with:office_start_time'],
             'allow_after_hours'     => ['nullable', 'boolean'],
             'disable_radius_login'  => ['nullable', 'boolean'],
+            'allow_backdated_payments' => ['nullable', 'boolean'],
         ];
         if ($isSuperAdmin) {
             $rules['password'] = ['nullable', 'string', 'min:6', 'confirmed'];
@@ -114,6 +117,7 @@ class UserMasterController extends Controller
         $validated['is_active'] = $request->boolean('is_active', true);
         $validated['allow_after_hours'] = $request->boolean('allow_after_hours', false);
         $validated['disable_radius_login'] = $request->boolean('disable_radius_login', false);
+        $validated['allow_backdated_payments'] = $request->boolean('allow_backdated_payments', false);
         $validated['role']      = $this->legacyRoleFor($validated['role_id']);
 
         $userMaster->update($validated);

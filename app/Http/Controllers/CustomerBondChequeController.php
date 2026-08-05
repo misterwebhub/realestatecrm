@@ -52,6 +52,21 @@ class CustomerBondChequeController extends Controller
         }
     }
 
+    /**
+     * Abort 403 unless the current user holds the "cheques.delete" permission
+     * (Super Admin always passes via Gate::before). Deleting a cheque entry —
+     * single, bulk, or via the manage-screen row remover — must never be
+     * possible for a user whose role wasn't explicitly granted this permission,
+     * even if they own the record or can view/edit cheques.
+     */
+    protected function authorizeChequeDelete(): void
+    {
+        $user = auth()->user();
+        if (! $user || ! $user->can('cheques.delete')) {
+            abort(403, 'You are not allowed to delete cheques.');
+        }
+    }
+
     public function index(Request $request)
     {
         $filterStatus  = $request->query('status', '');
@@ -250,9 +265,13 @@ class CustomerBondChequeController extends Controller
 
         $bondId = $data['customer_bond_id'];
 
-        // Process deletions first so replaced cheque_numbers are allowed
+        // Process deletions first so replaced cheque_numbers are allowed.
+        // Removing an existing (saved) cheque row on this screen is still a
+        // delete, so it requires the same "cheques.delete" permission as the
+        // dedicated destroy/bulk-delete routes.
         $deletedIds = $data['deleted_ids'] ?? [];
         if (!empty($deletedIds)) {
+            $this->authorizeChequeDelete();
             CustomerBondCheque::whereIn('id', $deletedIds)->where('customer_bond_id', $bondId)->delete();
         }
 
@@ -873,6 +892,8 @@ class CustomerBondChequeController extends Controller
      */
     public function bulkDelete(Request $request)
     {
+        $this->authorizeChequeDelete();
+
         $data = $request->validate([
             'cheque_ids'   => ['required', 'array', 'min:1'],
             'cheque_ids.*' => ['integer', 'exists:customer_bond_cheques,id'],
@@ -907,6 +928,8 @@ class CustomerBondChequeController extends Controller
 
     public function destroy(CustomerBondCheque $customerBondCheque)
     {
+        $this->authorizeChequeDelete();
+
         $user = auth()->user();
         if ($user && ! $user->isSuperAdmin()
             && (string) $customerBondCheque->getAttribute('created_by') !== (string) $user->getKey()) {

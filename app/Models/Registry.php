@@ -61,6 +61,60 @@ class Registry extends Model
         return $this->belongsTo(Plot::class);
     }
 
+    /**
+     * Every plot this registry covers (multi-plot registries). Mirrors
+     * CustomerBond::plots(). plot_id above still points at the "primary"
+     * (first) plot for backward compatibility with single-plot code paths.
+     */
+    public function plots()
+    {
+        return $this->belongsToMany(Plot::class, 'registry_plot')
+            ->withPivot(['area'])
+            ->withTimestamps();
+    }
+
+    /**
+     * All plots this registry covers, whether tracked via the registry_plot
+     * pivot (new multi-plot registries) or only via the legacy singular
+     * plot_id column (older registries created before the pivot existed).
+     */
+    public function allPlots()
+    {
+        $plots = $this->relationLoaded('plots') ? $this->plots : $this->plots()->get();
+
+        if ($plots->isEmpty() && $this->plot) {
+            return collect([$this->plot]);
+        }
+
+        return $plots;
+    }
+
+    /**
+     * Comma-separated plot titles for display (index listing, etc).
+     */
+    public function plotTitlesLabel(): string
+    {
+        $plots = $this->allPlots();
+
+        if ($plots->isEmpty()) {
+            return '-';
+        }
+
+        return $plots->map(fn ($p) => $p->title ?: ('Plot-' . $p->id))->implode(', ');
+    }
+
+    /**
+     * Match registries covering a given plot, whether via the legacy
+     * singular plot_id column or the registry_plot pivot table.
+     */
+    public function scopeForPlot($query, $plotId)
+    {
+        return $query->where(function ($q) use ($plotId) {
+            $q->where('plot_id', $plotId)
+              ->orWhereHas('plots', fn ($pq) => $pq->where('plots.id', $plotId));
+        });
+    }
+
     public function arazi()
     {
         return $this->belongsTo(Arazi::class, 'arazi_code', 'legacy_arazi_code');

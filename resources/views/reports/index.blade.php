@@ -82,7 +82,7 @@
         ],
         [
             'title' => 'Pending Installments',
-            'desc'  => 'Bonds with an outstanding balance: paid via cheque/cash/other, balance, installment amount and Overdue/Pending status.',
+            'desc'  => 'Dynamic EMI report: finance amount, monthly EMI, expected/paid/outstanding/credit, last & next EMI and auto status (On Time/Partial/Ahead/Overdue/Fully Paid).',
             'url'   => route('reports.pending-installments'),
             'icon'  => 'bi-alarm',
             'color' => '#dc2626',
