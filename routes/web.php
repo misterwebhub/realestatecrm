@@ -69,6 +69,13 @@ Route::middleware(['auth', 'office-hours'])->group(function () {
     Route::get('deed-mappings/map/{araziCode?}', [\App\Http\Controllers\DeedMappingController::class, 'map'])->name('deed-mappings.map');
     Route::post('deed-mappings', [\App\Http\Controllers\DeedMappingController::class, 'store'])->name('deed-mappings.store');
 
+    // Deed Merging: pick an arazi, check whether all its kisan rows resolve to one single partner
+    Route::get('deed-merges', [\App\Http\Controllers\DeedMergeController::class, 'index'])->name('deed-merges.index');
+    Route::get('deed-merges/check', [\App\Http\Controllers\DeedMergeController::class, 'check'])->name('deed-merges.check');
+    Route::post('deed-merges', [\App\Http\Controllers\DeedMergeController::class, 'store'])->name('deed-merges.store');
+    Route::put('deed-merges/{deedMerging}', [\App\Http\Controllers\DeedMergeController::class, 'update'])->name('deed-merges.update');
+    Route::delete('deed-merges/{deedMerging}', [\App\Http\Controllers\DeedMergeController::class, 'destroy'])->name('deed-merges.destroy');
+
     Route::resource('plots', PlotController::class)->except(['show']);
     Route::get('plot-holds', [\App\Http\Controllers\PlotHoldController::class, 'index'])->name('plot-holds.index');
     Route::post('plot-holds', [\App\Http\Controllers\PlotHoldController::class, 'store'])->name('plot-holds.store');

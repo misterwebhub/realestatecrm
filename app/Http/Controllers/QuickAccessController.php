@@ -26,6 +26,7 @@ class QuickAccessController extends Controller
                     ['icon' => 'bi-file-earmark-arrow-up','color' => 'secondary','title' => 'Arazi Documents',      'desc' => 'Uploaded documents for arazi records',       'url' => route('arazi-documents.index'),     'add_url' => route('arazi-documents.create')],
                     ['icon' => 'bi-journal-text',         'color' => 'dark',     'title' => 'Plot Registry',        'desc' => 'Registry records for sold plots',            'url' => route('registries.index'),          'add_url' => route('registries.create')],
                     ['icon' => 'bi-file-earmark-lock',    'color' => 'teal',     'title' => 'Deed Mapping',         'desc' => 'Map each arazi\'s kisan rows to a deed no & partner', 'url' => route('deed-mappings.index'), 'add_url' => route('deed-mappings.map')],
+                    ['icon' => 'bi-arrow-down-up',        'color' => 'teal',     'title' => 'Deed Merging',         'desc' => 'Check if an arazi\'s kisan rows all share one partner', 'url' => route('deed-merges.index'), 'add_url' => null],
                 ],
             ];
         }

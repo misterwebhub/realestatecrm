@@ -96,6 +96,15 @@ class Arazi extends Model
         return $this->hasOne(DeedMapping::class);
     }
 
+    /**
+     * Deed Merging: if this arazi row's deed mapping has already been
+     * folded into a persisted merge, this is that item record.
+     */
+    public function deedMergingItem()
+    {
+        return $this->hasOne(DeedMergingItem::class);
+    }
+
     public function documents()
     {
         return $this->hasMany(AraziDocument::class, 'arazi_code', 'legacy_arazi_code');

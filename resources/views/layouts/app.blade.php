@@ -159,6 +159,15 @@
                         </li>
                     @endcan
 
+                    @can('deed_merges.view')
+                        <li class="nav-item">
+                            <a href="{{ route('deed-merges.index') }}" class="nav-link {{ request()->routeIs('deed-merges.*') ? 'active' : '' }}">
+                                <i class="nav-icon bi bi-arrow-down-up"></i>
+                                <p>Deed Merging</p>
+                            </a>
+                        </li>
+                    @endcan
+
                     @can('plots.view')
                         <li class="nav-item">
                             <a href="{{ route('plots.index') }}" class="nav-link {{ request()->routeIs('plots.*') ? 'active' : '' }}">
