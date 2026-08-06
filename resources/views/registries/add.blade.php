@@ -361,49 +361,76 @@
     /* ── Deed No (Select2) ── */
     const deedEl = $('deed_no_select');
 
-    function initDeedSelect2(){
+    function initDeedSelect2(placeholderText){
         if (!(window.jQuery && jQuery.fn && jQuery.fn.select2)) return;
         const $el = jQuery(deedEl);
-        if ($el.hasClass('select2-hidden-accessible')) return;
+        const already = $el.hasClass('select2-hidden-accessible');
+
+        // Select2 only reads data-placeholder at init time, so once a bond is applied
+        // and deeds are loaded we need to destroy + reinit to swap the stale
+        // "Select a bond first" text out for a live placeholder.
+        if (placeholderText) $el.data('placeholder', placeholderText);
+        if (already) {
+            if (!placeholderText) return;
+            $el.select2('destroy');
+        }
+
         $el.select2({
             theme: 'bootstrap-5',
             width: '100%',
-            placeholder: $el.data('placeholder') || 'Select Deed No',
+            placeholder: placeholderText || $el.data('placeholder') || 'Select Deed No',
             allowClear: true,
             dropdownParent: ($el.closest('form').length ? $el.closest('form') : jQuery(document.body))
         });
     }
 
-    async function loadDeeds(araziCode){
+    async function loadDeeds(araziCode, customerName){
         if (!deedEl) return;
         // keep currently-selected value (e.g. on validation redirect) so it isn't wiped
         const current = deedEl.value;
 
         if (!araziCode) {
             deedEl.innerHTML = '<option value=""></option>';
-            if (window.jQuery) jQuery(deedEl).val('').trigger('change');
+            if (window.jQuery) {
+                initDeedSelect2('Select a bond first');
+                jQuery(deedEl).val('').trigger('change');
+            }
             return;
         }
 
         try {
-            const res  = await fetch(DEEDS_URL + '?arazi_code=' + encodeURIComponent(araziCode), {headers:{Accept:'application/json'}});
+            let url = DEEDS_URL + '?arazi_code=' + encodeURIComponent(araziCode);
+            if (customerName) url += '&customer=' + encodeURIComponent(customerName);
+            const res  = await fetch(url, {headers:{Accept:'application/json'}});
             const data = await res.json();
+            // deeds: [{value, label, name, type: 'deed'|'merged'}, ...] from the real
+            // Deed Mapping / Deed Merging feature — 'merged' entries (label like
+            // "12343222-MERGED(123,131232312)") are listed first, followed by plain
+            // 'deed' entries ("deed no - partner") for rows that aren't part of a merge.
             const deeds = data.deeds || [];
 
+            const escHtml = s => String(s ?? '').replace(/[&<>"']/g, c => ({
+                '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;'
+            }[c]));
+
+            // If nothing is selected yet, auto-select the deed the backend picked as the
+            // default for this bond's customer (preferring a merged deed no if found).
+            const target = current || (data.default_value != null ? String(data.default_value) : '');
+
             let html = '<option value=""></option>';
-            const set = new Set(deeds.map(String));
-            if (current && !set.has(String(current))) {
-                html += `<option value="${current}" selected>${current}</option>`;
+            const set = new Set(deeds.map(d => String(d.value)));
+            if (target && !set.has(String(target))) {
+                html += `<option value="${escHtml(target)}" selected>${escHtml(target)}</option>`;
             }
             deeds.forEach(d => {
-                const sel = String(d) === String(current) ? 'selected' : '';
-                html += `<option value="${d}" ${sel}>${d}</option>`;
+                const sel = String(d.value) === String(target) ? 'selected' : '';
+                html += `<option value="${escHtml(d.value)}" ${sel}>${escHtml(d.label)}</option>`;
             });
             deedEl.innerHTML = html;
 
             if (window.jQuery) {
-                initDeedSelect2();
-                jQuery(deedEl).val(current || '').trigger('change');
+                initDeedSelect2(deeds.length ? 'Select Deed No' : 'No deeds found for this arazi');
+                jQuery(deedEl).val(target || '').trigger('change');
             }
         } catch(e) { /* ignore */ }
     }
@@ -487,7 +514,7 @@
     araziSelect?.addEventListener('change', function(){
         const code = this.value || '';
         $('h_arazi_code').value = code;
-        loadDeeds(code);
+        loadDeeds(code, $('d_customer_name')?.value || '');
         loadPartners(code);
     });
 
@@ -543,8 +570,9 @@
         $('h_arazi_code').value   = b.arazi_code || '';
         $('h_bond_amount').value  = b.bond_amount || '';
 
-        // Load deed numbers for this bond's arazi into the Deed No dropdown
-        loadDeeds(b.arazi_code || '');
+        // Load deed numbers for this bond's arazi into the Deed No dropdown, auto-selecting
+        // the deed (preferring a merged one) that matches this bond's customer name.
+        loadDeeds(b.arazi_code || '', b.customer_name || '');
         $('h_pending').value      = b.pending_amount || '';
 
         // ── Plot handling: show all as info badges ──
@@ -747,7 +775,7 @@
     // Preload deed + arazi-group options if an arazi is already set (edit mode / validation redirect)
     const presetArazi = $('h_arazi_code')?.value || '';
     if (presetArazi) {
-        loadDeeds(presetArazi);
+        loadDeeds(presetArazi, $('d_customer_name')?.value || '');
         populateAraziOptions(presetArazi);
         loadPartners(presetArazi);
     }

@@ -316,31 +316,6 @@
             const val = $(this).val();
             if(!val){ araziSelect.dataset.resolvedAraziId=''; araziSelect.dataset.resolvedForValue=''; resetKisanSelects(); return; }
 
-            // If selection was made from modal, use that arazi id directly
-            if(window.__selectedFromModal){
-                window.__selectedFromModal = false;
-                $.getJSON("{{ route('ajax.kisans.by-arazi') }}", { arazi_code: val })
-                    .done(function(data){ populateKisans(data || []); })
-                    .fail(function(){ resetKisanSelects(); });
-                (async function(){
-                    try{
-                        const res = await fetch(araziInfoUrl.replace('__ARAZI_ID__', encodeURIComponent(val)));
-                        if(!res.ok) return;
-                        const info = await res.json();
-                        if(info){
-                            if(!window.__skipAutoDeedFill){
-                                try{ applyDeedNoOptions(info); }catch(e){}
-                                try{ autoSelectPartner(info.partner_id); }catch(e){}
-                            }
-                            try{ updateAraziAreaHint(info); }catch(e){}
-                            try{ document.querySelector('input[name="road_land_gaj"]').value = info.road_area ?? 0; }catch(e){}
-                            window.__skipAutoDeedFill = false;
-                        }
-                    }catch(e){}
-                })();
-                return;
-            }
-
             // If user re-selects the same grouped option already resolved from modal — skip modal
             if(araziSelect.dataset.resolvedAraziId && araziSelect.dataset.resolvedForValue === val){
                 const rid = araziSelect.dataset.resolvedAraziId;
@@ -435,15 +410,22 @@
             const a = evt.detail || {};
             if(!a || !a.id) return;
             try{
-                // indicate that auto-filling deed_no should be skipped for this programmatic selection
-                window.__skipAutoDeedFill = true;
-                window.__selectedFromModal = true;
+                // NOTE: we deliberately do NOT set window.__selectedFromModal / __skipAutoDeedFill
+                // here. Those flags used to be consumed by the main arazi_select 'change' handler,
+                // but this modal-selection code path never actually fires a real 'change' event
+                // (it only syncs Select2's display via 'change.select2', which the plain
+                // .on('change', fn) handler below does not receive). That left the flags dangling
+                // as "true" until the NEXT time the user picked a different arazi code, at which
+                // point the change handler wrongly treated that unrelated selection as if it came
+                // from the modal and skipped the "multiple arazi found" popup entirely — e.g.
+                // selecting 245 (multi-match) then switching straight to 239 (also multi-match)
+                // would not reopen the popup for 239 until the dropdown was cleared first.
                 // try to set the grouping option (match by code/label) so UI reflects selected group
                 try{
-                    const code = a.label || '';
+                    const code = String(a.label ?? a.arazi_code ?? '');
                     let matched = false;
                     for(const opt of (araziSelect.options || [])){
-                        if(opt.dataset && opt.dataset.code === code){
+                        if(String(opt.value) === code){
                             araziSelect.value = opt.value;
                             // Store resolved arazi ID so re-selecting this option skips the modal
                             araziSelect.dataset.resolvedAraziId = String(a.id);

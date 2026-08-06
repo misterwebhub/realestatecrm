@@ -888,33 +888,154 @@ class RegistryController extends Controller
     }
 
     /**
-     * Return the list of deed numbers recorded in kisan_registries for a given arazi_code.
-     * Used to populate the Deed No dropdown on the registry create form once a bond is chosen.
+     * Return the list of deed numbers for a given arazi_code, sourced from the real Deed
+     * Mapping / Deed Merging feature (deed_mappings + deed_mergings/deed_merging_items) —
+     * the same data the "Deed Merging" screen (deed-merges.index) manages. Used to populate
+     * the Deed No dropdown on the registry create form once a bond is chosen.
+     *
+     * Each Arazi row under this code (or any code grouped with it) can be deed-mapped to a
+     * plain Deed No (deed_mappings.deed_no), and any set of deed-mapped rows can be folded
+     * into a merge (deed_mergings.merged_deed_no) that consolidates their individual deed
+     * numbers into one new Deed No. A merge is represented by its consolidated summary entry
+     * — labelled "{merged_deed_no}-MERGED({member deed no 1},{member deed no 2},...)" —
+     * immediately followed by one entry per member deed no underneath it, each still
+     * individually selectable as "{deed_no}-{partner name}". Rows that are deed-mapped but
+     * not part of any merge are listed the same way, after all merge groups.
+     *
+     * If a `customer` name is passed (the currently-applied bond's customer), it's matched
+     * against the partner name on each entry (merge or plain) to compute `default_value` —
+     * the value the frontend should auto-select. With no match, `default_value` still always
+     * prefers a merged entry over a plain one — the first merge found, or the first plain
+     * deed entry if none exists — so "a merged deed no exists → it gets auto-selected" holds
+     * even when nothing matches the bond's customer name.
      */
     public function deedsByArazi(Request $request)
     {
-        $code = trim((string) $request->query('arazi_code', ''));
+        $code     = trim((string) $request->query('arazi_code', ''));
+        $customer = trim((string) $request->query('customer', ''));
 
         if ($code === '') {
-            return response()->json(['found' => false, 'deeds' => []]);
+            return response()->json(['found' => false, 'deeds' => [], 'default_value' => null]);
         }
 
         $codes = $this->relatedAraziCodes($code);
 
-        $rows = \App\Models\KisanRegistry::whereIn('arazi_code', $codes)
-            ->get(['arazi_deed_no', 'name_deed_no']);
+        $arazis = \App\Models\Arazi::whereIn('legacy_arazi_code', $codes)
+            ->with(['kisan', 'deedMapping.partner', 'deedMergingItem.deedMerging.partner'])
+            ->orderBy('id')
+            ->get();
 
-        $deeds = $rows->flatMap(function ($r) {
-            return [$r->arazi_deed_no, $r->name_deed_no];
-        })->filter(function ($v) {
-            return $v !== null && trim((string) $v) !== '';
-        })->map(function ($v) {
-            return trim((string) $v);
-        })->unique()->values()->all();
+        // "{deed_no}-K-{kisan name}-P-{partner name}" — used for every individually
+        // selectable deed entry (plain single or a merge's member deed no).
+        $buildLabel = function (string $deedNo, string $kisanName, string $partnerName): string {
+            $label = $deedNo;
+            if ($kisanName !== '') $label .= '-K-' . $kisanName;
+            if ($partnerName !== '') $label .= '-P-' . $partnerName;
+            return $label;
+        };
+
+        $singleDeeds  = [];
+        $mergedGroups = []; // merge id => ['merged_deed_no' => ..., 'members' => [['deed_no','kisan_name']...], 'partner_name' => ...]
+        $seenSingle   = [];
+
+        foreach ($arazis as $arazi) {
+            $mapping = $arazi->deedMapping;
+            if (! $mapping) {
+                continue;
+            }
+
+            $deedNo    = trim((string) $mapping->deed_no);
+            $kisanName = trim((string) ($arazi->kisan->name ?? ''));
+            $item      = $arazi->deedMergingItem;
+
+            if ($item && $item->deedMerging) {
+                $merging = $item->deedMerging;
+                $mid     = $merging->id;
+
+                if (! isset($mergedGroups[$mid])) {
+                    $mergedGroups[$mid] = [
+                        'merged_deed_no' => trim((string) $merging->merged_deed_no),
+                        'members'        => [],
+                        'partner_name'   => trim((string) ($merging->partner->name ?? $mapping->partner->name ?? '')),
+                    ];
+                }
+                if ($deedNo !== '') {
+                    $mergedGroups[$mid]['members'][] = ['deed_no' => $deedNo, 'kisan_name' => $kisanName];
+                }
+                continue;
+            }
+
+            if ($deedNo === '' || isset($seenSingle[$deedNo])) {
+                continue;
+            }
+            $seenSingle[$deedNo] = true;
+
+            $partnerName = trim((string) ($mapping->partner->name ?? ''));
+            $singleDeeds[] = [
+                'value' => $deedNo,
+                'label' => $buildLabel($deedNo, $kisanName, $partnerName),
+                'name'  => $partnerName,
+                'type'  => 'deed',
+            ];
+        }
+
+        $deeds        = [];
+        $defaultValue = null;
+
+        foreach ($mergedGroups as $g) {
+            $mergedNo = $g['merged_deed_no'];
+            if ($mergedNo === '') {
+                continue;
+            }
+            $partnerName  = $g['partner_name'];
+            $memberDeedNos = array_column($g['members'], 'deed_no');
+            $deeds[] = [
+                'value' => $mergedNo,
+                'label' => $mergedNo . '-MERGED(' . implode(',', $memberDeedNos) . ')',
+                'name'  => $partnerName,
+                'type'  => 'merged',
+            ];
+
+            // Member deed nos underneath the merge summary — still individually
+            // selectable, same "{deed_no}-K-{kisan}-P-{partner}" style as a plain entry.
+            foreach ($g['members'] as $member) {
+                $deeds[] = [
+                    'value' => $member['deed_no'],
+                    'label' => $buildLabel($member['deed_no'], $member['kisan_name'], $partnerName),
+                    'name'  => $partnerName,
+                    'type'  => 'deed',
+                ];
+            }
+
+            if ($customer !== '' && $partnerName !== '' && stripos($partnerName, $customer) !== false) {
+                $defaultValue = $mergedNo;
+            }
+        }
+
+        foreach ($singleDeeds as $entry) {
+            $deeds[] = $entry;
+
+            if ($defaultValue === null && $customer !== '' && $entry['name'] !== ''
+                && stripos($entry['name'], $customer) !== false) {
+                $defaultValue = $entry['value'];
+            }
+        }
+
+        // No customer match (or no customer given) — still prefer a merged deed no over a
+        // plain one: take the first merged entry if any exists, else the first plain deed.
+        if ($defaultValue === null) {
+            foreach ($deeds as $d) {
+                if ($d['type'] === 'merged') { $defaultValue = $d['value']; break; }
+            }
+            if ($defaultValue === null && ! empty($deeds)) {
+                $defaultValue = $deeds[0]['value'];
+            }
+        }
 
         return response()->json([
-            'found' => count($deeds) > 0,
-            'deeds' => $deeds,
+            'found'         => count($deeds) > 0,
+            'deeds'         => $deeds,
+            'default_value' => $defaultValue,
         ]);
     }
 
