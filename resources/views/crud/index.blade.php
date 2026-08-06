@@ -102,8 +102,12 @@
                     </div>
                     <div class="col-md-2">
                         <label class="form-label small fw-semibold mb-1">Broker</label>
-                        <input type="text" name="broker" value="{{ $cp_broker ?? '' }}"
-                               class="form-control form-control-sm" placeholder="Broker name…">
+                        <select name="broker_id" class="form-select form-select-sm js-select2" data-placeholder="All Brokers">
+                            <option value="">All Brokers</option>
+                            @foreach($brokers ?? [] as $b)
+                                <option value="{{ $b->id }}" @selected((string)($cp_broker_id ?? '') === (string)$b->id)>{{ $b->name }}</option>
+                            @endforeach
+                        </select>
                     </div>
                     <div class="col-md-2">
                         <label class="form-label small fw-semibold mb-1">Type</label>

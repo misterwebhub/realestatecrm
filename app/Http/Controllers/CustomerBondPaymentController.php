@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Http\Controllers\Concerns\ExportsCsv;
 use App\Http\Controllers\Concerns\ManagesCrud;
+use App\Models\Agent;
 use App\Models\Customer;
 use App\Models\CustomerBond;
 use App\Models\CustomerBondPayment;
@@ -75,7 +76,7 @@ class CustomerBondPaymentController extends Controller
         $bondQ       = trim((string) $request->input('bond', ''));
         $araziCode   = trim((string) $request->input('arazi_code', ''));
         $plotQ       = trim((string) $request->input('plot', ''));
-        $brokerQ     = trim((string) $request->input('broker', ''));
+        $brokerId    = trim((string) $request->input('broker_id', ''));
         $entryType   = trim((string) $request->input('entry_type', ''));
         $creditDebit = trim((string) $request->input('credit_debit', ''));
         $dateFrom    = trim((string) $request->input('date_from', ''));
@@ -115,10 +116,10 @@ class CustomerBondPaymentController extends Controller
             );
         }
 
-        // Search by broker name (the bond's assigned broker/agent)
-        if ($brokerQ !== '') {
+        // Filter by the bond's assigned broker/agent (exact id — select2 dropdown)
+        if ($brokerId !== '') {
             $query->whereHas('customerBond.broker', fn($b) =>
-                $b->where('name', 'like', '%'.$brokerQ.'%')
+                $b->where('id', $brokerId)
             );
         }
 
@@ -157,6 +158,8 @@ class CustomerBondPaymentController extends Controller
             'net'     => round($sumCredit - $sumDebit, 2),
         ];
 
+        $brokers = Agent::where('broker_type', 'customer')->orderBy('name')->get(['id', 'name']);
+
         $rows = $records->map(function (Model $record) use ($routeName) {
             $entry = $record->entry_no;
             return array_merge($this->resourceRow($record), [
@@ -179,7 +182,8 @@ class CustomerBondPaymentController extends Controller
             'cp_bond'                => $bondQ,
             'cp_arazi'               => $araziCode,
             'cp_plot'                => $plotQ,
-            'cp_broker'              => $brokerQ,
+            'cp_broker_id'           => $brokerId,
+            'brokers'                => $brokers,
             'cp_entry_type'          => $entryType,
             'cp_credit_debit'        => $creditDebit,
             'cp_date_from'           => $dateFrom,
