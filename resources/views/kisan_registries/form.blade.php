@@ -38,8 +38,15 @@
                 </div>
                 <div class="col-md-3">
                     <label class="form-label">ARAZI DEED No.</label>
-                          <input type="text" id="deed_no_input" name="arazi_deed_no" required class="form-control @error('arazi_deed_no') is-invalid @enderror"
-                              value="{{ old('arazi_deed_no', $item->arazi_deed_no) }}">
+                    <input type="text" id="deed_no_input" name="arazi_deed_no" required
+                        @if(! old('arazi_deed_no') && ! $item->arazi_deed_no) readonly @endif
+                        class="form-control @error('arazi_deed_no') is-invalid @enderror"
+                        value="{{ old('arazi_deed_no', $item->arazi_deed_no) }}">
+                    <select id="deed_no_select" name="arazi_deed_no" required disabled
+                        class="form-select d-none @error('arazi_deed_no') is-invalid @enderror"></select>
+                    <div class="form-text" id="deed_no_hint" style="display:none;">
+                        This arazi row was merged — choose which Deed No to use for this registry.
+                    </div>
                     @error('arazi_deed_no')<div class="invalid-feedback">{{ $message }}</div>@enderror
                 </div>
                 <div class="col-md-3">
@@ -210,6 +217,66 @@
             hint.style.display = '';
         }
 
+        // ARAZI DEED No. resolution for the currently picked arazi row (i.e.
+        // one specific kisan's share): if that row was folded into a Deed
+        // Merging, offer a dropdown to pick between the Merged Deed No and
+        // the plain Deed No (merged is the default). Otherwise, if a plain
+        // Deed No mapping exists, auto-fill it and lock the field read-only
+        // — there is nothing to choose. If neither exists, fall back to a
+        // free-text field so the row can still be registered manually.
+        function applyDeedNoOptions(info){
+            info = info || {};
+            const deedNo = (info.deed_no || '').trim();
+            const mergedDeedNo = (info.merged_deed_no || '').trim();
+            const input = document.getElementById('deed_no_input');
+            const select = document.getElementById('deed_no_select');
+            const hint = document.getElementById('deed_no_hint');
+            if(!input || !select) return;
+
+            if(mergedDeedNo){
+                select.innerHTML = '';
+                const addOpt = function(val, label){
+                    const o = document.createElement('option');
+                    o.value = val; o.textContent = label;
+                    select.appendChild(o);
+                };
+                addOpt(mergedDeedNo, 'Merged Deed No: ' + mergedDeedNo);
+                if(deedNo && deedNo !== mergedDeedNo){ addOpt(deedNo, 'Deed No: ' + deedNo); }
+                select.value = mergedDeedNo;
+                select.disabled = false;
+                select.classList.remove('d-none', 'is-invalid');
+                input.classList.add('d-none');
+                input.disabled = true;
+                input.required = false;
+                select.required = true;
+                if(hint) hint.style.display = '';
+            } else {
+                input.value = deedNo;
+                input.readOnly = !!deedNo;
+                input.disabled = false;
+                input.required = true;
+                input.classList.remove('d-none');
+                select.disabled = true;
+                select.required = false;
+                select.classList.add('d-none');
+                if(hint) hint.style.display = 'none';
+            }
+        }
+
+        // Auto-select the Partner on the first Buyer row from this arazi
+        // row's mapped/merged partner — but only if the user hasn't already
+        // picked one, so it never clobbers a manual choice.
+        function autoSelectPartner(partnerId){
+            if(!partnerId) return;
+            try{
+                const firstPartnerSelect = document.querySelector('.buyer-partner');
+                if(firstPartnerSelect && !firstPartnerSelect.value){
+                    firstPartnerSelect.value = String(partnerId);
+                    firstPartnerSelect.dispatchEvent(new Event('change', { bubbles: true }));
+                }
+            }catch(e){}
+        }
+
         function resetKisanSelects(){
             try{ deedName.empty().append('<option></option>').val(null).trigger('change'); }catch(e){}
         }
@@ -261,7 +328,10 @@
                         if(!res.ok) return;
                         const info = await res.json();
                         if(info){
-                            if(!window.__skipAutoDeedFill) try{ document.getElementById('deed_no_input').value = info.legacy_arazi_code || ''; }catch(e){}
+                            if(!window.__skipAutoDeedFill){
+                                try{ applyDeedNoOptions(info); }catch(e){}
+                                try{ autoSelectPartner(info.partner_id); }catch(e){}
+                            }
                             try{ updateAraziAreaHint(info); }catch(e){}
                             try{ document.querySelector('input[name="road_land_gaj"]').value = info.road_area ?? 0; }catch(e){}
                             window.__skipAutoDeedFill = false;
@@ -283,6 +353,8 @@
                         if(!res.ok) return;
                         const info = await res.json();
                         if(info){
+                            try{ applyDeedNoOptions(info); }catch(e){}
+                            try{ autoSelectPartner(info.partner_id); }catch(e){}
                             try{ updateAraziAreaHint(info); }catch(e){}
                             try{ document.querySelector('input[name="road_land_gaj"]').value = info.road_area ?? 0; }catch(e){}
                         }
@@ -311,11 +383,13 @@
                         $.getJSON("{{ route('ajax.kisans.by-arazi') }}", { arazi_code: code })
                             .done(function(data){ populateKisans(data || []); })
                             .fail(function(){ resetKisanSelects(); });
+                        // The single-match lookup already carries this row's deed/merge info.
+                        try{ applyDeedNoOptions(json); }catch(e){}
+                        try{ autoSelectPartner(json.partner_id); }catch(e){}
                         const infoRes = await fetch(araziInfoUrl.replace('__ARAZI_ID__', encodeURIComponent(araziId)));
                         if(infoRes && infoRes.ok){
                             const info = await infoRes.json();
                             if(info){
-                                try{ document.getElementById('deed_no_input').value = info.legacy_arazi_code || ''; }catch(e){}
                                 try{ updateAraziAreaHint(info); }catch(e){}
                                 try{ document.querySelector('input[name="road_land_gaj"]').value = info.road_area ?? 0; }catch(e){}
                             }
@@ -386,8 +460,23 @@
                 // directly fetch kisans and arazi info for the exact arazi selected in modal
                 try{
                     $.getJSON("{{ route('ajax.kisans.by-arazi') }}", { arazi_code: a.arazi_code || a.label })
-                        .done(function(data){ populateKisans(data || []); })
+                        .done(function(data){
+                            populateKisans(data || []);
+                            // Prefer the exact kisan tied to the row picked in the modal,
+                            // when it's actually present in this arazi code's kisan list.
+                            if(a.kisan){
+                                try{
+                                    const names = deedName.find('option').map(function(){ return this.value; }).get();
+                                    if(names.indexOf(a.kisan) !== -1){ deedName.val(a.kisan).trigger('change'); }
+                                }catch(e){}
+                            }
+                        })
                         .fail(function(){ resetKisanSelects(); });
+
+                    // The modal row already carries this arazi row's Deed No /
+                    // Merged Deed No / Partner — apply them straight away.
+                    try{ applyDeedNoOptions(a); }catch(e){}
+                    try{ autoSelectPartner(a.partner_id); }catch(e){}
 
                     (async function(){
                         try{
@@ -395,7 +484,6 @@
                             if(!res.ok) return;
                             const info = await res.json();
                             if(info){
-                                // do NOT auto-fill deed_no or name_deed_no here
                                 try{ updateAraziAreaHint(info); }catch(e){}
                                 try{ document.querySelector('input[name="road_land_gaj"]').value = info.road_area ?? 0; }catch(e){}
                             }

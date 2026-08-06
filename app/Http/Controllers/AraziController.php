@@ -382,7 +382,8 @@ class AraziController extends Controller
             return response()->json(['found' => false]);
         }
 
-        $araziQuery = Arazi::where('legacy_arazi_code', $code);
+        $araziQuery = Arazi::where('legacy_arazi_code', $code)
+            ->with(['kisan', 'deedMapping.partner', 'deedMergingItem.deedMerging.partner']);
         $arazis = $araziQuery->get();
         if ($arazis->isEmpty()) {
             return response()->json(['found' => false]);
@@ -391,7 +392,7 @@ class AraziController extends Controller
         // If multiple arazis share same legacy code, return matches for client to choose
         if ($arazis->count() > 1) {
             $matches = $arazis->map(function (Arazi $a) {
-                return [
+                return array_merge([
                     'id' => $a->id,
                     'arazi_code' => $a->legacy_arazi_code,
                     'label' => $a->araziNoCode(),
@@ -401,7 +402,7 @@ class AraziController extends Controller
                     'unit' => $a->unit ?? 'gaz',
                     'road_area' => $a->road_area ?? 0,
                     'status' => $a->status,
-                ];
+                ], $this->deedInfoFor($a));
             })->values()->all();
 
             return response()->json(['found' => true, 'matches' => $matches]);
@@ -412,13 +413,33 @@ class AraziController extends Controller
         // gather plots across every Arazi record sharing this Arazi No code
         $plots = $this->decoratePlots(Arazi::plotsForCode($arazi->araziNoCode()));
 
-        return response()->json([
+        return response()->json(array_merge([
             'found' => true,
             'arazi_id' => $arazi->id,
             'arazi_code' => $arazi->legacy_arazi_code,
             'arazi_label' => $arazi->araziNoCode(),
             'plots' => $plots,
-        ]);
+        ], $this->deedInfoFor($arazi)));
+    }
+
+    /**
+     * Deed Mapping / Deed Merging info for a single Arazi row (i.e. one
+     * kisan's share): the plain mapped Deed No + Partner, and — if that row
+     * has since been folded into a persisted merge — the merged Deed No and
+     * the partner every merged row resolved to (which supersedes the plain
+     * mapping's partner for that row).
+     */
+    private function deedInfoFor(Arazi $arazi): array
+    {
+        $mapping = $arazi->deedMapping;
+        $merge   = $arazi->deedMergingItem?->deedMerging;
+
+        return [
+            'deed_no'        => $mapping?->deed_no,
+            'merged_deed_no' => $merge?->merged_deed_no,
+            'partner_id'     => $merge?->partner_id ?? $mapping?->partner_id,
+            'partner_name'   => $merge?->partner?->name ?? $mapping?->partner?->name,
+        ];
     }
 
     /**
@@ -427,6 +448,8 @@ class AraziController extends Controller
      */
     public function info(Arazi $arazi)
     {
+        $arazi->loadMissing(['kisan', 'deedMapping.partner', 'deedMergingItem.deedMerging.partner']);
+
         $saleableTotal = $arazi->saleable_area;
         $existing = (float) Plot::where('arazi_code', $arazi->legacy_arazi_code)->sum('area');
         $remaining = $saleableTotal - $existing;
@@ -441,7 +464,7 @@ class AraziController extends Controller
             $totalGaz = (float) $saleableTotal;
         }
 
-        return response()->json([
+        return response()->json(array_merge([
             'id' => $arazi->id,
             'legacy_arazi_code' => $arazi->legacy_arazi_code,
             'kisan' => [
@@ -453,7 +476,7 @@ class AraziController extends Controller
             'road_area' => (float) ($arazi->road_area ?? 0),
             'saleable_total_gaz' => (float) $totalGaz,
             'remaining_gaz' => (float) round($remainingGaz, 2),
-        ]);
+        ], $this->deedInfoFor($arazi)));
     }
 
     public function grid(Arazi $arazi)
