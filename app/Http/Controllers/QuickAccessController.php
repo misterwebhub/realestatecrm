@@ -77,6 +77,7 @@ class QuickAccessController extends Controller
                     ['icon' => 'bi-hourglass-split',      'color' => 'warning',  'title' => 'Waiting Payments',     'desc' => 'Registry payments pending clearance',        'url' => route('registries.waiting-payments'),'add_url' => null],
                     ['icon' => 'bi-bar-chart-line',       'color' => 'info',     'title' => 'Plot Details Report',  'desc' => 'Detailed report by arazi / plot',            'url' => route('reports.plot.details'),      'add_url' => null],
                     ['icon' => 'bi-alarm',                'color' => 'danger',   'title' => 'Pending Installments',  'desc' => 'Dynamic EMI report with auto status: On Time/Partial/Ahead/Overdue/Fully Paid', 'url' => route('reports.pending-installments'), 'add_url' => null],
+                    ['icon' => 'bi-diagram-3',            'color' => 'purple',   'title' => 'Deed Merge Breakdown',  'desc' => 'For a Merged Deed No, see which arazi records were consolidated into it, saleable area & how much sold', 'url' => route('reports.deed-merge-breakdown'), 'add_url' => null],
                 ],
             ];
         }

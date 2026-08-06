@@ -224,6 +224,7 @@ Route::middleware(['auth', 'office-hours'])->group(function () {
     Route::get('reports/payments', [\App\Http\Controllers\ReportsController::class, 'payments'])->name('reports.payments');
     Route::get('reports/sales', [\App\Http\Controllers\ReportsController::class, 'sales'])->name('reports.sales');
     Route::get('reports/pending-installments', [\App\Http\Controllers\ReportsController::class, 'pendingInstallments'])->name('reports.pending-installments');
+    Route::get('reports/deed-merge-breakdown', [\App\Http\Controllers\ReportsController::class, 'deedMergeBreakdown'])->name('reports.deed-merge-breakdown');
     Route::get('reports/emi-detail/{customer_bond}', [\App\Http\Controllers\ReportsController::class, 'emiDetail'])->name('reports.emi-detail');
 
     // Arazis Map index: list folders under project root `arazis-map` and link to their index.php

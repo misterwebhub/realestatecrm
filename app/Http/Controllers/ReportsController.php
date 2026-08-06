@@ -7,6 +7,7 @@ use App\Models\AppSetting;
 use App\Models\Arazi;
 use App\Models\CustomerBond;
 use App\Models\CustomerBondPayment;
+use App\Models\DeedMerging;
 use App\Models\KisanRegistryBuyer;
 use App\Models\Partner;
 use App\Models\Plot;
@@ -833,6 +834,94 @@ class ReportsController extends Controller
             ->values();
 
         return response()->json(['deeds' => $deeds]);
+    }
+
+    /**
+     * Deed Merge Breakdown: for a chosen Merged Deed No, show which arazi record (kisan
+     * share) each member deed no came from, how much saleable area it contributed — i.e.
+     * how much land was consolidated into that merged Deed No, and from where — and how
+     * much of it has actually been sold (registered).
+     *
+     * A registry can reference a deed no either as one of the original member deed nos
+     * (if the sale happened before the merge) or as the new merged_deed_no itself (if sold
+     * after consolidation), so both are matched: per-row against the member's own deed no,
+     * and a merge-level total against the merged_deed_no directly.
+     */
+    public function deedMergeBreakdown(Request $request)
+    {
+        $mergingId = trim((string) $request->query('deed_merging_id', ''));
+
+        // Searchable "Merged Deed No" select — one option per merge.
+        $merges = $this->ownScope(
+            DeedMerging::whereNotNull('merged_deed_no')->where('merged_deed_no', '!=', '')
+        )->orderBy('merged_deed_no')->get(['id', 'arazi_code', 'merged_deed_no']);
+
+        $selected        = null;
+        $rows            = [];
+        $totalSaleable   = 0.0;
+        $totalSoldRows   = 0.0;
+        $mergedSold      = 0.0;
+        $totalSold       = 0.0;
+        $totalRemaining  = 0.0;
+
+        if ($mergingId !== '') {
+            $selected = $this->ownScope(DeedMerging::query())
+                ->with(['partner', 'items.arazi.kisan'])
+                ->find($mergingId);
+
+            if ($selected) {
+                $memberDeedNos = $selected->items->pluck('deed_no')->filter()->values()->all();
+                $allDeedNos    = array_unique(array_merge($memberDeedNos, [$selected->merged_deed_no]));
+
+                // Sold area per deed no: sum of registrySoldArea() for every registry
+                // recorded against that deed no, whether it's a member's original deed no
+                // or the merged deed no itself.
+                $soldByDeedNo = $this->ownScope(Registry::query())
+                    ->whereIn('deed_no', $allDeedNos)
+                    ->with('plot')
+                    ->get()
+                    ->groupBy('deed_no')
+                    ->map(fn ($regs) => $regs->sum(fn ($r) => $this->registrySoldArea($r)));
+
+                foreach ($selected->items as $item) {
+                    $arazi    = $item->arazi;
+                    $saleable = $arazi ? (float) $arazi->saleable_area : 0.0;
+                    $sold     = (float) ($soldByDeedNo[$item->deed_no] ?? 0);
+                    $remaining = max(0, round($saleable - $sold, 2));
+
+                    $totalSaleable += $saleable;
+                    $totalSoldRows += $sold;
+
+                    $rows[] = [
+                        'deed_no'       => $item->deed_no,
+                        'arazi_code'    => $arazi->legacy_arazi_code ?? '-',
+                        'kisan'         => $arazi->kisan->name ?? '-',
+                        'saleable_area' => round($saleable, 2),
+                        'sold_area'     => round($sold, 2),
+                        'remaining'     => $remaining,
+                    ];
+                }
+
+                // Sold directly against the merged deed no (post-merge sales) — kept
+                // separate from the per-row member sums since it isn't tied to one arazi.
+                $mergedSold = (float) ($soldByDeedNo[$selected->merged_deed_no] ?? 0);
+
+                $totalSold      = $totalSoldRows + $mergedSold;
+                $totalRemaining = max(0, round($totalSaleable - $totalSold, 2));
+            }
+        }
+
+        return view('reports.deed_merge_breakdown', [
+            'title'           => 'Deed Merge Breakdown',
+            'merges'          => $merges,
+            'mergingId'       => $mergingId,
+            'selected'        => $selected,
+            'rows'            => $rows,
+            'totalSaleable'   => round($totalSaleable, 2),
+            'mergedSold'      => round($mergedSold, 2),
+            'totalSold'       => round($totalSold, 2),
+            'totalRemaining'  => $totalRemaining,
+        ]);
     }
 
     /**

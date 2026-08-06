@@ -73,6 +73,7 @@ return [
         'report_payments_by_user'  => ['label' => 'Payments by User',     'group' => 'Reports', 'actions' => $view],
         'report_bonds_cumulative'  => ['label' => 'Bond Cumulative',      'group' => 'Reports', 'actions' => $view],
         'report_plot_details'      => ['label' => 'Plot Details',         'group' => 'Reports', 'actions' => $view],
+        'report_deed_merge_breakdown' => ['label' => 'Deed Merge Breakdown', 'group' => 'Reports', 'actions' => $view],
 
         // ── System ──────────────────────────────────────────────────────
         'user_master'   => ['label' => 'User Master',           'group' => 'System', 'actions' => $crud],

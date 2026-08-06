@@ -908,6 +908,12 @@ class RegistryController extends Controller
      * prefers a merged entry over a plain one — the first merge found, or the first plain
      * deed entry if none exists — so "a merged deed no exists → it gets auto-selected" holds
      * even when nothing matches the bond's customer name.
+     *
+     * Deed Mapping is a brand-new feature, so most historical arazi rows have never been
+     * deed-mapped. Any Arazi row with no deed_mappings entry falls back to the legacy deed
+     * no already recorded on its Kisan Registry entry (KisanRegistry.arazi_deed_no, matched
+     * by arazi_id) so those older records still get a selectable Deed No here instead of
+     * disappearing from the dropdown.
      */
     public function deedsByArazi(Request $request)
     {
@@ -925,6 +931,17 @@ class RegistryController extends Controller
             ->orderBy('id')
             ->get();
 
+        // Fallback source for arazi rows that were never run through the Deed Mapping
+        // feature (deed_mappings is brand new — most historical arazi rows predate it).
+        // Their real deed no still lives on the Kisan Registry entry recorded for that
+        // exact arazi row (arazi_id), e.g. KisanRegistry.arazi_deed_no = "7295".
+        $legacyDeedByArazi = \App\Models\KisanRegistry::whereIn('arazi_id', $arazis->pluck('id'))
+            ->whereNotNull('arazi_deed_no')
+            ->where('arazi_deed_no', '!=', '')
+            ->get(['arazi_id', 'arazi_deed_no'])
+            ->groupBy('arazi_id')
+            ->map(fn ($rows) => trim((string) $rows->first()->arazi_deed_no));
+
         // "{deed_no}-K-{kisan name}-P-{partner name}" — used for every individually
         // selectable deed entry (plain single or a merge's member deed no).
         $buildLabel = function (string $deedNo, string $kisanName, string $partnerName): string {
@@ -939,14 +956,28 @@ class RegistryController extends Controller
         $seenSingle   = [];
 
         foreach ($arazis as $arazi) {
-            $mapping = $arazi->deedMapping;
+            $mapping   = $arazi->deedMapping;
+            $kisanName = trim((string) ($arazi->kisan->name ?? ''));
+
             if (! $mapping) {
+                // Legacy fallback — plain deed no from the Kisan Registry record, no
+                // partner attached (this arazi hasn't been deed-mapped/merged yet).
+                $legacyDeedNo = trim((string) ($legacyDeedByArazi[$arazi->id] ?? ''));
+                if ($legacyDeedNo === '' || isset($seenSingle[$legacyDeedNo])) {
+                    continue;
+                }
+                $seenSingle[$legacyDeedNo] = true;
+                $singleDeeds[] = [
+                    'value' => $legacyDeedNo,
+                    'label' => $buildLabel($legacyDeedNo, $kisanName, ''),
+                    'name'  => '',
+                    'type'  => 'deed',
+                ];
                 continue;
             }
 
-            $deedNo    = trim((string) $mapping->deed_no);
-            $kisanName = trim((string) ($arazi->kisan->name ?? ''));
-            $item      = $arazi->deedMergingItem;
+            $deedNo = trim((string) $mapping->deed_no);
+            $item   = $arazi->deedMergingItem;
 
             if ($item && $item->deedMerging) {
                 $merging = $item->deedMerging;

@@ -239,7 +239,7 @@
                         <li class="nav-item"><a href="{{ route('partners.index') }}" class="nav-link {{ request()->routeIs('partners.*') ? 'active' : '' }}"><i class="nav-icon bi bi-diagram-3"></i><p>Partners</p></a></li>
                     @endcan
 
-                    @canany(['reports.view','report_partners.view','report_arazis.view','report_brokers.view','report_registries.view','report_payments.view','report_sales.view','report_payments_by_user.view','report_bonds_cumulative.view','report_plot_details.view'])
+                    @canany(['reports.view','report_partners.view','report_arazis.view','report_brokers.view','report_registries.view','report_payments.view','report_sales.view','report_payments_by_user.view','report_bonds_cumulative.view','report_plot_details.view','report_deed_merge_breakdown.view'])
                         <li class="nav-item {{ request()->routeIs('reports.*') ? 'menu-open' : '' }}">
                             <a href="#" class="nav-link {{ request()->routeIs('reports.*') ? 'active' : '' }}">
                                 <i class="nav-icon bi bi-journal-text"></i>
@@ -259,6 +259,7 @@
                                 @can('report_payments_by_user.view')<li class="nav-item"><a href="{{ route('reports.customer-payments.by-user') }}" class="nav-link {{ request()->routeIs('reports.customer-payments.by-user') ? 'active' : '' }}"><i class="nav-icon bi bi-receipt"></i><p>Payments by User</p></a></li>@endcan
                                 @can('report_bonds_cumulative.view')<li class="nav-item"><a href="{{ route('reports.bonds-cumulative') }}" class="nav-link {{ request()->routeIs('reports.bonds-cumulative') ? 'active' : '' }}"><i class="nav-icon bi bi-collection"></i><p>Bond Cumulative</p></a></li>@endcan
                                 @can('report_plot_details.view')<li class="nav-item"><a href="{{ route('reports.plot.details') }}" class="nav-link {{ request()->routeIs('reports.plot.details') ? 'active' : '' }}"><i class="nav-icon bi bi-grid-3x3-gap"></i><p>Plot Details</p></a></li>@endcan
+                                @can('report_deed_merge_breakdown.view')<li class="nav-item"><a href="{{ route('reports.deed-merge-breakdown') }}" class="nav-link {{ request()->routeIs('reports.deed-merge-breakdown') ? 'active' : '' }}"><i class="nav-icon bi bi-diagram-3"></i><p>Deed Merge Breakdown</p></a></li>@endcan
                             </ul>
                         </li>
                     @endcanany

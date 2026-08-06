@@ -87,6 +87,13 @@
             'icon'  => 'bi-alarm',
             'color' => '#dc2626',
         ],
+        [
+            'title' => 'Deed Merge Breakdown',
+            'desc'  => 'For a chosen Merged Deed No, see which arazi records (kisan shares) were consolidated into it and how much saleable area each contributed.',
+            'url'   => route('reports.deed-merge-breakdown'),
+            'icon'  => 'bi-diagram-3',
+            'color' => '#9333ea',
+        ],
     ];
 @endphp
 
