@@ -136,10 +136,19 @@
             .catch(function () { renderRows([]); });
     }
 
-    araziSelect.addEventListener('change', function () {
+    function onAraziChange() {
         araziHidden.value = araziSelect.value;
         loadRows(araziSelect.value);
-    });
+    }
+
+    // Plain change listener covers a native <select>. Select2 (initialized
+    // globally on this element) fires its change notification through
+    // jQuery's own event system, not a real DOM event, so addEventListener
+    // alone never sees it — bind through jQuery too when it's active.
+    araziSelect.addEventListener('change', onAraziChange);
+    if (window.jQuery && jQuery.fn.select2) {
+        jQuery(araziSelect).on('change', onAraziChange);
+    }
 
     // Initial state: server already loaded rows for $selectedCode (edit mode).
     if (araziSelect.value) {

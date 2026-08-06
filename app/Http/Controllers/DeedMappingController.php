@@ -16,17 +16,19 @@ class DeedMappingController extends Controller
 {
     /**
      * Listing: every arazi code with how many of its kisan rows are mapped,
-     * plus the mapped rows themselves (kisan, deed no, partner) so it reads
-     * the same way the mapping form does. Supports searching by arazi code,
-     * kisan, deed no, and partner — each rendered as a select2 dropdown of
-     * actual values (exact match) rather than free-text.
+     * plus EVERY kisan row for that code — mapped and unmapped alike — so
+     * the block reads as a complete picture of the arazi, not just the
+     * mapped subset. Supports searching by arazi code, kisan, deed no, and
+     * partner — each rendered as a select2 dropdown of actual values (exact
+     * match) rather than free-text.
      *
      * The Arazi filter is a "jump to this code" lookup (per CLAUDE.md, arazi
      * is always identified by its legacy code): picking one always shows
      * that arazi's block — mapped or not — same as browsing the unfiltered
      * list. Kisan/Deed No/Partner are substantive search filters: when any
      * of those is active (with or without an arazi code), only arazi codes
-     * with at least one matching mapped row are shown.
+     * with at least one matching *mapped* row are shown — but once a code
+     * qualifies, its whole block (mapped + unmapped rows) is still shown.
      */
     public function index(Request $request)
     {
@@ -37,24 +39,6 @@ class DeedMappingController extends Controller
         $hasSearchFilter = $kisanId !== '' || $deedNo !== '' || $partnerId !== '';
         $hasFilter        = $araziCode !== '' || $hasSearchFilter;
 
-        $mappingsQuery = DeedMapping::with(['arazi.kisan', 'partner']);
-
-        if ($araziCode !== '') {
-            $mappingsQuery->whereHas('arazi', fn ($q) => $q->where('legacy_arazi_code', $araziCode));
-        }
-        if ($kisanId !== '') {
-            $mappingsQuery->whereHas('arazi', fn ($q) => $q->where('kisan_id', $kisanId));
-        }
-        if ($deedNo !== '') {
-            $mappingsQuery->where('deed_no', $deedNo);
-        }
-        if ($partnerId !== '') {
-            $mappingsQuery->where('partner_id', $partnerId);
-        }
-
-        $mappings = $mappingsQuery->get();
-        $groups   = $mappings->groupBy(fn ($m) => $m->arazi?->legacy_arazi_code);
-
         $araziCodes = Arazi::whereNotNull('legacy_arazi_code')
             ->where('legacy_arazi_code', '!=', '')
             ->orderBy('legacy_arazi_code')
@@ -62,31 +46,61 @@ class DeedMappingController extends Controller
             ->unique()
             ->values();
 
+        // Which arazi codes have at least one *mapped* row matching the
+        // active kisan/deed no/partner filters — used only to decide which
+        // codes qualify, not to limit which rows show within them.
+        $matchingCodes = collect();
+        if ($hasSearchFilter) {
+            $matchQuery = DeedMapping::with('arazi');
+            if ($kisanId !== '') {
+                $matchQuery->whereHas('arazi', fn ($q) => $q->where('kisan_id', $kisanId));
+            }
+            if ($deedNo !== '') {
+                $matchQuery->where('deed_no', $deedNo);
+            }
+            if ($partnerId !== '') {
+                $matchQuery->where('partner_id', $partnerId);
+            }
+            $matchingCodes = $matchQuery->get()
+                ->map(fn ($m) => $m->arazi?->legacy_arazi_code)
+                ->filter()
+                ->unique()
+                ->values();
+        }
+
         if ($araziCode !== '') {
             // Arazi code selected: always show that one code's block, whether
             // or not it (or its matching rows under other filters) is mapped.
-            // An unrecognized/tampered code yields no block at all.
+            // An unrecognized/tampered code yields no block at all. If search
+            // filters are also active, the jumped-to code must still match them.
             $codes = $araziCodes->contains(fn ($c) => (string) $c === (string) $araziCode)
                 ? collect([$araziCode])
                 : collect();
+            if ($hasSearchFilter) {
+                $codes = $codes->filter(fn ($c) => $matchingCodes->contains(fn ($m) => (string) $m === (string) $c))->values();
+            }
         } elseif ($hasSearchFilter) {
-            $codes = $groups->keys()->filter()->sort()->values();
+            $codes = $araziCodes->filter(fn ($c) => $matchingCodes->contains(fn ($m) => (string) $m === (string) $c))->sort()->values();
         } else {
             $codes = $araziCodes;
         }
 
-        $totalsByCode = Arazi::whereNotNull('legacy_arazi_code')
-            ->select('legacy_arazi_code', DB::raw('count(*) as total'))
-            ->groupBy('legacy_arazi_code')
-            ->pluck('total', 'legacy_arazi_code');
+        // Every arazi row (mapped or not) for the codes being shown, so each
+        // block lists its full kisan roster with mapped rows carrying their
+        // deed no/partner and unmapped rows showing as such.
+        $arazisByCode = Arazi::whereIn('legacy_arazi_code', $codes->all())
+            ->with(['kisan', 'deedMapping.partner'])
+            ->orderBy('id')
+            ->get()
+            ->groupBy('legacy_arazi_code');
 
-        $summary = $codes->map(function ($code) use ($groups, $totalsByCode) {
-            $rows = ($groups->get($code) ?? collect())->sortBy(fn ($r) => optional($r->arazi)->id)->values();
+        $summary = $codes->map(function ($code) use ($arazisByCode) {
+            $rows = ($arazisByCode->get($code) ?? collect())->values();
 
             return [
                 'code'   => $code,
-                'total'  => (int) ($totalsByCode[$code] ?? 0),
-                'mapped' => $rows->count(),
+                'total'  => $rows->count(),
+                'mapped' => $rows->filter(fn ($a) => $a->deedMapping !== null)->count(),
                 'rows'   => $rows,
             ];
         });

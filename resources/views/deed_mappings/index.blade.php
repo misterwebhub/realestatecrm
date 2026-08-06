@@ -83,7 +83,7 @@
                     <i class="bi bi-pencil"></i> {{ $group['mapped'] > 0 ? 'Edit' : 'Map' }}
                 </a>
             </div>
-            @if($group['mapped'] > 0)
+            @if($group['rows']->isNotEmpty())
                 <div class="table-responsive">
                     <table class="table table-sm mb-0 align-middle">
                         <thead class="table-light">
@@ -92,22 +92,36 @@
                                 <th>Kisan</th>
                                 <th>Deed No</th>
                                 <th>Partner</th>
+                                <th style="width:120px;">Status</th>
                             </tr>
                         </thead>
                         <tbody>
                             @foreach($group['rows'] as $i => $row)
                                 <tr>
                                     <td class="ps-3">{{ $i + 1 }}</td>
-                                    <td>{{ optional($row->arazi->kisan)->name ?? '—' }}</td>
-                                    <td><span class="badge bg-primary-subtle text-primary-emphasis">{{ $row->deed_no }}</span></td>
-                                    <td>{{ optional($row->partner)->name ?? '—' }}</td>
+                                    <td>{{ optional($row->kisan)->name ?? '—' }}</td>
+                                    <td>
+                                        @if($row->deedMapping)
+                                            <span class="badge bg-primary-subtle text-primary-emphasis">{{ $row->deedMapping->deed_no }}</span>
+                                        @else
+                                            <span class="text-muted">—</span>
+                                        @endif
+                                    </td>
+                                    <td>{{ optional($row->deedMapping?->partner)->name ?? '—' }}</td>
+                                    <td>
+                                        @if($row->deedMapping)
+                                            <span class="badge bg-success-subtle text-success border border-success-subtle">Mapped</span>
+                                        @else
+                                            <span class="badge bg-secondary-subtle text-secondary border border-secondary-subtle">Unmapped</span>
+                                        @endif
+                                    </td>
                                 </tr>
                             @endforeach
                         </tbody>
                     </table>
                 </div>
             @else
-                <div class="card-body py-3 text-muted">Not mapped yet.</div>
+                <div class="card-body py-3 text-muted">No kisan rows for this arazi.</div>
             @endif
         </div>
     @empty
