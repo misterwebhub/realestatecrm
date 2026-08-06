@@ -86,6 +86,16 @@ class Arazi extends Model
         return $this->hasOne(Registry::class, 'arazi_code', 'legacy_arazi_code');
     }
 
+    /**
+     * Deed Mapping: this arazi row's (i.e. this kisan's share's) assigned
+     * Deed No + Partner. One-to-one — a given Arazi row has at most one
+     * deed mapping.
+     */
+    public function deedMapping()
+    {
+        return $this->hasOne(DeedMapping::class);
+    }
+
     public function documents()
     {
         return $this->hasMany(AraziDocument::class, 'arazi_code', 'legacy_arazi_code');

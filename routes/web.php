@@ -62,6 +62,13 @@ Route::middleware(['auth', 'office-hours'])->group(function () {
     Route::get('arazi-groups/{araziGroup}/edit', [\App\Http\Controllers\AraziGroupController::class, 'edit'])->name('arazi-groups.edit');
     Route::put('arazi-groups/{araziGroup}', [\App\Http\Controllers\AraziGroupController::class, 'update'])->name('arazi-groups.update');
     Route::delete('arazi-groups/{araziGroup}', [\App\Http\Controllers\AraziGroupController::class, 'destroy'])->name('arazi-groups.destroy');
+
+    // Deed Mapping: select an arazi, map each kisan row under it to a Deed No + Partner
+    Route::get('deed-mappings', [\App\Http\Controllers\DeedMappingController::class, 'index'])->name('deed-mappings.index');
+    Route::get('deed-mappings/rows', [\App\Http\Controllers\DeedMappingController::class, 'rows'])->name('deed-mappings.rows');
+    Route::get('deed-mappings/map/{araziCode?}', [\App\Http\Controllers\DeedMappingController::class, 'map'])->name('deed-mappings.map');
+    Route::post('deed-mappings', [\App\Http\Controllers\DeedMappingController::class, 'store'])->name('deed-mappings.store');
+
     Route::resource('plots', PlotController::class)->except(['show']);
     Route::get('plot-holds', [\App\Http\Controllers\PlotHoldController::class, 'index'])->name('plot-holds.index');
     Route::post('plot-holds', [\App\Http\Controllers\PlotHoldController::class, 'store'])->name('plot-holds.store');

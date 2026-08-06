@@ -150,6 +150,15 @@
                         </li>
                     @endcan
 
+                    @can('deed_mappings.view')
+                        <li class="nav-item">
+                            <a href="{{ route('deed-mappings.index') }}" class="nav-link {{ request()->routeIs('deed-mappings.*') ? 'active' : '' }}">
+                                <i class="nav-icon bi bi-file-earmark-lock"></i>
+                                <p>Deed Mapping</p>
+                            </a>
+                        </li>
+                    @endcan
+
                     @can('plots.view')
                         <li class="nav-item">
                             <a href="{{ route('plots.index') }}" class="nav-link {{ request()->routeIs('plots.*') ? 'active' : '' }}">

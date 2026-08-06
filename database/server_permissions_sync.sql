@@ -128,7 +128,7 @@ UPDATE `customer_bond_cheques` SET created_by = @admin_id WHERE created_by IS NU
 
 -- ----------------------------------------------------------------------------
 -- 3) Permission rows — one per "{module}.{action}" from config/permissions.php
---    (108 rows). INSERT ... ON DUPLICATE KEY UPDATE means existing rows
+--    (112 rows). INSERT ... ON DUPLICATE KEY UPDATE means existing rows
 --    (matched by unique `name`) are left as-is (module/action re-affirmed,
 --    no data loss); only missing rows get inserted.
 -- ----------------------------------------------------------------------------
@@ -143,6 +143,10 @@ INSERT INTO `permissions` (`name`, `module`, `action`, `created_at`, `updated_at
 ('arazi_groups.create','arazi_groups','create',NOW(),NOW()),
 ('arazi_groups.edit','arazi_groups','edit',NOW(),NOW()),
 ('arazi_groups.delete','arazi_groups','delete',NOW(),NOW()),
+('deed_mappings.view','deed_mappings','view',NOW(),NOW()),
+('deed_mappings.create','deed_mappings','create',NOW(),NOW()),
+('deed_mappings.edit','deed_mappings','edit',NOW(),NOW()),
+('deed_mappings.delete','deed_mappings','delete',NOW(),NOW()),
 ('plots.view','plots','view',NOW(),NOW()),
 ('plots.create','plots','create',NOW(),NOW()),
 ('plots.edit','plots','edit',NOW(),NOW()),

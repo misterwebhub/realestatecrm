@@ -28,6 +28,7 @@ return [
         'arazis'            => ['label' => 'Arazi (Lands)',   'group' => 'Land & Plots', 'actions' => $crud],
         'arazi_maps'        => ['label' => 'Arazi Maps',      'group' => 'Land & Plots', 'actions' => $view],
         'arazi_groups'      => ['label' => 'Arazi Groups',    'group' => 'Land & Plots', 'actions' => $crud],
+        'deed_mappings'     => ['label' => 'Deed Mapping',    'group' => 'Land & Plots', 'actions' => $crud],
         'plots'             => ['label' => 'Plots',           'group' => 'Land & Plots', 'actions' => $crud],
         'plot_holds'        => ['label' => 'Plot Holds',      'group' => 'Land & Plots', 'actions' => $crud],
         'registries'        => ['label' => 'Plot Registry',   'group' => 'Land & Plots', 'actions' => $crud],
