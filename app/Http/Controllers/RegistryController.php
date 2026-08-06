@@ -899,7 +899,9 @@ class RegistryController extends Controller
             return response()->json(['found' => false, 'deeds' => []]);
         }
 
-        $rows = \App\Models\KisanRegistry::where('arazi_code', $code)
+        $codes = $this->relatedAraziCodes($code);
+
+        $rows = \App\Models\KisanRegistry::whereIn('arazi_code', $codes)
             ->get(['arazi_deed_no', 'name_deed_no']);
 
         $deeds = $rows->flatMap(function ($r) {
