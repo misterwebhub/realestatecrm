@@ -30,7 +30,15 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        //
+        // Belt-and-suspenders: also require the helper file directly here,
+        // not just via composer.json's "autoload.files" entry. That entry
+        // only takes effect after `composer dump-autoload` is rerun on a
+        // server, and a deploy that skips that step would otherwise throw
+        // "Call to undefined function inr()" everywhere money is displayed.
+        // AppServiceProvider is loaded via plain PSR-4 (no dump-autoload
+        // needed for that), so this always runs. inr() is already guarded
+        // with function_exists() so it's safe to load twice.
+        require_once app_path('helpers.php');
     }
 
     /**
