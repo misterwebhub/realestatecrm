@@ -26,8 +26,6 @@ class RegistryController extends Controller
 
     public function waitingPayments(): View
     {
-        $this->registryLifecycleService->expirePendingRegistries();
-
         $records = $this->applyOwnershipScope(
             Registry::with(['customer', 'arazi', 'agent'])
                 ->where('status', 'pending')
@@ -489,9 +487,19 @@ class RegistryController extends Controller
         $filterRegNo     = trim((string) $request->input('reg_no', ''));
         $filterDeedNo    = trim((string) $request->input('deed_no', ''));
         $filterBrokerId  = trim((string) $request->input('broker_id', ''));
+        $filterDateFrom  = trim((string) $request->input('date_from', ''));
+        $filterDateTo    = trim((string) $request->input('date_to', ''));
 
         if ($filterAraziCode !== '') {
             $q->where('arazi_code', $filterAraziCode);
+        }
+
+        if ($filterDateFrom !== '') {
+            $q->whereDate('registry_date', '>=', $filterDateFrom);
+        }
+
+        if ($filterDateTo !== '') {
+            $q->whereDate('registry_date', '<=', $filterDateTo);
         }
 
         if ($filterPlotId) {
@@ -528,6 +536,43 @@ class RegistryController extends Controller
             $rows = array_values(array_filter($rows, fn ($row) => (string) ($row['broker_id'] ?? '') === $filterBrokerId));
         }
 
+        // Summary of the filtered result set (computed before pagination slices it).
+        $registrySummary = [
+            'count' => count($rows),
+            'gaz'   => array_sum(array_column($rows, 'land_size')),
+        ];
+
+        // "Stock" = saleable area still available (not filtered by date — it's a
+        // present-day snapshot), scoped to the selected arazi code if any, same
+        // saleable/sold logic used in ReportsController::sales().
+        $stockArazis = Arazi::whereNotNull('legacy_arazi_code')
+            ->where('legacy_arazi_code', '!=', '')
+            ->when($filterAraziCode !== '', fn ($q2) => $q2->where('legacy_arazi_code', $filterAraziCode))
+            ->get(['legacy_arazi_code', 'size', 'road_area']);
+        $totalSaleable = 0.0;
+        foreach ($stockArazis as $a) {
+            $totalSaleable += max((float) $a->size - (float) $a->road_area, 0);
+        }
+        $totalSoldAllTime = (float) $this->applyOwnershipScope(Registry::query())
+            ->when($filterAraziCode !== '', fn ($q2) => $q2->where('arazi_code', $filterAraziCode))
+            ->sum('land_size');
+        $registrySummary['stock'] = max($totalSaleable - $totalSoldAllTime, 0);
+
+        // Paginate the already-filtered rows (broker filter is applied in PHP,
+        // so pagination is done here rather than at the DB query level).
+        $perPage = 50;
+        $page    = (int) $request->input('page', 1);
+        $page    = $page > 0 ? $page : 1;
+        $total   = count($rows);
+        $pagedRows = array_slice($rows, ($page - 1) * $perPage, $perPage);
+        $paginator = new \Illuminate\Pagination\LengthAwarePaginator(
+            $pagedRows,
+            $total,
+            $perPage,
+            $page,
+            ['path' => $request->url(), 'query' => $request->query()]
+        );
+
         // Plots for selected arazi code (all arazis with that code)
         $filterPlots = collect();
         if ($filterAraziCode !== '') {
@@ -551,7 +596,9 @@ class RegistryController extends Controller
         return view('registries.index', [
             'title'           => $this->resourceTitle(),
             'columns'         => $this->resourceColumns(),
-            'rows'            => $rows,
+            'rows'            => $pagedRows,
+            'paginator'       => $paginator,
+            'registrySummary' => $registrySummary,
             'createUrl'       => route($this->resourceRouteName() . '.create'),
             'araziOptions'    => $araziOptions,
             'filterPlots'     => $filterPlots,
@@ -561,6 +608,8 @@ class RegistryController extends Controller
             'filterDeedNo'    => $filterDeedNo,
             'brokerOptions'   => $brokerOptions,
             'filterBrokerId'  => $filterBrokerId,
+            'filterDateFrom'  => $filterDateFrom,
+            'filterDateTo'    => $filterDateTo,
         ]);
     }
 
@@ -746,6 +795,7 @@ class RegistryController extends Controller
                 ucfirst($item->status),
             ],
             'broker_id' => $bond?->broker_id,
+            'land_size' => (float) ($item->land_size ?? 0),
         ];
     }
 

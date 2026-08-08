@@ -377,7 +377,27 @@ class CustomerBondController extends Controller
             $query->whereDate('bond_date', '<=', $dateTo);
         }
 
-        $records = $query->get();
+        // Cumulative summary over the FULL filtered set (not just the current
+        // page) — computed via DB aggregates on cloned copies of the query,
+        // before paginate() below mutates/executes the original.
+        $summaryBase = clone $query;
+        $totalCount      = (clone $summaryBase)->count();
+        $totalBondAmount = (float) (clone $summaryBase)->sum('bond_amount');
+        $totalPaid       = (float) \App\Models\CustomerBondPayment::whereIn(
+            'customer_bond_id',
+            (clone $summaryBase)->select('customer_bonds.id')
+        )->sum('amount');
+        $totalBalance = max(0, round($totalBondAmount - $totalPaid, 2));
+
+        $summary = [
+            'count'   => $totalCount,
+            'amount'  => round($totalBondAmount, 2),
+            'paid'    => round($totalPaid, 2),
+            'balance' => $totalBalance,
+        ];
+
+        $paginator = $query->paginate(50)->withQueryString();
+        $records   = $paginator->getCollection();
         $routeName = $this->resourceRouteName();
 
         $rows = $records->map(function (Model $record) use ($routeName) {
@@ -394,9 +414,11 @@ class CustomerBondController extends Controller
             'title' => $this->resourceTitle(),
             'columns' => $this->resourceColumns(),
             'rows' => $rows,
+            'paginator' => $paginator,
             'createUrl' => route($routeName . '.create'),
             'exportCsvUrl' => $this->allowsCsvExport() ? route($routeName.'.export.csv') : null,
             'isCustomerBondIndex' => true,
+            'cbSummary' => $summary,
             'filter_arazi' => $araziCode,
             'filter_plot' => $plotQuery,
             'filter_q' => $customerQ,

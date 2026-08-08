@@ -556,6 +556,44 @@
                     input.addEventListener('keydown', function(e){ if(e.key === 'Enter'){ e.preventDefault(); lookup(); } });
                 })();
             </script>
+
+            {{-- Cumulative summary of the filtered result set --}}
+            @if(!empty($cbSummary))
+            <div class="row g-2 mb-3 px-3">
+                <div class="col-6 col-md-3">
+                    <div class="card shadow-sm border-start border-4 border-secondary h-100">
+                        <div class="card-body py-2">
+                            <div class="small text-muted text-uppercase">Bonds</div>
+                            <div class="fs-6 fw-bold">{{ number_format($cbSummary['count']) }}</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-6 col-md-3">
+                    <div class="card shadow-sm border-start border-4 border-primary h-100">
+                        <div class="card-body py-2">
+                            <div class="small text-muted text-uppercase">Total Amount</div>
+                            <div class="fs-6 fw-bold text-primary">₹{{ number_format($cbSummary['amount'],2) }}</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-6 col-md-3">
+                    <div class="card shadow-sm border-start border-4 border-success h-100">
+                        <div class="card-body py-2">
+                            <div class="small text-muted text-uppercase">Total Paid</div>
+                            <div class="fs-6 fw-bold text-success">₹{{ number_format($cbSummary['paid'],2) }}</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-6 col-md-3">
+                    <div class="card shadow-sm border-start border-4 border-danger h-100">
+                        <div class="card-body py-2">
+                            <div class="small text-muted text-uppercase">Total Balance</div>
+                            <div class="fs-6 fw-bold text-danger">₹{{ number_format($cbSummary['balance'],2) }}</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            @endif
         @endif
 
         @if(!empty($isPlotIndex))

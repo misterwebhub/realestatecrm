@@ -94,6 +94,13 @@
             'icon'  => 'bi-diagram-3',
             'color' => '#9333ea',
         ],
+        [
+            'title' => 'Deed Report',
+            'desc'  => 'Look up any single Deed No (standalone, merged member, or Merged Deed No) and see allotted, sold &amp; remaining area, plus its Merged Deed No.',
+            'url'   => route('reports.deed-report'),
+            'icon'  => 'bi-file-earmark-ruled',
+            'color' => '#0d9488',
+        ],
     ];
 @endphp
 

@@ -110,8 +110,8 @@
         <div class="col-12">
             <div class="text-muted" style="font-size:11px;">
                 <i class="bi bi-info-circle"></i>
-                Due Date defaults to <strong>today → today + Reminder Days ({{ $reminderDays }})</strong> from Settings, showing installments due now or coming up soon.
-                Bonds already unpaid past their due date (Partial/Overdue, per the Overdue Days setting = {{ $overdueDays }}) always show regardless of this window. Adjust the dates above to widen or narrow the view.
+                Due Date, Settings ke हिसाब से डिफ़ॉल्ट <strong>आज → आज + Reminder Days ({{ $reminderDays }})</strong> तक रहती है, ताकि अभी due या जल्दी आने वाली installments दिख सकें।
+                जिन Bonds की due date पहले ही निकल चुकी है और payment बाकी है (Partial/Overdue, Overdue Days setting = {{ $overdueDays }} के अनुसार), वो इस date window से बाहर होने पर भी हमेशा दिखेंगे। ऊपर दी गई dates बदलकर view को बड़ा या छोटा किया जा सकता है।
             </div>
         </div>
     </form>
@@ -176,9 +176,16 @@
         </div>
     </div>
 
+    {{-- Cash / Cheque note — summary cards removed, sirf explanation point rakha gaya hai --}}
+    <div class="alert alert-light border small mb-3 no-print" style="font-size:11.5px;">
+        <i class="bi bi-info-circle"></i>
+        <strong>Note:</strong> Bond ke against jo cheques bane hain wo uska kuch part cover karte hain; Bond Amount me se jo bacha part hai use "cash" mana jata hai.
+        Jaise: Bond ₹1,000, cheques ₹500 ke bane → cash portion = ₹500. Agar in cheques me se ₹300 clear ho gaye, to Cheque se Payment = ₹300, Cheque ka Pending Balance = ₹200, aur Cash ka Pending Balance = ₹500 rahega (jab tak cash na mile).
+    </div>
+
     <div class="card">
         <div class="table-responsive">
-            <table class="table table-sm table-hover align-middle mb-0" style="font-size:11.5px;">
+            <table class="table table-sm table-bordered table-hover align-middle mb-0" style="font-size:11.5px;">
                 <thead class="table-light">
                     <tr>
                         <th>#</th>
@@ -197,6 +204,13 @@
                         <th>Next EMI Due</th>
                         <th>Overdue</th>
                         <th class="text-center">Status</th>
+                        <th class="text-end">Cheque Total</th>
+                        <th class="text-end">Payment&nbsp;from&nbsp;Cheque</th>
+                        <th class="text-end">Pending&nbsp;Cheque&nbsp;Balance</th>
+                        <th class="text-end">Payment&nbsp;from&nbsp;Cash</th>
+                        <th class="text-end">Pending&nbsp;Cash&nbsp;Balance</th>
+                        <th class="text-end">Total&nbsp;Paid&nbsp;(Cash+Cheque)</th>
+                        <th class="text-end">Total&nbsp;Balance</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -249,9 +263,16 @@
                                     <div class="badge bg-info-subtle text-info-emphasis mt-1">Reminder</div>
                                 @endif
                             </td>
+                            <td class="text-end">{{ number_format($r['cheque_total'],2) }}</td>
+                            <td class="text-end text-primary">{{ number_format($r['cheque_paid'],2) }}</td>
+                            <td class="text-end {{ $r['cheque_pending_balance'] > 0.009 ? 'text-warning-emphasis fw-bold' : '' }}">{{ number_format($r['cheque_pending_balance'],2) }}</td>
+                            <td class="text-end text-success">{{ number_format($r['cash_paid'],2) }}</td>
+                            <td class="text-end {{ $r['cash_pending_balance'] > 0.009 ? 'text-danger fw-bold' : '' }}">{{ number_format($r['cash_pending_balance'],2) }}</td>
+                            <td class="text-end fw-semibold">{{ number_format($r['total_paid_all'],2) }}</td>
+                            <td class="text-end fw-semibold">{{ number_format($r['total_balance_all'],2) }}</td>
                         </tr>
                     @empty
-                        <tr><td colspan="16" class="text-center text-muted py-4">No bonds match the selected filters.</td></tr>
+                        <tr><td colspan="23" class="text-center text-muted py-4">No bonds match the selected filters.</td></tr>
                     @endforelse
                 </tbody>
                 @if(count($rows))
@@ -271,6 +292,13 @@
                         <td></td>
                         <td></td>
                         <td></td>
+                        <td class="text-end">{{ number_format($g_cheque_total,2) }}</td>
+                        <td class="text-end text-primary">{{ number_format($g_cheque_paid,2) }}</td>
+                        <td class="text-end text-warning-emphasis">{{ number_format($g_cheque_pending_balance,2) }}</td>
+                        <td class="text-end text-success">{{ number_format($g_cash_paid,2) }}</td>
+                        <td class="text-end text-danger">{{ number_format($g_cash_pending_balance,2) }}</td>
+                        <td class="text-end">{{ number_format($g_total_paid_all,2) }}</td>
+                        <td class="text-end">{{ number_format($g_total_balance_all,2) }}</td>
                     </tr>
                 </tfoot>
                 @endif

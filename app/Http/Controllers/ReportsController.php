@@ -7,7 +7,9 @@ use App\Models\AppSetting;
 use App\Models\Arazi;
 use App\Models\CustomerBond;
 use App\Models\CustomerBondPayment;
+use App\Models\DeedMapping;
 use App\Models\DeedMerging;
+use App\Models\DeedMergingItem;
 use App\Models\KisanRegistryBuyer;
 use App\Models\Partner;
 use App\Models\Plot;
@@ -507,7 +509,7 @@ class ReportsController extends Controller
             $dateToC = $today->copy()->addDays($reminderDays)->endOfDay();
         }
 
-        $bondsQuery = CustomerBond::with(['customer', 'arazi', 'payments'])
+        $bondsQuery = CustomerBond::with(['customer', 'arazi', 'payments', 'cheques'])
             ->whereNotNull('last_date')
             ->where('installment_amount', '>', 0)
             ->when($customerId, fn ($q) => $q->where('customer_id', $customerId))
@@ -520,6 +522,10 @@ class ReportsController extends Controller
 
         $rows = [];
         $gBondAmount = $gAdvance = $gFinance = $gExpected = $gPaid = $gOutstanding = $gCredit = $gRemaining = 0.0;
+        // Cash/Cheque split (see docblock above the loop for the logic).
+        $gChequeTotal = $gChequePaid = $gChequePendingBalance = 0.0;
+        $gCashPaid = $gCashPendingBalance = 0.0;
+        $gTotalPaidAll = $gTotalBalanceAll = 0.0;
 
         foreach ($bonds as $bond) {
             $emi = EmiCalculator::calculate($bond, $today, $overdueDays);
@@ -545,6 +551,33 @@ class ReportsController extends Controller
                     continue;
                 }
             }
+
+            // ── Cash / Cheque split ──────────────────────────────────────
+            // A bond's amount is expected to be covered partly by cheques
+            // (post-dated cheques logged against the bond via "Assign
+            // Cheques to Bond") and whatever's left of the bond amount is
+            // treated as the "cash" portion. Example: Bond = 1000, cheques
+            // worth 500 were created against it -> the other 500 is the cash
+            // portion. If 300 of those cheques have cleared, Payment from
+            // Cheque = 300, Pending Cheque Balance = 200. Any money actually
+            // received that isn't accounted for by a cleared cheque (cash,
+            // RTGS, UPI, the booking advance, etc.) counts as "cash paid" —
+            // so Pending Cash Balance = 500 - 0 = 500 in that example.
+            // This is computed live every request, nothing is stored.
+            $chequeTotal = round((float) $bond->cheques->sum('amount'), 2);
+            $chequePaid  = round((float) $bond->cheques->where('status', 'cleared')->sum('amount'), 2);
+            $chequePendingBalance = round(max($chequeTotal - $chequePaid, 0), 2);
+
+            // Everything ever paid on the bond, any method (advance/booking
+            // payment + every EMI-side entry) — $emi['total_paid'] alone
+            // excludes the advance, so add it back in here.
+            $totalPaidAll = round($emi['advance_amount'] + $emi['total_paid'], 2);
+
+            $cashPortion = round(max($emi['bond_amount'] - $chequeTotal, 0), 2);
+            $cashPaid    = round(max($totalPaidAll - $chequePaid, 0), 2);
+            $cashPendingBalance = round(max($cashPortion - $cashPaid, 0), 2);
+
+            $totalBalanceAll = round(max($emi['bond_amount'] - $totalPaidAll, 0), 2);
 
             $meta = EmiCalculator::statusMeta($emi['status']);
 
@@ -584,6 +617,13 @@ class ReportsController extends Controller
                 'status_label'       => $meta['label'],
                 'status_emoji'       => $meta['emoji'],
                 'status_badge'       => $meta['badge'],
+                'cheque_total'          => $chequeTotal,
+                'cheque_paid'           => $chequePaid,
+                'cheque_pending_balance'=> $chequePendingBalance,
+                'cash_paid'             => $cashPaid,
+                'cash_pending_balance'  => $cashPendingBalance,
+                'total_paid_all'        => $totalPaidAll,
+                'total_balance_all'     => $totalBalanceAll,
             ];
 
             $gBondAmount  += $emi['bond_amount'];
@@ -594,6 +634,14 @@ class ReportsController extends Controller
             $gOutstanding += $emi['outstanding'];
             $gCredit      += $emi['credit'];
             $gRemaining   += $emi['remaining_balance'];
+
+            $gChequeTotal          += $chequeTotal;
+            $gChequePaid           += $chequePaid;
+            $gChequePendingBalance += $chequePendingBalance;
+            $gCashPaid             += $cashPaid;
+            $gCashPendingBalance   += $cashPendingBalance;
+            $gTotalPaidAll         += $totalPaidAll;
+            $gTotalBalanceAll      += $totalBalanceAll;
         }
 
         if (strtolower((string) $request->query('export')) === 'csv') {
@@ -610,7 +658,7 @@ class ReportsController extends Controller
 
             $filename = 'pending-installments-' . now()->format('Ymd-His') . '.csv';
 
-            return response()->streamDownload(function () use ($rows, $filters, $gBondAmount, $gAdvance, $gFinance, $gExpected, $gPaid, $gOutstanding, $gCredit, $gRemaining) {
+            return response()->streamDownload(function () use ($rows, $filters, $gBondAmount, $gAdvance, $gFinance, $gExpected, $gPaid, $gOutstanding, $gCredit, $gRemaining, $gChequeTotal, $gChequePaid, $gChequePendingBalance, $gCashPaid, $gCashPendingBalance, $gTotalPaidAll, $gTotalBalanceAll) {
                 $out = fopen('php://output', 'w');
                 fwrite($out, "\xEF\xBB\xBF");
 
@@ -630,6 +678,9 @@ class ReportsController extends Controller
                     'Last EMI #', 'Last EMI Date', 'Last EMI Amount',
                     'Next EMI #', 'Next Due Date', 'Next EMI Amount',
                     'Overdue', 'Status',
+                    'Cheque Total', 'Payment from Cheque', 'Pending Cheque Balance',
+                    'Payment from Cash', 'Pending Cash Balance',
+                    'Total Paid (Cash+Cheque)', 'Total Balance',
                 ]);
 
                 foreach ($rows as $i => $r) {
@@ -657,6 +708,13 @@ class ReportsController extends Controller
                         $r['next_emi_amount'] !== null ? number_format($r['next_emi_amount'], 2, '.', '') : '-',
                         $r['overdue_human'] ?? '-',
                         $r['status_label'],
+                        number_format($r['cheque_total'], 2, '.', ''),
+                        number_format($r['cheque_paid'], 2, '.', ''),
+                        number_format($r['cheque_pending_balance'], 2, '.', ''),
+                        number_format($r['cash_paid'], 2, '.', ''),
+                        number_format($r['cash_pending_balance'], 2, '.', ''),
+                        number_format($r['total_paid_all'], 2, '.', ''),
+                        number_format($r['total_balance_all'], 2, '.', ''),
                     ]);
                 }
 
@@ -674,6 +732,13 @@ class ReportsController extends Controller
                     number_format($gCredit, 2, '.', ''),
                     number_format($gRemaining, 2, '.', ''),
                     '', '', '', '', '', '', '', '',
+                    number_format($gChequeTotal, 2, '.', ''),
+                    number_format($gChequePaid, 2, '.', ''),
+                    number_format($gChequePendingBalance, 2, '.', ''),
+                    number_format($gCashPaid, 2, '.', ''),
+                    number_format($gCashPendingBalance, 2, '.', ''),
+                    number_format($gTotalPaidAll, 2, '.', ''),
+                    number_format($gTotalBalanceAll, 2, '.', ''),
                 ]);
 
                 fclose($out);
@@ -702,6 +767,13 @@ class ReportsController extends Controller
             'g_outstanding' => round($gOutstanding, 2),
             'g_credit'      => round($gCredit, 2),
             'g_remaining'   => round($gRemaining, 2),
+            'g_cheque_total'           => round($gChequeTotal, 2),
+            'g_cheque_paid'            => round($gChequePaid, 2),
+            'g_cheque_pending_balance' => round($gChequePendingBalance, 2),
+            'g_cash_paid'              => round($gCashPaid, 2),
+            'g_cash_pending_balance'   => round($gCashPendingBalance, 2),
+            'g_total_paid_all'         => round($gTotalPaidAll, 2),
+            'g_total_balance_all'      => round($gTotalBalanceAll, 2),
         ]);
     }
 
@@ -937,6 +1009,178 @@ class ReportsController extends Controller
             'totalSold'       => round($totalSold, 2),
             'totalRemaining'  => $totalRemaining,
         ]);
+    }
+
+    /**
+     * Deed Report: look up a single Deed No (raw/original or a Merged Deed No)
+     * and show its full picture — allotted (saleable) area, sold area, and
+     * remaining ("left") area — along with the Merged Deed No it belongs to
+     * (if any) or the member deeds consolidated into it (if it IS a merged
+     * deed no).
+     *
+     * A deed no can be one of three things in this app:
+     *   1. A Merged Deed No itself (deed_mergings.merged_deed_no) — an
+     *      aggregate of several original deeds.
+     *   2. An original member deed no that was later merged into a Merged
+     *      Deed No (deed_merging_items.deed_no).
+     *   3. A standalone deed no that was never merged (deed_mappings.deed_no).
+     */
+    public function deedReport(Request $request)
+    {
+        $deedNo = trim((string) $request->query('deed_no', ''));
+
+        $result = null;
+        if ($deedNo !== '') {
+            $result = $this->resolveDeedReport($deedNo);
+        }
+
+        return view('reports.deed_report', [
+            'title'   => 'Deed Report',
+            'deedNo'  => $deedNo,
+            'result'  => $result,
+        ]);
+    }
+
+    /**
+     * Resolve a single deed no into its full report data, handling all three
+     * cases described on deedReport() above. Returns null only when nothing
+     * at all (no mapping, no merge, no registry) references this deed no.
+     */
+    protected function resolveDeedReport(string $deedNo): ?array
+    {
+        // Case 1: the searched value IS a Merged Deed No — aggregate across
+        // every original member deed consolidated into it (same math as
+        // deedMergeBreakdown()).
+        $merge = $this->ownScope(DeedMerging::where('merged_deed_no', $deedNo))
+            ->with(['partner', 'items.arazi.kisan'])
+            ->first();
+
+        if ($merge) {
+            $memberDeedNos = $merge->items->pluck('deed_no')->filter()->values()->all();
+            $allDeedNos    = array_unique(array_merge($memberDeedNos, [$merge->merged_deed_no]));
+
+            $soldByDeedNo = $this->ownScope(Registry::query())
+                ->whereIn('deed_no', $allDeedNos)
+                ->with('plot')
+                ->get()
+                ->groupBy('deed_no')
+                ->map(fn ($regs) => $regs->sum(fn ($r) => $this->registrySoldArea($r)));
+
+            $members = [];
+            $allotted = 0.0;
+            $memberSold = 0.0;
+            foreach ($merge->items as $item) {
+                $arazi    = $item->arazi;
+                $saleable = $arazi ? (float) $arazi->saleable_area : 0.0;
+                $sold     = (float) ($soldByDeedNo[$item->deed_no] ?? 0);
+                $allotted += $saleable;
+                $memberSold += $sold;
+
+                $members[] = [
+                    'deed_no'  => $item->deed_no,
+                    'arazi_code' => $arazi->legacy_arazi_code ?? '-',
+                    'kisan'    => $arazi->kisan->name ?? '-',
+                    'allotted' => round($saleable, 2),
+                    'sold'     => round($sold, 2),
+                    'remaining' => max(0, round($saleable - $sold, 2)),
+                ];
+            }
+
+            $mergedSold = (float) ($soldByDeedNo[$merge->merged_deed_no] ?? 0);
+            $sold       = $memberSold + $mergedSold;
+
+            return [
+                'type'           => 'merged',
+                'deed_no'        => $deedNo,
+                'merged_deed_no' => $merge->merged_deed_no,
+                'partner'        => $merge->partner->name ?? '-',
+                'arazi_code'     => $merge->arazi_code,
+                'kisan'          => '-',
+                'allotted'       => round($allotted, 2),
+                'sold'           => round($sold, 2),
+                'remaining'      => max(0, round($allotted - $sold, 2)),
+                'merged_sold'    => round($mergedSold, 2),
+                'members'        => $members,
+            ];
+        }
+
+        // Case 2: the searched value is an ORIGINAL deed no that was later
+        // merged into a bigger Merged Deed No. deed_merging_items has no
+        // created_by of its own, so scope through the parent DeedMerging.
+        $memberItem = DeedMergingItem::where('deed_no', $deedNo)
+            ->whereHas('deedMerging', fn ($q) => $this->ownScope($q))
+            ->with(['deedMerging', 'arazi.kisan'])
+            ->first();
+
+        if ($memberItem) {
+            $arazi    = $memberItem->arazi;
+            $allotted = $arazi ? (float) $arazi->saleable_area : 0.0;
+            $sold     = (float) $this->ownScope(Registry::where('deed_no', $deedNo))
+                ->with('plot')->get()->sum(fn ($r) => $this->registrySoldArea($r));
+
+            return [
+                'type'           => 'member',
+                'deed_no'        => $deedNo,
+                'merged_deed_no' => $memberItem->deedMerging->merged_deed_no ?? '-',
+                'partner'        => '-',
+                'arazi_code'     => $arazi->legacy_arazi_code ?? '-',
+                'kisan'          => $arazi->kisan->name ?? '-',
+                'allotted'       => round($allotted, 2),
+                'sold'           => round($sold, 2),
+                'remaining'      => max(0, round($allotted - $sold, 2)),
+                'merged_sold'    => null,
+                'members'        => [],
+            ];
+        }
+
+        // Case 3: a standalone deed no that was never part of any merge.
+        $mapping = $this->ownScope(DeedMapping::where('deed_no', $deedNo))
+            ->with(['arazi.kisan', 'partner'])->first();
+
+        if ($mapping) {
+            $arazi    = $mapping->arazi;
+            $allotted = $arazi ? (float) $arazi->saleable_area : 0.0;
+            $sold     = (float) $this->ownScope(Registry::where('deed_no', $deedNo))
+                ->with('plot')->get()->sum(fn ($r) => $this->registrySoldArea($r));
+
+            return [
+                'type'           => 'standalone',
+                'deed_no'        => $deedNo,
+                'merged_deed_no' => '-',
+                'partner'        => $mapping->partner->name ?? '-',
+                'arazi_code'     => $arazi->legacy_arazi_code ?? '-',
+                'kisan'          => $arazi->kisan->name ?? '-',
+                'allotted'       => round($allotted, 2),
+                'sold'           => round($sold, 2),
+                'remaining'      => max(0, round($allotted - $sold, 2)),
+                'merged_sold'    => null,
+                'members'        => [],
+            ];
+        }
+
+        // Case 4 (fallback): no formal deed mapping/merge record at all, but
+        // registries were still filed directly against this deed no — report
+        // what we can (sold area; allotted/remaining are unknown here).
+        $registries = $this->ownScope(Registry::where('deed_no', $deedNo))->with('plot')->get();
+        if ($registries->isNotEmpty()) {
+            $sold = (float) $registries->sum(fn ($r) => $this->registrySoldArea($r));
+
+            return [
+                'type'           => 'fallback',
+                'deed_no'        => $deedNo,
+                'merged_deed_no' => '-',
+                'partner'        => '-',
+                'arazi_code'     => $registries->first()->arazi_code ?? '-',
+                'kisan'          => '-',
+                'allotted'       => null,
+                'sold'           => round($sold, 2),
+                'remaining'      => null,
+                'merged_sold'    => null,
+                'members'        => [],
+            ];
+        }
+
+        return null;
     }
 
     /**

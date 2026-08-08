@@ -12,7 +12,9 @@ class Kernel extends ConsoleKernel
      */
     protected function schedule(Schedule $schedule): void
     {
-        $schedule->command('registries:expire-pending')->dailyAt('00:30');
+        // registries:expire-pending removed — pending registries no longer
+        // auto-cancel when their due_date passes. Run it manually via
+        // `php artisan registries:expire-pending` if ever needed.
         $schedule->command('bookings:expire')->dailyAt('00:10');
     }
 

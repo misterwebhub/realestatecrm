@@ -47,11 +47,49 @@
                         @endforeach
                     </select>
                 </div>
+                <div style="min-width:150px;">
+                    <label class="form-label small fw-semibold mb-1">Date From</label>
+                    <input type="date" name="date_from" value="{{ $filterDateFrom ?? '' }}" class="form-control form-control-sm">
+                </div>
+                <div style="min-width:150px;">
+                    <label class="form-label small fw-semibold mb-1">Date To</label>
+                    <input type="date" name="date_to" value="{{ $filterDateTo ?? '' }}" class="form-control form-control-sm">
+                </div>
                 <button type="submit" class="btn btn-primary btn-sm"><i class="bi bi-search"></i> Search</button>
                 <a href="{{ route('registries.index') }}" class="btn btn-outline-secondary btn-sm">Reset</a>
             </form>
         </div>
     </div>
+
+    {{-- Cumulative summary of the filtered result set --}}
+    @if(!empty($registrySummary))
+    <div class="row g-2 mb-3">
+        <div class="col-6 col-md-4">
+            <div class="card shadow-sm border-start border-4 border-secondary h-100">
+                <div class="card-body py-2">
+                    <div class="small text-muted text-uppercase">Registries</div>
+                    <div class="fs-6 fw-bold">{{ number_format($registrySummary['count']) }}</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-md-4">
+            <div class="card shadow-sm border-start border-4 border-primary h-100">
+                <div class="card-body py-2">
+                    <div class="small text-muted text-uppercase">Total Gaz (Sold)</div>
+                    <div class="fs-6 fw-bold text-primary">{{ number_format($registrySummary['gaz'], 2) }} gaz</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-md-4">
+            <div class="card shadow-sm border-start border-4 border-success h-100">
+                <div class="card-body py-2">
+                    <div class="small text-muted text-uppercase">Stock (Available)</div>
+                    <div class="fs-6 fw-bold text-success">{{ number_format($registrySummary['stock'], 2) }} gaz</div>
+                </div>
+            </div>
+        </div>
+    </div>
+    @endif
 
     <div class="card">
         <div class="card-body table-responsive p-0">
@@ -101,6 +139,15 @@
                 </tbody>
             </table>
         </div>
+        @if(!empty($paginator) && $paginator->hasPages())
+            <div class="card-footer d-flex justify-content-between align-items-center flex-wrap gap-2">
+                <div class="small text-muted">
+                    Showing {{ number_format($paginator->firstItem() ?? 0) }}–{{ number_format($paginator->lastItem() ?? 0) }}
+                    of {{ number_format($paginator->total()) }}
+                </div>
+                <div>{{ $paginator->links() }}</div>
+            </div>
+        @endif
     </div>
 
 @endsection

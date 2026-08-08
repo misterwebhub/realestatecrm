@@ -10,15 +10,12 @@ use App\Models\Kisan;
 use App\Models\KisanBond;
 use App\Models\Payment;
 use App\Models\Registry;
-use App\Services\RegistryLifecycleService;
 use Illuminate\View\View;
 
 class DashboardController extends Controller
 {
-    public function index(RegistryLifecycleService $registryLifecycleService): View
+    public function index(): View
     {
-        $registryLifecycleService->expirePendingRegistries();
-
         return view('dashboard', [
             // Shared inventory / reference data — global counts for everyone.
             'totalKisans' => Kisan::count(),

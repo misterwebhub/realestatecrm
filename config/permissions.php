@@ -74,6 +74,7 @@ return [
         'report_bonds_cumulative'  => ['label' => 'Bond Cumulative',      'group' => 'Reports', 'actions' => $view],
         'report_plot_details'      => ['label' => 'Plot Details',         'group' => 'Reports', 'actions' => $view],
         'report_deed_merge_breakdown' => ['label' => 'Deed Merge Breakdown', 'group' => 'Reports', 'actions' => $view],
+        'report_deed_report'       => ['label' => 'Deed Report',           'group' => 'Reports', 'actions' => $view],
 
         // ── System ──────────────────────────────────────────────────────
         'user_master'   => ['label' => 'User Master',           'group' => 'System', 'actions' => $crud],
