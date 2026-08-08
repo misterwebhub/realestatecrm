@@ -182,6 +182,15 @@
                 </div>
             </div>
         </div>
+        <div class="col-6 col-md-3">
+            <div class="card shadow-sm border-start border-4 h-100" style="border-left-color:#0f766e !important;">
+                <div class="card-body py-2">
+                    <div class="small text-muted text-uppercase">Total Sold Area <span class="text-muted">(gaz)</span></div>
+                    <div class="fs-6 fw-bold" style="color:#0f766e;">{{ number_format($g_sold_area,2) }}</div>
+                    <div class="small text-muted">of {{ number_format($g_plot_area,2) }} total plot area</div>
+                </div>
+            </div>
+        </div>
     </div>
 
     <div class="card">
@@ -195,6 +204,7 @@
                         <th>Customer</th>
                         <th>Arazi</th>
                         <th>Plot (gaz)</th>
+                        <th class="text-end">Sold Area <span class="text-muted">(gaz)</span></th>
                         <th>Broker</th>
                         <th class="text-end">Bond Amount</th>
                         <th class="text-end">Paid <span class="text-muted">(cash)</span></th>
@@ -253,6 +263,7 @@
                                     </table>
                                 @endif
                             </td>
+                            <td class="text-end fw-semibold" style="color:#0f766e;">{{ number_format($r['sold_area'],2) }}</td>
                             <td>{{ $r['broker'] }}</td>
                             <td class="text-end">{{ number_format($r['total'],2) }}</td>
                             <td class="text-end text-success">{{ number_format($r['paid'],2) }}</td>
@@ -330,13 +341,18 @@
                             </td>
                         </tr>
                     @empty
-                        <tr><td colspan="16" class="text-center text-muted py-4">No bonds found.</td></tr>
+                        <tr><td colspan="17" class="text-center text-muted py-4">No bonds found.</td></tr>
                     @endforelse
                 </tbody>
                 @if(count($rows))
                 <tfoot class="table-light">
                     <tr class="fw-bold">
-                        <td colspan="7" class="text-end">GRAND TOTAL</td>
+                        <td colspan="6" class="text-end">GRAND TOTAL</td>
+                        <td class="text-end" style="color:#0f766e;">
+                            <div class="small text-muted fw-normal text-uppercase" style="font-size:9px;">Sold Area (gaz)</div>
+                            <div>{{ number_format($g_sold_area,2) }}</div>
+                        </td>
+                        <td></td>
                         <td class="text-end">
                             <div class="small text-muted fw-normal text-uppercase" style="font-size:9px;">Bond Amount</div>
                             <div>{{ number_format($g_total,2) }}</div>

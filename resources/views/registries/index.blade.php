@@ -37,6 +37,16 @@
                     <input type="text" name="deed_no" value="{{ $filterDeedNo ?? '' }}"
                         class="form-control form-control-sm" placeholder="Deed No.">
                 </div>
+                <div style="min-width:160px; flex:1 1 160px;">
+                    <select name="broker_id" id="filter_broker_id" class="form-select form-select-sm">
+                        <option value="">-- Broker --</option>
+                        @foreach($brokerOptions as $b)
+                            <option value="{{ $b->id }}" {{ (string)$b->id === (string)($filterBrokerId ?? '') ? 'selected' : '' }}>
+                                {{ $b->name }}
+                            </option>
+                        @endforeach
+                    </select>
+                </div>
                 <button type="submit" class="btn btn-primary btn-sm"><i class="bi bi-search"></i> Search</button>
                 <a href="{{ route('registries.index') }}" class="btn btn-outline-secondary btn-sm">Reset</a>
             </form>
@@ -57,8 +67,12 @@
                 <tbody>
                 @forelse($rows as $row)
                     <tr>
-                        @foreach($row['cells'] as $cell)
-                            <td>{{ $cell }}</td>
+                        @foreach($row['cells'] as $i => $cell)
+                            @if(($columns[$i] ?? null) === 'Plot')
+                                <td style="padding:8px;min-width:220px;">{!! $cell !!}</td>
+                            @else
+                                <td>{{ $cell }}</td>
+                            @endif
                         @endforeach
                         <td class="text-end">
                             @if(!empty($row['print_url']))
@@ -127,6 +141,7 @@
     if(window.jQuery && jQuery.fn.select2){
         jQuery('#filter_arazi_code').select2({ theme:'bootstrap-5', width:'100%', allowClear:true, placeholder:'-- Arazi No. --' });
         jQuery('#filter_plot_id').select2({ theme:'bootstrap-5', width:'100%', allowClear:true, placeholder:'-- Plot No. --' });
+        jQuery('#filter_broker_id').select2({ theme:'bootstrap-5', width:'100%', allowClear:true, placeholder:'-- Broker --' });
         jQuery('#filter_arazi_code').on('change', function(){ loadPlotsByCode(this.value, null); });
     }
 })();

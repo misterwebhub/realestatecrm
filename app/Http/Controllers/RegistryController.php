@@ -92,7 +92,7 @@ class RegistryController extends Controller
 
     protected function resourceColumns(): array
     {
-        return ['Reg Code', 'Customer', 'Bond Arazi', 'Registry Arazi', 'Plot', 'Booking Mode', 'Registry Date', 'Deed No', 'Circle Value', 'Amount', 'Lock', 'Status'];
+        return ['Reg Code', 'Bond No', 'Customer', 'Bond Arazi', 'Registry Arazi', 'Plot', 'Registry Date', 'Deed No', 'Circle Value', 'Amount', 'Status'];
     }
 
     protected function resourceFields(?Model $item = null): array
@@ -488,6 +488,7 @@ class RegistryController extends Controller
         $filterPlotId    = $request->input('plot_id');
         $filterRegNo     = trim((string) $request->input('reg_no', ''));
         $filterDeedNo    = trim((string) $request->input('deed_no', ''));
+        $filterBrokerId  = trim((string) $request->input('broker_id', ''));
 
         if ($filterAraziCode !== '') {
             $q->where('arazi_code', $filterAraziCode);
@@ -520,6 +521,13 @@ class RegistryController extends Controller
             ]);
         })->all();
 
+        // Broker filter — Registry has no direct broker_id column, its broker is
+        // resolved (in resourceRow, above) from the matching CustomerBond. Filter
+        // on that already-resolved value rather than re-deriving it in SQL.
+        if ($filterBrokerId !== '') {
+            $rows = array_values(array_filter($rows, fn ($row) => (string) ($row['broker_id'] ?? '') === $filterBrokerId));
+        }
+
         // Plots for selected arazi code (all arazis with that code)
         $filterPlots = collect();
         if ($filterAraziCode !== '') {
@@ -534,6 +542,12 @@ class RegistryController extends Controller
             ->unique()
             ->values();
 
+        // Brokers — same source list used for the bond's own broker_id field
+        // (Agent::where('broker_type', 'customer'), see CustomerBondController).
+        $brokerOptions = \App\Models\Agent::where('broker_type', 'customer')
+            ->orderBy('name')
+            ->get(['id', 'name']);
+
         return view('registries.index', [
             'title'           => $this->resourceTitle(),
             'columns'         => $this->resourceColumns(),
@@ -545,6 +559,8 @@ class RegistryController extends Controller
             'filterPlotId'    => $filterPlotId,
             'filterRegNo'     => $filterRegNo,
             'filterDeedNo'    => $filterDeedNo,
+            'brokerOptions'   => $brokerOptions,
+            'filterBrokerId'  => $filterBrokerId,
         ]);
     }
 
@@ -672,23 +688,64 @@ class RegistryController extends Controller
     protected function resourceRow(Model $item): array
     {
         /** @var Registry $item */
-        $bondPlot = $item->allPlots()->first();
+        $plots    = $item->allPlots();
+        $bondPlot = $plots->first();
+
+        // Registry has no direct FK to CustomerBond — resolve it the same way
+        // ReportsController::registryPaymentStats()/bondsCumulative() do: the
+        // bond that belongs to this registry's customer and covers (at least)
+        // one of the same plot(s).
+        $bond = null;
+        if ($item->customer_id && $plots->isNotEmpty()) {
+            $plotIds = $plots->pluck('id')->all();
+            $bond = \App\Models\CustomerBond::with(['plots', 'broker'])
+                ->where('customer_id', $item->customer_id)
+                ->whereHas('plots', fn ($q) => $q->whereIn('plots.id', $plotIds))
+                ->first();
+        }
+
+        $brokerName = $bond?->broker?->name ?: '-';
+        $bondPlots  = $bond ? $bond->plots : $plots;
+
+        // Styled the same as the "Plots" mini-table on the Customer Bonds index
+        // (resources/views/crud/index.blade.php ~line 538) — blue gradient
+        // header, alternating row shading, hover highlight — plus a Broker column.
+        $plotsHtml = '<span class="text-muted px-2" style="font-size:12px;">—</span>';
+        if ($bondPlots->isNotEmpty()) {
+            $plotsHtml = '<table style="width:100%;border-collapse:collapse;font-size:12px;border:1px solid #d0ddf0;border-radius:6px;overflow:hidden;box-shadow:0 1px 4px rgba(26,58,107,.09);">'
+                . '<thead><tr style="background:linear-gradient(90deg,#1a3a6b,#2a52a0);">'
+                . '<th style="padding:4px 8px;color:rgba(255,255,255,.75);font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;border-right:1px solid rgba(255,255,255,.12);">Plot</th>'
+                . '<th style="padding:4px 8px;color:rgba(255,255,255,.75);font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;border-right:1px solid rgba(255,255,255,.12);">Area</th>'
+                . '<th style="padding:4px 8px;color:rgba(255,255,255,.75);font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;">Broker</th>'
+                . '</tr></thead><tbody>';
+            foreach ($bondPlots as $pi => $pl) {
+                $title = $pl->title ?: ('Plot-' . $pl->id);
+                $area  = $pl->area ? number_format((float) $pl->area, 2) . ' gaz' : '-';
+                $bg    = $pi % 2 === 0 ? '#fff' : '#f6f9ff';
+                $plotsHtml .= '<tr style="background:' . $bg . ';border-bottom:1px solid #e4ecf7;" onmouseover="this.style.background=\'#edf3ff\'" onmouseout="this.style.background=\'' . $bg . '\'">'
+                    . '<td style="padding:4px 8px;font-weight:600;color:#1a3a6b;border-right:1px solid #e4ecf7;white-space:nowrap;">' . e($title) . '</td>'
+                    . '<td style="padding:4px 8px;color:#374151;white-space:nowrap;border-right:1px solid #e4ecf7;">' . e($area) . '</td>'
+                    . '<td style="padding:4px 8px;color:#374151;white-space:nowrap;">' . e($brokerName) . '</td>'
+                    . '</tr>';
+            }
+            $plotsHtml .= '</tbody></table>';
+        }
 
         return [
             'cells' => [
                 $item->registry_code ?? '-',
+                $bond?->bond_no ?? '-',
                 $item->customer?->name ?? '-',
                 $bondPlot?->arazi_code ?: '-',
                 $item->arazi_code ?: '-',
-                $item->plotTitlesLabel(),
-                strtoupper((string) $item->booking_mode),
+                $plotsHtml,
                 optional($item->registry_date)->format('d-m-Y') ?? '-',
                 $item->deed_no ?? '—',
                 $item->circle_value !== null ? number_format((float) $item->circle_value, 2) : '—',
                 number_format((float) ($item->registry_amount ?? $item->land_size), 2),
-                ucfirst((string) $item->lock_status),
                 ucfirst($item->status),
             ],
+            'broker_id' => $bond?->broker_id,
         ];
     }
 

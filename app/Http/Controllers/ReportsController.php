@@ -233,6 +233,7 @@ class ReportsController extends Controller
         $debitTypes = ['return', 'discount'];
         $rows = [];
         $gTotal = $gPaid = $gBalance = $gChequePaid = $gChequeBal = $gPaidAll = $gChequeTotal = 0;
+        $gPlotArea = $gSoldArea = 0.0;
 
         foreach ($bonds as $bond) {
             $code = $bond->arazi_code ?: ($bond->arazi?->legacy_arazi_code ?? '-');
@@ -247,6 +248,11 @@ class ReportsController extends Controller
                 'gaz'      => (float) ($pl->area ?? 0),
                 'registry' => isset($plotIdsWithRegistry[$pl->id]) ? 'Y' : 'N',
             ])->values()->all();
+
+            // Sold area = area of this bond's plots that already have a registry record
+            // (Registry = Y), i.e. the portion actually sold/registered so far.
+            $plotArea = (float) collect($plotsData)->sum('gaz');
+            $soldArea = (float) collect($plotsData)->where('registry', 'Y')->sum('gaz');
 
             // Plot Registry filter — keep the bond only if one of its plots matches Y/N.
             if ($plotRegistry !== '' && ! collect($plotsData)->contains(fn ($p) => $p['registry'] === $plotRegistry)) {
@@ -303,6 +309,8 @@ class ReportsController extends Controller
                 'customer'       => $bond->customer?->name ?? '—',
                 'arazi'          => $code,
                 'plots'          => $plotsData,
+                'plot_area'      => round($plotArea, 2),
+                'sold_area'      => round($soldArea, 2),
                 'broker'         => $bond->broker?->name ?? '—',
                 'total'          => round($total, 2),
                 'paid'           => round($paidPeriod, 2),
@@ -325,6 +333,8 @@ class ReportsController extends Controller
             $gChequeBal += $chequeBalance;
             $gPaidAll += $paidAll;
             $gChequeTotal += (float) $bond->cheques->sum('amount');
+            $gPlotArea += $plotArea;
+            $gSoldArea += $soldArea;
         }
 
         if (strtolower((string) $request->query('export')) === 'csv') {
@@ -346,7 +356,7 @@ class ReportsController extends Controller
 
             $filename = 'bond-cumulative-' . now()->format('Ymd-His') . '.csv';
 
-            return response()->streamDownload(function () use ($rows, $filters, $gTotal, $gPaid, $gChequePaid, $gChequeBal, $gChequeTotal, $gPaidAll, $gBalance) {
+            return response()->streamDownload(function () use ($rows, $filters, $gTotal, $gPaid, $gChequePaid, $gChequeBal, $gChequeTotal, $gPaidAll, $gBalance, $gPlotArea, $gSoldArea) {
                 $out = fopen('php://output', 'w');
                 // UTF-8 BOM for Excel.
                 fwrite($out, "\xEF\xBB\xBF");
@@ -361,7 +371,7 @@ class ReportsController extends Controller
                 fputcsv($out, []);
 
                 fputcsv($out, [
-                    '#', 'Bond Date', 'Bond', 'Customer', 'Arazi', 'Plots (gaz)', 'Broker',
+                    '#', 'Bond Date', 'Bond', 'Customer', 'Arazi', 'Plots (gaz)', 'Sold Area (gaz)', 'Broker',
                     'Bond Amount', 'Paid (cash)', 'Cheque Paid', 'Cheque Balance', 'Registry',
                     'Cheque Name', 'Cheque Paid (all)', 'Cheque Unpaid (all)', 'Cheque Total',
                     'Total Paid (all)', 'Total Balance (all)',
@@ -376,6 +386,7 @@ class ReportsController extends Controller
                         $r['customer'],
                         $r['arazi'],
                         $plots,
+                        number_format($r['sold_area'], 2, '.', ''),
                         $r['broker'],
                         number_format($r['total'], 2, '.', ''),
                         number_format($r['paid'], 2, '.', ''),
@@ -396,7 +407,9 @@ class ReportsController extends Controller
 
                 fputcsv($out, []);
                 fputcsv($out, [
-                    'GRAND TOTAL', '', '', '', '', '', '',
+                    'GRAND TOTAL', '', '', '', '', '',
+                    number_format($gSoldArea, 2, '.', ''),
+                    '',
                     number_format($gTotal, 2, '.', ''),
                     number_format($gPaid, 2, '.', ''),
                     number_format($gChequePaid, 2, '.', ''),
@@ -444,6 +457,8 @@ class ReportsController extends Controller
             'g_cheque_balance'=> round($gChequeBal, 2),
             'g_cheque_total'  => round($gChequeTotal, 2),
             'g_paid_all'      => round($gPaidAll, 2),
+            'g_plot_area'     => round($gPlotArea, 2),
+            'g_sold_area'     => round($gSoldArea, 2),
         ]);
     }
 
