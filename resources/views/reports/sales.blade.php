@@ -95,7 +95,7 @@
             <div class="card shadow-sm border-start border-4 border-secondary">
                 <div class="card-body">
                     <div class="text-muted small text-uppercase">Estimated Sold Value</div>
-                    <div class="fs-3 fw-bold">₹{{ number_format($total_value,2) }}</div>
+                    <div class="fs-3 fw-bold">₹{{ inr($total_value,2) }}</div>
                 </div>
             </div>
         </div>
@@ -130,7 +130,7 @@
                                     <span class="small">{{ number_format($b['pct'],1) }}%</span>
                                 </div>
                             </td>
-                            <td class="text-end">₹{{ number_format($b['value'],2) }}</td>
+                            <td class="text-end">₹{{ inr($b['value'],2) }}</td>
                         </tr>
                     @empty
                         <tr><td colspan="7" class="text-center text-muted py-4">No data.</td></tr>

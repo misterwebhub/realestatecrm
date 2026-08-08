@@ -63,9 +63,9 @@
                 </div>
                 <div class="col-auto ms-auto text-end small">
                     <span class="text-muted">Showing {{ $count }} • Amount</span>
-                    <span class="fw-bold">{{ number_format($sum_amount,2) }}</span>
+                    <span class="fw-bold">{{ inr($sum_amount,2) }}</span>
                     <span class="text-muted">• Balance</span>
-                    <span class="fw-bold text-danger">{{ number_format($sum_balance,2) }}</span>
+                    <span class="fw-bold text-danger">{{ inr($sum_balance,2) }}</span>
                 </div>
             </form>
         </div>
@@ -78,7 +78,7 @@
                     <div class="card-body">
                         <div class="text-muted small text-uppercase">{{ $s['status'] }}</div>
                         <div class="fs-4 fw-bold">{{ $s['count'] }}</div>
-                        <div class="small text-muted">Amount: {{ number_format($s['amount'],2) }}</div>
+                        <div class="small text-muted">Amount: {{ inr($s['amount'],2) }}</div>
                     </div>
                 </div>
             </div>
@@ -109,7 +109,7 @@
                             <td><span class="badge bg-primary-subtle text-primary-emphasis">{{ $r->arazi_code ?? '-' }}</span></td>
                             <td>{{ $r->agent?->name ?? '-' }}</td>
                             <td>{{ optional($r->registry_date)->format('d-m-Y') ?? '-' }}</td>
-                            <td class="text-end">{{ number_format((float)($r->registry_amount ?? 0),2) }}</td>
+                            <td class="text-end">{{ inr((float)($r->registry_amount ?? 0),2) }}</td>
                             <td class="text-center">
                                 <span class="badge bg-success"><i class="bi bi-check-circle me-1"></i>Done</span>
                             </td>
@@ -121,7 +121,7 @@
                                 @endphp
                                 <div class="d-flex justify-content-between small mb-1">
                                     <span class="fw-semibold">{{ number_format($pct,1) }}% paid</span>
-                                    <span class="{{ $bal > 0 ? 'text-danger' : 'text-success' }}">Bal: {{ number_format($bal,2) }}</span>
+                                    <span class="{{ $bal > 0 ? 'text-danger' : 'text-success' }}">Bal: {{ inr($bal,2) }}</span>
                                 </div>
                                 <div class="progress" style="height:6px;">
                                     <div class="progress-bar {{ $barClass }}" style="width:{{ min($pct,100) }}%"></div>

@@ -54,10 +54,10 @@
     </div>
 
     <div class="row g-2 mb-3">
-        <div class="col-md-3"><div class="card shadow-sm border-start border-4 border-primary"><div class="card-body py-2"><div class="small text-muted text-uppercase">Bond Total</div><div class="fs-6 fw-bold">{{ number_format($total_bond,2) }}</div></div></div></div>
-        <div class="col-md-3"><div class="card shadow-sm border-start border-4 border-info"><div class="card-body py-2"><div class="small text-muted text-uppercase">Commission</div><div class="fs-6 fw-bold">{{ number_format($total_commission,2) }}</div></div></div></div>
-        <div class="col-md-3"><div class="card shadow-sm border-start border-4 border-success"><div class="card-body py-2"><div class="small text-muted text-uppercase">Paid</div><div class="fs-6 fw-bold text-success">{{ number_format($total_paid,2) }}</div></div></div></div>
-        <div class="col-md-3"><div class="card shadow-sm border-start border-4 border-danger"><div class="card-body py-2"><div class="small text-muted text-uppercase">Balance</div><div class="fs-6 fw-bold text-danger">{{ number_format($total_balance,2) }}</div></div></div></div>
+        <div class="col-md-3"><div class="card shadow-sm border-start border-4 border-primary"><div class="card-body py-2"><div class="small text-muted text-uppercase">Bond Total</div><div class="fs-6 fw-bold">{{ inr($total_bond,2) }}</div></div></div></div>
+        <div class="col-md-3"><div class="card shadow-sm border-start border-4 border-info"><div class="card-body py-2"><div class="small text-muted text-uppercase">Commission</div><div class="fs-6 fw-bold">{{ inr($total_commission,2) }}</div></div></div></div>
+        <div class="col-md-3"><div class="card shadow-sm border-start border-4 border-success"><div class="card-body py-2"><div class="small text-muted text-uppercase">Paid</div><div class="fs-6 fw-bold text-success">{{ inr($total_paid,2) }}</div></div></div></div>
+        <div class="col-md-3"><div class="card shadow-sm border-start border-4 border-danger"><div class="card-body py-2"><div class="small text-muted text-uppercase">Balance</div><div class="fs-6 fw-bold text-danger">{{ inr($total_balance,2) }}</div></div></div></div>
     </div>
 
     <div class="card shadow-sm">
@@ -84,10 +84,10 @@
                             <td class="small text-muted">{{ $r['mobile'] }}</td>
                             <td class="text-center">{{ $r['commission_pct'] !== null ? $r['commission_pct'].'%' : '-' }}</td>
                             <td class="text-center">{{ $r['bonds'] }}</td>
-                            <td class="text-end">{{ number_format($r['bond_total'],2) }}</td>
-                            <td class="text-end">{{ number_format($r['commission'],2) }}</td>
-                            <td class="text-end text-success">{{ number_format($r['paid'],2) }}</td>
-                            <td class="text-end {{ $r['balance'] > 0 ? 'text-danger fw-semibold' : '' }}">{{ number_format($r['balance'],2) }}</td>
+                            <td class="text-end">{{ inr($r['bond_total'],2) }}</td>
+                            <td class="text-end">{{ inr($r['commission'],2) }}</td>
+                            <td class="text-end text-success">{{ inr($r['paid'],2) }}</td>
+                            <td class="text-end {{ $r['balance'] > 0 ? 'text-danger fw-semibold' : '' }}">{{ inr($r['balance'],2) }}</td>
                             <td class="text-center">{{ $r['reg_total'] }}</td>
                             <td class="text-center">
                                 @if($r['reg_done'] > 0)<span class="badge bg-success">{{ $r['reg_done'] }}</span>@else<span class="text-muted">0</span>@endif

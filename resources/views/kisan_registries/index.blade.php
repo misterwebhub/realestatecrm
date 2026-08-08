@@ -84,13 +84,13 @@
                         @php
                             $total = (float)$rec->stamp + (float)$rec->registrar_fees + (float)$rec->khasra + (float)$rec->commission + (float)$rec->brokari;
                         @endphp
-                        {{ number_format($total, 2) }}
+                        {{ inr($total, 2) }}
                         <small class="text-muted d-block" style="font-size:0.75em;">
-                            Stamp: {{ number_format($rec->stamp,2) }} |
-                            Reg: {{ number_format($rec->registrar_fees,2) }} |
-                            Khasra: {{ number_format($rec->khasra,2) }} |
-                            Comm: {{ number_format($rec->commission,2) }} |
-                            Brokari: {{ number_format($rec->brokari,2) }}
+                            Stamp: {{ inr($rec->stamp,2) }} |
+                            Reg: {{ inr($rec->registrar_fees,2) }} |
+                            Khasra: {{ inr($rec->khasra,2) }} |
+                            Comm: {{ inr($rec->commission,2) }} |
+                            Brokari: {{ inr($rec->brokari,2) }}
                         </small>
                     </td>
                     <td>

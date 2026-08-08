@@ -63,7 +63,7 @@ class InvestorController extends Controller
             'cells' => [
                 $item->name,
                 $item->mobile,
-                number_format((float) $item->investment_amount, 2),
+                inr((float) $item->investment_amount, 2),
                 (string) $item->return_percentage,
                 optional($item->invested_on)->format('d-m-Y') ?? '-',
                 ucfirst($item->status),

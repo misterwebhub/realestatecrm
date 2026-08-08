@@ -130,7 +130,7 @@
             <div class="card shadow-sm border-start border-4 border-primary h-100">
                 <div class="card-body py-2">
                     <div class="small text-muted text-uppercase">Bond Amount</div>
-                    <div class="fs-6 fw-bold text-primary">₹{{ number_format($g_total,2) }}</div>
+                    <div class="fs-6 fw-bold text-primary">₹{{ inr($g_total,2) }}</div>
                 </div>
             </div>
         </div>
@@ -138,7 +138,7 @@
             <div class="card shadow-sm border-start border-4 border-success h-100">
                 <div class="card-body py-2">
                     <div class="small text-muted text-uppercase">Paid (cash)</div>
-                    <div class="fs-6 fw-bold text-success">₹{{ number_format($g_paid,2) }}</div>
+                    <div class="fs-6 fw-bold text-success">₹{{ inr($g_paid,2) }}</div>
                 </div>
             </div>
         </div>
@@ -146,7 +146,7 @@
             <div class="card shadow-sm border-start border-4 border-success h-100">
                 <div class="card-body py-2">
                     <div class="small text-muted text-uppercase">Paid Cheque <span class="text-muted">(cleared)</span></div>
-                    <div class="fs-6 fw-bold text-success">₹{{ number_format($g_cheque_paid,2) }}</div>
+                    <div class="fs-6 fw-bold text-success">₹{{ inr($g_cheque_paid,2) }}</div>
                 </div>
             </div>
         </div>
@@ -154,7 +154,7 @@
             <div class="card shadow-sm border-start border-4 border-warning h-100">
                 <div class="card-body py-2">
                     <div class="small text-muted text-uppercase">Pending Cheque</div>
-                    <div class="fs-6 fw-bold text-warning-emphasis">₹{{ number_format($g_cheque_balance,2) }}</div>
+                    <div class="fs-6 fw-bold text-warning-emphasis">₹{{ inr($g_cheque_balance,2) }}</div>
                 </div>
             </div>
         </div>
@@ -162,7 +162,7 @@
             <div class="card shadow-sm border-start border-4 border-info h-100">
                 <div class="card-body py-2">
                     <div class="small text-muted text-uppercase">Cheque Total</div>
-                    <div class="fs-6 fw-bold text-info-emphasis">₹{{ number_format($g_cheque_total,2) }}</div>
+                    <div class="fs-6 fw-bold text-info-emphasis">₹{{ inr($g_cheque_total,2) }}</div>
                 </div>
             </div>
         </div>
@@ -170,7 +170,7 @@
             <div class="card shadow-sm border-start border-4 border-success h-100">
                 <div class="card-body py-2">
                     <div class="small text-muted text-uppercase">Total Paid <span class="text-muted">(all)</span></div>
-                    <div class="fs-6 fw-bold text-success">₹{{ number_format($g_paid_all,2) }}</div>
+                    <div class="fs-6 fw-bold text-success">₹{{ inr($g_paid_all,2) }}</div>
                 </div>
             </div>
         </div>
@@ -178,7 +178,7 @@
             <div class="card shadow-sm border-start border-4 border-danger h-100">
                 <div class="card-body py-2">
                     <div class="small text-muted text-uppercase">Total Balance <span class="text-muted">(all)</span></div>
-                    <div class="fs-6 fw-bold {{ $g_balance > 0 ? 'text-danger' : 'text-success' }}">₹{{ number_format($g_balance,2) }}</div>
+                    <div class="fs-6 fw-bold {{ $g_balance > 0 ? 'text-danger' : 'text-success' }}">₹{{ inr($g_balance,2) }}</div>
                 </div>
             </div>
         </div>
@@ -265,10 +265,10 @@
                             </td>
                             <td class="text-end fw-semibold" style="color:#0f766e;">{{ number_format($r['sold_area'],2) }}</td>
                             <td>{{ $r['broker'] }}</td>
-                            <td class="text-end">{{ number_format($r['total'],2) }}</td>
-                            <td class="text-end text-success">{{ number_format($r['paid'],2) }}</td>
-                            <td class="text-end text-success">{{ number_format($r['cheque_paid'],2) }}</td>
-                            <td class="text-end {{ $r['cheque_balance'] > 0 ? 'text-warning-emphasis' : '' }}">{{ number_format($r['cheque_balance'],2) }}</td>
+                            <td class="text-end">{{ inr($r['total'],2) }}</td>
+                            <td class="text-end text-success">{{ inr($r['paid'],2) }}</td>
+                            <td class="text-end text-success">{{ inr($r['cheque_paid'],2) }}</td>
+                            <td class="text-end {{ $r['cheque_balance'] > 0 ? 'text-warning-emphasis' : '' }}">{{ inr($r['cheque_balance'],2) }}</td>
                             <td class="text-center">
                                 @if($r['reg_status'] === 'Done')
                                     <span class="badge bg-success">Done</span>
@@ -296,15 +296,15 @@
                                             </tr>
                                             <tr style="background:#fff;border-bottom:1px solid #e4ecf7;">
                                                 <td style="padding:1px 5px;border-right:1px solid #e4ecf7;font-weight:600;color:#15803d;white-space:nowrap;">Total Paid</td>
-                                                <td style="padding:1px 5px;text-align:right;color:#15803d;font-weight:600;white-space:nowrap;">{{ number_format($r['cheque_paid_all'],2) }}</td>
+                                                <td style="padding:1px 5px;text-align:right;color:#15803d;font-weight:600;white-space:nowrap;">{{ inr($r['cheque_paid_all'],2) }}</td>
                                             </tr>
                                             <tr style="background:#f6f9ff;border-bottom:1px solid #e4ecf7;">
                                                 <td style="padding:1px 5px;border-right:1px solid #e4ecf7;font-weight:600;color:#b45309;white-space:nowrap;">Total Unpaid</td>
-                                                <td style="padding:1px 5px;text-align:right;color:#b45309;font-weight:600;white-space:nowrap;">{{ number_format($r['cheque_balance_all'],2) }}</td>
+                                                <td style="padding:1px 5px;text-align:right;color:#b45309;font-weight:600;white-space:nowrap;">{{ inr($r['cheque_balance_all'],2) }}</td>
                                             </tr>
                                             <tr style="background:#eef4ff;border-top:1px solid #d0ddf0;">
                                                 <td style="padding:1px 5px;border-right:1px solid #e4ecf7;font-weight:700;color:#1a3a6b;text-align:right;">Total</td>
-                                                <td style="padding:1px 5px;text-align:right;font-weight:700;color:#1a3a6b;white-space:nowrap;">{{ number_format($r['cheque_total'],2) }}</td>
+                                                <td style="padding:1px 5px;text-align:right;font-weight:700;color:#1a3a6b;white-space:nowrap;">{{ inr($r['cheque_total'],2) }}</td>
                                             </tr>
                                         </tbody>
                                     </table>
@@ -317,9 +317,9 @@
                             <td class="text-end fw-bold">
                                 <a href="{{ url('/customer-bond-payments') }}?bond_id={{ $r['bond_id'] }}"
                                    target="_blank" rel="noopener"
-                                   title="View payments for this bond">{{ number_format($r['paid_all'],2) }}</a>
+                                   title="View payments for this bond">{{ inr($r['paid_all'],2) }}</a>
                             </td>
-                            <td class="text-end fw-bold {{ $r['balance'] > 0 ? 'text-danger' : '' }}">{{ number_format($r['balance'],2) }}</td>
+                            <td class="text-end fw-bold {{ $r['balance'] > 0 ? 'text-danger' : '' }}">{{ inr($r['balance'],2) }}</td>
                             <td class="text-center no-print">
                                 @php
                                     $entriesUrl = url('/customer-bond-payments') . '?' . http_build_query([
@@ -355,32 +355,32 @@
                         <td></td>
                         <td class="text-end">
                             <div class="small text-muted fw-normal text-uppercase" style="font-size:9px;">Bond Amount</div>
-                            <div>{{ number_format($g_total,2) }}</div>
+                            <div>{{ inr($g_total,2) }}</div>
                         </td>
                         <td class="text-end text-success">
                             <div class="small text-muted fw-normal text-uppercase" style="font-size:9px;">Paid (cash)</div>
-                            <div>{{ number_format($g_paid,2) }}</div>
+                            <div>{{ inr($g_paid,2) }}</div>
                         </td>
                         <td class="text-end text-success">
                             <div class="small text-muted fw-normal text-uppercase" style="font-size:9px;">Paid Cheque</div>
-                            <div>{{ number_format($g_cheque_paid,2) }}</div>
+                            <div>{{ inr($g_cheque_paid,2) }}</div>
                         </td>
                         <td class="text-end">
                             <div class="small text-muted fw-normal text-uppercase" style="font-size:9px;">Pending Cheque</div>
-                            <div>{{ number_format($g_cheque_balance,2) }}</div>
+                            <div>{{ inr($g_cheque_balance,2) }}</div>
                         </td>
                         <td></td>
                         <td class="text-center">
                             <div class="small text-muted fw-normal text-uppercase" style="font-size:9px;">Cheque Total</div>
-                            <div>{{ number_format($g_cheque_total,2) }}</div>
+                            <div>{{ inr($g_cheque_total,2) }}</div>
                         </td>
                         <td class="text-end">
                             <div class="small text-muted fw-normal text-uppercase" style="font-size:9px;">Total Paid (all)</div>
-                            <div>{{ number_format($g_paid_all,2) }}</div>
+                            <div>{{ inr($g_paid_all,2) }}</div>
                         </td>
                         <td class="text-end text-danger">
                             <div class="small text-muted fw-normal text-uppercase" style="font-size:9px;">Total Balance (all)</div>
-                            <div>{{ number_format($g_balance,2) }}</div>
+                            <div>{{ inr($g_balance,2) }}</div>
                         </td>
                         <td class="no-print"></td>
                     </tr>

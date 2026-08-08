@@ -204,15 +204,15 @@
         <div class="col-right">
             <div class="amt-row">
                 <div class="amt-lbl">Bond Amount</div>
-                <div class="amt-val total">Rs. {{ number_format($r['total_amount'] ?? 0, 2) }}</div>
+                <div class="amt-val total">Rs. {{ inr($r['total_amount'] ?? 0, 2) }}</div>
             </div>
             <div class="amt-row">
                 <div class="amt-lbl">Total Paid</div>
-                <div class="amt-val paid">Rs. {{ number_format($r['paid_amount'] ?? 0, 2) }}</div>
+                <div class="amt-val paid">Rs. {{ inr($r['paid_amount'] ?? 0, 2) }}</div>
             </div>
             <div class="amt-row">
                 <div class="amt-lbl">Balance</div>
-                <div class="amt-val balance">Rs. {{ number_format($r['balance_amount'] ?? 0, 2) }}</div>
+                <div class="amt-val balance">Rs. {{ inr($r['balance_amount'] ?? 0, 2) }}</div>
             </div>
         </div>
 

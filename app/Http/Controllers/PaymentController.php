@@ -248,7 +248,7 @@ class PaymentController extends Controller
                     ->latest()
                     ->get()
                     ->mapWithKeys(function (KisanBond $bond) {
-                        return [$bond->id => $bond->bond_no . ' - ' . number_format((float) ($bond->total_amount ?? $bond->bond_amount ?? 0), 2)];
+                        return [$bond->id => $bond->bond_no . ' - ' . inr((float) ($bond->total_amount ?? $bond->bond_amount ?? 0), 2)];
                     })
                     ->all(),
                 'value' => $item?->kisan_bond_id,

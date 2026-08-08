@@ -56,12 +56,12 @@
 
             <div class="card">
                 <div><span class="label">Sale Land:</span> <span class="value">{{ number_format((float) ($bond->sale_land ?? 0), 2) }}</span></div>
-                <div><span class="label">Sale Rate:</span> <span class="value">{{ number_format((float) ($bond->sale_rate ?? 0), 2) }}</span></div>
-                <div><span class="label">Total Amount:</span> <span class="value">{{ number_format((float) ($bond->total_amount ?? $bond->bond_amount ?? 0), 2) }}</span></div>
+                <div><span class="label">Sale Rate:</span> <span class="value">{{ inr((float) ($bond->sale_rate ?? 0), 2) }}</span></div>
+                <div><span class="label">Total Amount:</span> <span class="value">{{ inr((float) ($bond->total_amount ?? $bond->bond_amount ?? 0), 2) }}</span></div>
                 <div><span class="label">Bayana Mode:</span> <span class="value">{{ ucfirst($bond->bayana_mode ?? '-') }}</span></div>
                 <div><span class="label">Type:</span> <span class="value">{{ $bond->bond_type ?? '-' }}</span></div>
-                <div><span class="label">Amount:</span> <span class="value">{{ number_format((float) ($bond->amount ?? 0), 2) }}</span></div>
-                <div><span class="label">Balance:</span> <span class="value">{{ number_format((float) ($bond->balance ?? 0), 2) }}</span></div>
+                <div><span class="label">Amount:</span> <span class="value">{{ inr((float) ($bond->amount ?? 0), 2) }}</span></div>
+                <div><span class="label">Balance:</span> <span class="value">{{ inr((float) ($bond->balance ?? 0), 2) }}</span></div>
                 <div><span class="label">Last Date:</span> <span class="value">{{ optional($bond->last_date)->format('d-m-Y') ?? '-' }}</span></div>
             </div>
         </div>
@@ -88,8 +88,8 @@
                                 </td>
                                 <td style="border:1px solid #ddd;padding:6px;text-align:right">{{ number_format((float) ($arazi->pivot->land_size ?? $arazi->size ?? 0), 2) }}</td>
                                 <td style="border:1px solid #ddd;padding:6px;text-align:right">{{ number_format((float) ($arazi->pivot->sale_land ?? 0), 2) }}</td>
-                                <td style="border:1px solid #ddd;padding:6px;text-align:right">{{ number_format((float) ($arazi->pivot->sale_rate ?? 0), 2) }}</td>
-                                <td style="border:1px solid #ddd;padding:6px;text-align:right">{{ number_format((float) ($arazi->pivot->sale_amount ?? 0), 2) }}</td>
+                                <td style="border:1px solid #ddd;padding:6px;text-align:right">{{ inr((float) ($arazi->pivot->sale_rate ?? 0), 2) }}</td>
+                                <td style="border:1px solid #ddd;padding:6px;text-align:right">{{ inr((float) ($arazi->pivot->sale_amount ?? 0), 2) }}</td>
                             </tr>
                         @endforeach
                     </tbody>
@@ -99,7 +99,7 @@
                             <th style="border:1px solid #ddd;padding:6px;text-align:right">{{ number_format((float) ($bond->land_size ?? 0), 2) }}</th>
                             <th style="border:1px solid #ddd;padding:6px;text-align:right">{{ number_format((float) ($bond->sale_land ?? 0), 2) }}</th>
                             <th style="border:1px solid #ddd;padding:6px"></th>
-                            <th style="border:1px solid #ddd;padding:6px;text-align:right">{{ number_format((float) ($bond->total_amount ?? $bond->bond_amount ?? 0), 2) }}</th>
+                            <th style="border:1px solid #ddd;padding:6px;text-align:right">{{ inr((float) ($bond->total_amount ?? $bond->bond_amount ?? 0), 2) }}</th>
                         </tr>
                     </tfoot>
                 </table>
@@ -111,9 +111,9 @@
         <div class="section-title">Broker / Payments</div>
         <div class="card">
             <div><span class="label">Broker:</span> <span class="value">{{ $bond->broker?->name ?? '-' }}</span></div>
-            <div><span class="label">Broker Payment:</span> <span class="value">{{ number_format((float) ($bond->broker_payment ?? 0), 2) }}</span></div>
-            <div><span class="label">Broker Paid:</span> <span class="value">{{ number_format((float) ($bond->broker_paid ?? 0), 2) }}</span></div>
-            <div><span class="label">Broker Balance:</span> <span class="value">{{ number_format((float) ($bond->broker_balance ?? 0), 2) }}</span></div>
+            <div><span class="label">Broker Payment:</span> <span class="value">{{ inr((float) ($bond->broker_payment ?? 0), 2) }}</span></div>
+            <div><span class="label">Broker Paid:</span> <span class="value">{{ inr((float) ($bond->broker_paid ?? 0), 2) }}</span></div>
+            <div><span class="label">Broker Balance:</span> <span class="value">{{ inr((float) ($bond->broker_balance ?? 0), 2) }}</span></div>
             <div><span class="label">Broker Comment:</span> <span class="value">{{ $bond->broker_comment ?? '-' }}</span></div>
         </div>
 

@@ -790,7 +790,7 @@ class RegistryController extends Controller
                 $plotsHtml,
                 optional($item->registry_date)->format('d-m-Y') ?? '-',
                 $item->deed_no ?? '—',
-                $item->circle_value !== null ? number_format((float) $item->circle_value, 2) : '—',
+                $item->circle_value !== null ? inr((float) $item->circle_value, 2) : '—',
                 number_format((float) ($item->registry_amount ?? $item->land_size), 2),
                 ucfirst($item->status),
             ],

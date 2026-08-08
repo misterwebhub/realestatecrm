@@ -60,7 +60,7 @@
         <div class="col-md-3"><div class="card shadow-sm border-start border-4 border-info"><div class="card-body py-2"><div class="small text-muted text-uppercase">Saleable</div><div class="fs-6 fw-bold">{{ number_format($total_saleable,2) }} gaz</div></div></div></div>
         <div class="col-md-3"><div class="card shadow-sm border-start border-4 border-success"><div class="card-body py-2"><div class="small text-muted text-uppercase">Sold</div><div class="fs-6 fw-bold text-success">{{ number_format($total_sold,2) }} gaz</div></div></div></div>
         <div class="col-md-3"><div class="card shadow-sm border-start border-4 border-danger"><div class="card-body py-2"><div class="small text-muted text-uppercase">Remaining</div><div class="fs-6 fw-bold text-danger">{{ number_format($total_remaining,2) }} gaz</div></div></div></div>
-        <div class="col-md-3"><div class="card shadow-sm border-start border-4 border-secondary"><div class="card-body py-2"><div class="small text-muted text-uppercase">Sold Value</div><div class="fs-6 fw-bold">₹{{ number_format($total_value,2) }}</div></div></div></div>
+        <div class="col-md-3"><div class="card shadow-sm border-start border-4 border-secondary"><div class="card-body py-2"><div class="small text-muted text-uppercase">Sold Value</div><div class="fs-6 fw-bold">₹{{ inr($total_value,2) }}</div></div></div></div>
     </div>
 
     <div class="card shadow-sm">

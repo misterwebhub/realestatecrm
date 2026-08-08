@@ -182,7 +182,7 @@
                     <div class="card shadow-sm border-start border-4 border-success h-100">
                         <div class="card-body py-2">
                             <div class="small text-muted text-uppercase">Total Credit</div>
-                            <div class="fs-6 fw-bold text-success">₹{{ number_format($cpSummary['credit'],2) }}</div>
+                            <div class="fs-6 fw-bold text-success">₹{{ inr($cpSummary['credit'],2) }}</div>
                         </div>
                     </div>
                 </div>
@@ -190,7 +190,7 @@
                     <div class="card shadow-sm border-start border-4 border-danger h-100">
                         <div class="card-body py-2">
                             <div class="small text-muted text-uppercase">Total Debit</div>
-                            <div class="fs-6 fw-bold text-danger">₹{{ number_format($cpSummary['debit'],2) }}</div>
+                            <div class="fs-6 fw-bold text-danger">₹{{ inr($cpSummary['debit'],2) }}</div>
                         </div>
                     </div>
                 </div>
@@ -198,7 +198,7 @@
                     <div class="card shadow-sm border-start border-4 border-primary h-100">
                         <div class="card-body py-2">
                             <div class="small text-muted text-uppercase">Net Total</div>
-                            <div class="fs-6 fw-bold {{ $cpSummary['net'] < 0 ? 'text-danger' : 'text-primary' }}">₹{{ number_format($cpSummary['net'],2) }}</div>
+                            <div class="fs-6 fw-bold {{ $cpSummary['net'] < 0 ? 'text-danger' : 'text-primary' }}">₹{{ inr($cpSummary['net'],2) }}</div>
                         </div>
                     </div>
                 </div>
@@ -572,7 +572,7 @@
                     <div class="card shadow-sm border-start border-4 border-primary h-100">
                         <div class="card-body py-2">
                             <div class="small text-muted text-uppercase">Total Amount</div>
-                            <div class="fs-6 fw-bold text-primary">₹{{ number_format($cbSummary['amount'],2) }}</div>
+                            <div class="fs-6 fw-bold text-primary">₹{{ inr($cbSummary['amount'],2) }}</div>
                         </div>
                     </div>
                 </div>
@@ -580,7 +580,7 @@
                     <div class="card shadow-sm border-start border-4 border-success h-100">
                         <div class="card-body py-2">
                             <div class="small text-muted text-uppercase">Total Paid</div>
-                            <div class="fs-6 fw-bold text-success">₹{{ number_format($cbSummary['paid'],2) }}</div>
+                            <div class="fs-6 fw-bold text-success">₹{{ inr($cbSummary['paid'],2) }}</div>
                         </div>
                     </div>
                 </div>
@@ -588,7 +588,7 @@
                     <div class="card shadow-sm border-start border-4 border-danger h-100">
                         <div class="card-body py-2">
                             <div class="small text-muted text-uppercase">Total Balance</div>
-                            <div class="fs-6 fw-bold text-danger">₹{{ number_format($cbSummary['balance'],2) }}</div>
+                            <div class="fs-6 fw-bold text-danger">₹{{ inr($cbSummary['balance'],2) }}</div>
                         </div>
                     </div>
                 </div>

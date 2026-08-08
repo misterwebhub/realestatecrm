@@ -214,7 +214,7 @@ class CustomerController extends Controller
             ->map(function ($bond) {
                 return [
                     'id' => $bond->id,
-                    'label' => $bond->bond_no . ' - ' . number_format((float) ($bond->total_amount ?? $bond->bond_amount ?? 0), 2),
+                    'label' => $bond->bond_no . ' - ' . inr((float) ($bond->total_amount ?? $bond->bond_amount ?? 0), 2),
                 ];
             })
             ->values();

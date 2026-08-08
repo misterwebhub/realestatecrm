@@ -289,7 +289,7 @@ class KisanBondController extends Controller
                     ? $item->arazis->map(fn (Arazi $arazi) => $arazi->araziNoCode())->join(', ')
                     : ($item->arazi?->legacy_arazi_code ?: '-'),
                 optional($item->bond_date)->format('d-m-Y') ?? '-',
-                number_format((float) $item->bond_amount, 2),
+                inr((float) $item->bond_amount, 2),
             ],
             'print_url' => route('kisan-bonds.print', $item->id),
             'pdf_url' => route('kisan-bonds.pdf', $item->id),

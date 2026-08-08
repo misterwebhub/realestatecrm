@@ -54,7 +54,7 @@
                 </div>
                 <div class="col-auto ms-auto">
                     <span class="text-muted small">Total Collected</span>
-                    <div class="fs-5 fw-bold text-success">{{ number_format($total,2) }}</div>
+                    <div class="fs-5 fw-bold text-success">{{ inr($total,2) }}</div>
                 </div>
             </form>
         </div>
@@ -69,7 +69,7 @@
                         <thead class="table-light"><tr><th>Month</th><th class="text-center">Entries</th><th class="text-end">Amount</th></tr></thead>
                         <tbody>
                             @forelse($byMonth as $m)
-                                <tr><td>{{ $m['month'] }}</td><td class="text-center">{{ $m['count'] }}</td><td class="text-end">{{ number_format($m['amount'],2) }}</td></tr>
+                                <tr><td>{{ $m['month'] }}</td><td class="text-center">{{ $m['count'] }}</td><td class="text-end">{{ inr($m['amount'],2) }}</td></tr>
                             @empty
                                 <tr><td colspan="3" class="text-center text-muted py-3">No data.</td></tr>
                             @endforelse
@@ -86,7 +86,7 @@
                         <thead class="table-light"><tr><th>Type</th><th class="text-center">Entries</th><th class="text-end">Amount</th></tr></thead>
                         <tbody>
                             @forelse($byType as $t)
-                                <tr><td>{{ $t['type'] }}</td><td class="text-center">{{ $t['count'] }}</td><td class="text-end">{{ number_format($t['amount'],2) }}</td></tr>
+                                <tr><td>{{ $t['type'] }}</td><td class="text-center">{{ $t['count'] }}</td><td class="text-end">{{ inr($t['amount'],2) }}</td></tr>
                             @empty
                                 <tr><td colspan="3" class="text-center text-muted py-3">No data.</td></tr>
                             @endforelse

@@ -22,7 +22,7 @@
                 <div class="col-md-3">
                     <div class="small-box text-bg-success">
                         <div class="inner">
-                            <h4>{{ number_format((float)$totalBondAmount,2) }}</h4>
+                            <h4>{{ inr((float)$totalBondAmount,2) }}</h4>
                             <p>Total Bond Amount</p>
                         </div>
                     </div>
@@ -30,7 +30,7 @@
                 <div class="col-md-3">
                     <div class="small-box text-bg-warning">
                         <div class="inner">
-                            <h4>{{ number_format((float)$totalPaid,2) }}</h4>
+                            <h4>{{ inr((float)$totalPaid,2) }}</h4>
                             <p>Total Paid</p>
                         </div>
                     </div>
@@ -56,7 +56,7 @@
                                     <tr>
                                         <td>{{ $p->entry_no }}</td>
                                         <td>{{ optional($p->entry_date)->format('d-m-Y') }}</td>
-                                        <td class="text-end">{{ number_format((float)$p->amount,2) }}</td>
+                                        <td class="text-end">{{ inr((float)$p->amount,2) }}</td>
                                         <td>{{ $p->payment_method ?? '-' }}</td>
                                     </tr>
                                 @endforeach
@@ -74,7 +74,7 @@
                                     <tr>
                                         <td>{{ $c->cheque_number }}</td>
                                         <td>{{ optional($c->cheque_date)->format('d-m-Y') }}</td>
-                                        <td class="text-end">{{ number_format((float)$c->amount,2) }}</td>
+                                        <td class="text-end">{{ inr((float)$c->amount,2) }}</td>
                                     </tr>
                                 @endforeach
                             </tbody>

@@ -130,7 +130,7 @@
             <div class="card shadow-sm border-start border-4 border-primary h-100">
                 <div class="card-body py-2">
                     <div class="small text-muted text-uppercase">Finance Amount</div>
-                    <div class="fs-6 fw-bold text-primary">₹{{ number_format($g_finance,2) }}</div>
+                    <div class="fs-6 fw-bold text-primary">₹{{ inr($g_finance,2) }}</div>
                 </div>
             </div>
         </div>
@@ -138,7 +138,7 @@
             <div class="card shadow-sm border-start border-4 border-dark h-100">
                 <div class="card-body py-2">
                     <div class="small text-muted text-uppercase">Expected Till Date</div>
-                    <div class="fs-6 fw-bold">₹{{ number_format($g_expected,2) }}</div>
+                    <div class="fs-6 fw-bold">₹{{ inr($g_expected,2) }}</div>
                 </div>
             </div>
         </div>
@@ -146,7 +146,7 @@
             <div class="card shadow-sm border-start border-4 border-success h-100">
                 <div class="card-body py-2">
                     <div class="small text-muted text-uppercase">Total Paid</div>
-                    <div class="fs-6 fw-bold text-success">₹{{ number_format($g_paid,2) }}</div>
+                    <div class="fs-6 fw-bold text-success">₹{{ inr($g_paid,2) }}</div>
                 </div>
             </div>
         </div>
@@ -154,7 +154,7 @@
             <div class="card shadow-sm border-start border-4 border-danger h-100">
                 <div class="card-body py-2">
                     <div class="small text-muted text-uppercase">Outstanding</div>
-                    <div class="fs-6 fw-bold text-danger">₹{{ number_format($g_outstanding,2) }}</div>
+                    <div class="fs-6 fw-bold text-danger">₹{{ inr($g_outstanding,2) }}</div>
                 </div>
             </div>
         </div>
@@ -162,7 +162,7 @@
             <div class="card shadow-sm border-start border-4 border-info h-100">
                 <div class="card-body py-2">
                     <div class="small text-muted text-uppercase">Credit</div>
-                    <div class="fs-6 fw-bold text-info-emphasis">₹{{ number_format($g_credit,2) }}</div>
+                    <div class="fs-6 fw-bold text-info-emphasis">₹{{ inr($g_credit,2) }}</div>
                 </div>
             </div>
         </div>
@@ -170,7 +170,7 @@
             <div class="card shadow-sm border-start border-4 border-warning h-100">
                 <div class="card-body py-2">
                     <div class="small text-muted text-uppercase">Remaining Balance</div>
-                    <div class="fs-6 fw-bold text-warning-emphasis">₹{{ number_format($g_remaining,2) }}</div>
+                    <div class="fs-6 fw-bold text-warning-emphasis">₹{{ inr($g_remaining,2) }}</div>
                 </div>
             </div>
         </div>
@@ -200,10 +200,10 @@
                         <th class="text-end">Outstanding</th>
                         <th class="text-end">Credit</th>
                         <th class="text-end">Remaining Balance</th>
+                        <th class="text-center">Status</th>
                         <th>Last EMI Paid</th>
                         <th>Next EMI Due</th>
                         <th>Overdue</th>
-                        <th class="text-center">Status</th>
                         <th class="text-end">Cheque Total</th>
                         <th class="text-end">Payment&nbsp;from&nbsp;Cheque</th>
                         <th class="text-end">Pending&nbsp;Cheque&nbsp;Balance</th>
@@ -225,19 +225,25 @@
                                 {{ $r['customer'] }}
                                 <div class="text-muted" style="font-size:10.5px;">{{ $r['customer_mobile'] }}</div>
                             </td>
-                            <td class="text-end">{{ number_format($r['bond_amount'],2) }}</td>
-                            <td class="text-end">{{ number_format($r['advance_amount'],2) }}</td>
-                            <td class="text-end fw-semibold">{{ number_format($r['finance_amount'],2) }}</td>
-                            <td class="text-end">{{ number_format($r['monthly_emi'],2) }}</td>
-                            <td class="text-end">{{ number_format($r['expected_till_date'],2) }}</td>
-                            <td class="text-end text-success">{{ number_format($r['total_paid'],2) }}</td>
-                            <td class="text-end {{ $r['outstanding'] > 0.009 ? 'text-danger fw-bold' : '' }}">{{ number_format($r['outstanding'],2) }}</td>
-                            <td class="text-end {{ $r['credit'] > 0.009 ? 'text-info-emphasis fw-bold' : '' }}">{{ number_format($r['credit'],2) }}</td>
-                            <td class="text-end">{{ number_format($r['remaining_balance'],2) }}</td>
+                            <td class="text-end">{{ inr($r['bond_amount'],2) }}</td>
+                            <td class="text-end">{{ inr($r['advance_amount'],2) }}</td>
+                            <td class="text-end fw-semibold">{{ inr($r['finance_amount'],2) }}</td>
+                            <td class="text-end">{{ inr($r['monthly_emi'],2) }}</td>
+                            <td class="text-end">{{ inr($r['expected_till_date'],2) }}</td>
+                            <td class="text-end text-success">{{ inr($r['total_paid'],2) }}</td>
+                            <td class="text-end {{ $r['outstanding'] > 0.009 ? 'text-danger fw-bold' : '' }}">{{ inr($r['outstanding'],2) }}</td>
+                            <td class="text-end {{ $r['credit'] > 0.009 ? 'text-info-emphasis fw-bold' : '' }}">{{ inr($r['credit'],2) }}</td>
+                            <td class="text-end">{{ inr($r['remaining_balance'],2) }}</td>
+                            <td class="text-center" style="white-space:nowrap;">
+                                <span class="badge {{ $r['status_badge'] }}">{{ $r['status_emoji'] }} {{ $r['status_label'] }}</span>
+                                @if($r['is_reminder'])
+                                    <div class="badge bg-info-subtle text-info-emphasis mt-1">Reminder</div>
+                                @endif
+                            </td>
                             <td style="white-space:nowrap;">
                                 @if($r['last_emi_number'])
                                     <div>EMI #{{ $r['last_emi_number'] }}</div>
-                                    <div class="text-muted" style="font-size:10.5px;">{{ $r['last_emi_date'] ?: '—' }} · ₹{{ number_format($r['last_emi_amount'],2) }}</div>
+                                    <div class="text-muted" style="font-size:10.5px;">{{ $r['last_emi_date'] ?: '—' }} · ₹{{ inr($r['last_emi_amount'],2) }}</div>
                                 @else
                                     <span class="text-muted">—</span>
                                 @endif
@@ -245,7 +251,7 @@
                             <td style="white-space:nowrap;">
                                 @if($r['next_emi_number'])
                                     <div>EMI #{{ $r['next_emi_number'] }}</div>
-                                    <div class="text-muted" style="font-size:10.5px;">{{ $r['next_due_date'] ?: '—' }} · ₹{{ number_format($r['next_emi_amount'],2) }}</div>
+                                    <div class="text-muted" style="font-size:10.5px;">{{ $r['next_due_date'] ?: '—' }} · ₹{{ inr($r['next_emi_amount'],2) }}</div>
                                 @else
                                     <span class="text-muted">—</span>
                                 @endif
@@ -257,19 +263,13 @@
                                     <span class="text-muted">—</span>
                                 @endif
                             </td>
-                            <td class="text-center" style="white-space:nowrap;">
-                                <span class="badge {{ $r['status_badge'] }}">{{ $r['status_emoji'] }} {{ $r['status_label'] }}</span>
-                                @if($r['is_reminder'])
-                                    <div class="badge bg-info-subtle text-info-emphasis mt-1">Reminder</div>
-                                @endif
-                            </td>
-                            <td class="text-end">{{ number_format($r['cheque_total'],2) }}</td>
-                            <td class="text-end text-primary">{{ number_format($r['cheque_paid'],2) }}</td>
-                            <td class="text-end {{ $r['cheque_pending_balance'] > 0.009 ? 'text-warning-emphasis fw-bold' : '' }}">{{ number_format($r['cheque_pending_balance'],2) }}</td>
-                            <td class="text-end text-success">{{ number_format($r['cash_paid'],2) }}</td>
-                            <td class="text-end {{ $r['cash_pending_balance'] > 0.009 ? 'text-danger fw-bold' : '' }}">{{ number_format($r['cash_pending_balance'],2) }}</td>
-                            <td class="text-end fw-semibold">{{ number_format($r['total_paid_all'],2) }}</td>
-                            <td class="text-end fw-semibold">{{ number_format($r['total_balance_all'],2) }}</td>
+                            <td class="text-end">{{ inr($r['cheque_total'],2) }}</td>
+                            <td class="text-end text-primary">{{ inr($r['cheque_paid'],2) }}</td>
+                            <td class="text-end {{ $r['cheque_pending_balance'] > 0.009 ? 'text-warning-emphasis fw-bold' : '' }}">{{ inr($r['cheque_pending_balance'],2) }}</td>
+                            <td class="text-end text-success">{{ inr($r['cash_paid'],2) }}</td>
+                            <td class="text-end {{ $r['cash_pending_balance'] > 0.009 ? 'text-danger fw-bold' : '' }}">{{ inr($r['cash_pending_balance'],2) }}</td>
+                            <td class="text-end fw-semibold">{{ inr($r['total_paid_all'],2) }}</td>
+                            <td class="text-end fw-semibold">{{ inr($r['total_balance_all'],2) }}</td>
                         </tr>
                     @empty
                         <tr><td colspan="23" class="text-center text-muted py-4">No bonds match the selected filters.</td></tr>
@@ -279,26 +279,26 @@
                 <tfoot class="table-light">
                     <tr class="fw-bold">
                         <td colspan="3" class="text-end">GRAND TOTAL</td>
-                        <td class="text-end">{{ number_format($g_bond_amount,2) }}</td>
-                        <td class="text-end">{{ number_format($g_advance,2) }}</td>
-                        <td class="text-end">{{ number_format($g_finance,2) }}</td>
+                        <td class="text-end">{{ inr($g_bond_amount,2) }}</td>
+                        <td class="text-end">{{ inr($g_advance,2) }}</td>
+                        <td class="text-end">{{ inr($g_finance,2) }}</td>
                         <td></td>
-                        <td class="text-end">{{ number_format($g_expected,2) }}</td>
-                        <td class="text-end text-success">{{ number_format($g_paid,2) }}</td>
-                        <td class="text-end text-danger">{{ number_format($g_outstanding,2) }}</td>
-                        <td class="text-end text-info-emphasis">{{ number_format($g_credit,2) }}</td>
-                        <td class="text-end">{{ number_format($g_remaining,2) }}</td>
-                        <td></td>
-                        <td></td>
+                        <td class="text-end">{{ inr($g_expected,2) }}</td>
+                        <td class="text-end text-success">{{ inr($g_paid,2) }}</td>
+                        <td class="text-end text-danger">{{ inr($g_outstanding,2) }}</td>
+                        <td class="text-end text-info-emphasis">{{ inr($g_credit,2) }}</td>
+                        <td class="text-end">{{ inr($g_remaining,2) }}</td>
                         <td></td>
                         <td></td>
-                        <td class="text-end">{{ number_format($g_cheque_total,2) }}</td>
-                        <td class="text-end text-primary">{{ number_format($g_cheque_paid,2) }}</td>
-                        <td class="text-end text-warning-emphasis">{{ number_format($g_cheque_pending_balance,2) }}</td>
-                        <td class="text-end text-success">{{ number_format($g_cash_paid,2) }}</td>
-                        <td class="text-end text-danger">{{ number_format($g_cash_pending_balance,2) }}</td>
-                        <td class="text-end">{{ number_format($g_total_paid_all,2) }}</td>
-                        <td class="text-end">{{ number_format($g_total_balance_all,2) }}</td>
+                        <td></td>
+                        <td></td>
+                        <td class="text-end">{{ inr($g_cheque_total,2) }}</td>
+                        <td class="text-end text-primary">{{ inr($g_cheque_paid,2) }}</td>
+                        <td class="text-end text-warning-emphasis">{{ inr($g_cheque_pending_balance,2) }}</td>
+                        <td class="text-end text-success">{{ inr($g_cash_paid,2) }}</td>
+                        <td class="text-end text-danger">{{ inr($g_cash_pending_balance,2) }}</td>
+                        <td class="text-end">{{ inr($g_total_paid_all,2) }}</td>
+                        <td class="text-end">{{ inr($g_total_balance_all,2) }}</td>
                     </tr>
                 </tfoot>
                 @endif

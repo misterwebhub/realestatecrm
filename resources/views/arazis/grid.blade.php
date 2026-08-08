@@ -11,8 +11,8 @@
 
     <div class="mb-3">
         <div class="d-flex gap-3 align-items-center">
-            <div><strong>Original Value:</strong> {{ number_format($arazi->original_value,2) }}</div>
-            <div><strong>After Expenses:</strong> {{ number_format($arazi->price_after_expenses,2) }}</div>
+            <div><strong>Original Value:</strong> {{ inr($arazi->original_value,2) }}</div>
+            <div><strong>After Expenses:</strong> {{ inr($arazi->price_after_expenses,2) }}</div>
             <div class="text-muted small">(Includes {{ $arazi->expenses()->count() }} expense(s))</div>
         </div>
     </div>

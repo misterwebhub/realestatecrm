@@ -56,7 +56,7 @@
                                     <tr>
                                         <td>{{ $b->bond_no }}</td>
                                         <td>{{ $b->customer?->name ?? '-' }}</td>
-                                        <td>{{ number_format((float) $b->broker_paid, 2) }}</td>
+                                        <td>{{ inr((float) $b->broker_paid, 2) }}</td>
                                     </tr>
                                 @endforeach
                             </tbody>

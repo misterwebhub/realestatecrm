@@ -48,20 +48,20 @@
     <div class="col-auto">
         <div class="px-3 py-2 rounded border" style="font-size:12px;background:#f8fafc;">
             <span class="text-muted">Bond Total</span>
-            <span class="ms-2 fw-bold text-primary">₹{{ number_format($totalAmount, 2) }}</span>
+            <span class="ms-2 fw-bold text-primary">₹{{ inr($totalAmount, 2) }}</span>
         </div>
     </div>
     <div class="col-auto">
         <div class="px-3 py-2 rounded border" style="font-size:12px;background:#dcfce7;">
             <span class="text-success fw-semibold">Paid</span>
-            <span class="ms-2 fw-bold text-success">₹{{ number_format($totalPaid, 2) }}</span>
+            <span class="ms-2 fw-bold text-success">₹{{ inr($totalPaid, 2) }}</span>
         </div>
     </div>
     <div class="col-auto">
         <div class="px-3 py-2 rounded border" style="font-size:12px;background:{{ $balance > 0 ? '#fee2e6' : '#dcfce7' }};">
             <span class="{{ $balance > 0 ? 'text-danger' : 'text-success' }} fw-semibold">Balance</span>
             <span class="ms-2 fw-bold {{ $balance > 0 ? 'text-danger' : 'text-success' }}">
-                @if($balance > 0) ₹{{ number_format($balance, 2) }}
+                @if($balance > 0) ₹{{ inr($balance, 2) }}
                 @else <i class="bi bi-check-circle-fill"></i> Cleared
                 @endif
             </span>
@@ -119,13 +119,13 @@
                         </td>
                         @if($isDebit)
                             <td class="text-end text-muted">—</td>
-                            <td class="text-end text-danger fw-semibold">−₹{{ number_format($amount, 2) }}</td>
+                            <td class="text-end text-danger fw-semibold">−₹{{ inr($amount, 2) }}</td>
                         @else
-                            <td class="text-end text-success fw-semibold">₹{{ number_format($amount, 2) }}</td>
+                            <td class="text-end text-success fw-semibold">₹{{ inr($amount, 2) }}</td>
                             <td class="text-end text-muted">—</td>
                         @endif
                         <td class="text-end fw-semibold" style="font-size:12px;color:{{ $running >= 0 ? '#1d4ed8' : '#b91c1c' }};">
-                            ₹{{ number_format($running, 2) }}
+                            ₹{{ inr($running, 2) }}
                         </td>
                         <td style="font-size:12px;color:#475569;">{{ $entry->payment_method ? strtoupper($entry->payment_method) : '-' }}</td>
                         <td style="font-size:12px;color:#475569;">{{ $entry->mtr_transaction_no ?: '-' }}</td>
@@ -168,13 +168,13 @@
                     <tr>
                         <td colspan="4" class="ps-3 py-2 text-end text-muted fw-semibold" style="font-size:12px;">TOTAL</td>
                         <td class="text-end text-success fw-bold" style="font-size:12px;">
-                            ₹{{ number_format($entries->whereNotIn('entry_type', ['return','discount'])->sum('amount'), 2) }}
+                            ₹{{ inr($entries->whereNotIn('entry_type', ['return','discount'])->sum('amount'), 2) }}
                         </td>
                         <td class="text-end text-danger fw-bold" style="font-size:12px;">
-                            ₹{{ number_format($entries->whereIn('entry_type', ['return','discount'])->sum('amount'), 2) }}
+                            ₹{{ inr($entries->whereIn('entry_type', ['return','discount'])->sum('amount'), 2) }}
                         </td>
                         <td class="text-end fw-bold" style="font-size:12px;color:{{ $balance > 0 ? '#b91c1c' : '#15803d' }};">
-                            ₹{{ number_format($running, 2) }}
+                            ₹{{ inr($running, 2) }}
                         </td>
                         <td colspan="6"></td>
                     </tr>

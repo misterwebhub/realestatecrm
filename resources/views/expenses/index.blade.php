@@ -40,7 +40,7 @@
                             </td>
                             <td>{{ $e->arazi?->legacy_arazi_code ?? '-' }}</td>
                             <td>{{ $e->label ?? '-' }}</td>
-                            <td class="text-end">{{ number_format($e->amount,2) }}</td>
+                            <td class="text-end">{{ inr($e->amount,2) }}</td>
                             <td>{{ $e->incurred_at?->format('Y-m-d') ?? '-' }}</td>
                             <td>{{ $e->creator?->name ?? ($e->created_by ? 'User #'.$e->created_by : '-') }}</td>
                         </tr>

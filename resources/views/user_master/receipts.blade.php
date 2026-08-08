@@ -59,19 +59,19 @@
     <div class="col-sm-3">
         <div class="p-3 rounded border" style="background:#dcfce7;">
             <div class="text-success small fw-semibold">Total Credit</div>
-            <div class="fw-bold fs-5 text-success">₹{{ number_format($grandCredit, 2) }}</div>
+            <div class="fw-bold fs-5 text-success">₹{{ inr($grandCredit, 2) }}</div>
         </div>
     </div>
     <div class="col-sm-3">
         <div class="p-3 rounded border" style="background:#fee2e6;">
             <div class="text-danger small fw-semibold">Total Debit (Returns)</div>
-            <div class="fw-bold fs-5 text-danger">₹{{ number_format($grandDebit, 2) }}</div>
+            <div class="fw-bold fs-5 text-danger">₹{{ inr($grandDebit, 2) }}</div>
         </div>
     </div>
     <div class="col-sm-3">
         <div class="p-3 rounded border" style="background:#dbeafe;">
             <div class="text-primary small fw-semibold">Net Collected</div>
-            <div class="fw-bold fs-5 text-primary">₹{{ number_format($grandNet, 2) }}</div>
+            <div class="fw-bold fs-5 text-primary">₹{{ inr($grandNet, 2) }}</div>
         </div>
     </div>
 </div>
@@ -110,11 +110,11 @@
             <span class="text-muted" style="font-size:12px;">{{ $plots }}</span>
         @endif
         <div class="ms-auto d-flex gap-2" style="font-size:12px;">
-            <span class="text-success fw-semibold">Credit: ₹{{ number_format($group['credit'], 2) }}</span>
+            <span class="text-success fw-semibold">Credit: ₹{{ inr($group['credit'], 2) }}</span>
             @if($group['debit'] > 0)
-                <span class="text-danger fw-semibold">Debit: ₹{{ number_format($group['debit'], 2) }}</span>
+                <span class="text-danger fw-semibold">Debit: ₹{{ inr($group['debit'], 2) }}</span>
             @endif
-            <span class="text-primary fw-bold">Net: ₹{{ number_format($group['net'], 2) }}</span>
+            <span class="text-primary fw-bold">Net: ₹{{ inr($group['net'], 2) }}</span>
         </div>
     </div>
 
@@ -158,10 +158,10 @@
                         </span>
                     </td>
                     <td class="text-end {{ $isDebit ? 'text-muted' : 'text-success fw-semibold' }}">
-                        {{ $isDebit ? '—' : '₹'.number_format((float)$entry->amount, 2) }}
+                        {{ $isDebit ? '—' : '₹'.inr((float)$entry->amount, 2) }}
                     </td>
                     <td class="text-end {{ $isDebit ? 'text-danger fw-semibold' : 'text-muted' }}">
-                        {{ $isDebit ? '₹'.number_format((float)$entry->amount, 2) : '—' }}
+                        {{ $isDebit ? '₹'.inr((float)$entry->amount, 2) : '—' }}
                     </td>
                     <td class="text-muted">{{ $entry->payment_method ?? '—' }}</td>
                     <td class="text-muted" style="max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
@@ -181,8 +181,8 @@
             <tfoot style="background:#f8fafc;border-top:2px solid #e2e8f0;">
                 <tr>
                     <td colspan="4" class="ps-3 py-1 text-end text-muted fw-semibold" style="font-size:11px;">SUBTOTAL</td>
-                    <td class="text-end text-success fw-bold" style="font-size:12px;">₹{{ number_format($group['credit'], 2) }}</td>
-                    <td class="text-end text-danger fw-bold" style="font-size:12px;">{{ $group['debit'] > 0 ? '₹'.number_format($group['debit'], 2) : '—' }}</td>
+                    <td class="text-end text-success fw-bold" style="font-size:12px;">₹{{ inr($group['credit'], 2) }}</td>
+                    <td class="text-end text-danger fw-bold" style="font-size:12px;">{{ $group['debit'] > 0 ? '₹'.inr($group['debit'], 2) : '—' }}</td>
                     <td colspan="3"></td>
                 </tr>
             </tfoot>
@@ -195,11 +195,11 @@
 <div class="card border-0 shadow-sm" style="border-left:4px solid #0d6efd !important;">
     <div class="card-body py-2 px-3 d-flex flex-wrap gap-4 align-items-center">
         <span class="fw-bold text-muted" style="font-size:12px;">GRAND TOTAL — {{ $payments->count() }} receipt(s) across {{ $byBond->count() }} bond(s)</span>
-        <span class="ms-auto text-success fw-bold">Credit: ₹{{ number_format($grandCredit, 2) }}</span>
+        <span class="ms-auto text-success fw-bold">Credit: ₹{{ inr($grandCredit, 2) }}</span>
         @if($grandDebit > 0)
-            <span class="text-danger fw-bold">Debit: ₹{{ number_format($grandDebit, 2) }}</span>
+            <span class="text-danger fw-bold">Debit: ₹{{ inr($grandDebit, 2) }}</span>
         @endif
-        <span class="text-primary fw-bold">Net: ₹{{ number_format($grandNet, 2) }}</span>
+        <span class="text-primary fw-bold">Net: ₹{{ inr($grandNet, 2) }}</span>
     </div>
 </div>
 

@@ -79,7 +79,7 @@
         <div class="cheque-stat" style="background:{{ $c['bg'] }}; border-color:{{ $c['border'] }}; color:{{ $c['text'] }};">
             <div class="cs-label">{{ $label }}</div>
             <div class="cs-count">{{ $s ? number_format($s->count) : 0 }} cheque(s)</div>
-            <div class="cs-amount">₹{{ $s ? number_format((float)$s->total, 2) : '0.00' }}</div>
+            <div class="cs-amount">₹{{ $s ? inr((float)$s->total, 2) : '0.00' }}</div>
         </div>
     </div>
     @endforeach
@@ -159,7 +159,7 @@
                                 <span class="text-muted" style="font-size:13px;">/ {{ $cheque->branch_name }}</span>
                             @endif
                         </td>
-                        <td class="text-end fw-bold">₹{{ number_format((float)$cheque->amount, 2) }}</td>
+                        <td class="text-end fw-bold">₹{{ inr((float)$cheque->amount, 2) }}</td>
                         <td>
                             <span class="badge" style="font-size:12px; padding:5px 11px; background:{{ $sc['bg'] }}; color:{{ $sc['text'] }}; border:1px solid {{ $sc['border'] }};">
                                 {{ ucfirst($cheque->status) }}
@@ -189,7 +189,7 @@
                 <tfoot>
                     <tr style="background:#f8fafc; font-weight:700; font-size:13px; border-top:2px solid #e2e8f0;">
                         <td colspan="7" class="ps-3 py-2 text-end text-muted">TOTAL</td>
-                        <td class="text-end text-primary">₹{{ number_format($cheques->sum('amount'), 2) }}</td>
+                        <td class="text-end text-primary">₹{{ inr($cheques->sum('amount'), 2) }}</td>
                         <td colspan="4"></td>
                     </tr>
                 </tfoot>

@@ -64,7 +64,7 @@ class PartnerController extends Controller
                 $item->name,
                 $item->mobile,
                 (string) $item->share_percentage,
-                number_format((float) $item->capital_amount, 2),
+                inr((float) $item->capital_amount, 2),
                 optional($item->joined_on)->format('d-m-Y') ?? '-',
                 ucfirst($item->status),
             ],

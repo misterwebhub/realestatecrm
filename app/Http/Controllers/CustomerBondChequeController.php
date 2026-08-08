@@ -197,7 +197,7 @@ class CustomerBondChequeController extends Controller
         $cheques = $query->get()->map(function ($c) {
             return [
                 'id' => $c->id,
-                'label' => ($c->cheque_number ? $c->cheque_number . ' — ' : '') . '₹' . number_format((float)$c->amount, 2) . ' — ' . ucfirst($c->status),
+                'label' => ($c->cheque_number ? $c->cheque_number . ' — ' : '') . '₹' . inr((float)$c->amount, 2) . ' — ' . ucfirst($c->status),
                 'amount' => (float) $c->amount,
                 'status' => $c->status,
             ];

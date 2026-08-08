@@ -486,9 +486,9 @@ class CustomerBondController extends Controller
                 '',  // arazi — rendered as HTML in view via bond_arazi / bond_plots
                 '',  // plots
                 optional($item->bond_date)->format('d-m-Y') ?? '-',
-                number_format((float) $item->bond_amount, 2),
-                number_format((float) ($item->paid_amount ?? 0), 2),
-                number_format(max(0, ((float) ($item->bond_amount ?? 0) - (float) ($item->paid_amount ?? 0))), 2),
+                inr((float) $item->bond_amount, 2),
+                inr((float) ($item->paid_amount ?? 0), 2),
+                inr(max(0, ((float) ($item->bond_amount ?? 0) - (float) ($item->paid_amount ?? 0))), 2),
             ],
             'bond_arazi' => $araziCode,
             'bond_plots' => $plotRows,
@@ -562,16 +562,16 @@ class CustomerBondController extends Controller
             'end_date'         => optional($customer_bond->expiry_date ?? $customer_bond->last_date)->format('d-m-Y') ?? '-',
             'arazi'            => $araziLabel,
             'plots'            => $plotsLabel,
-            'total_amount'     => number_format($totalAmount, 2),
-            'paid_amount'      => number_format($paidAmount, 2),
-            'balance'          => number_format($balance, 2),
+            'total_amount'     => inr($totalAmount, 2),
+            'paid_amount'      => inr($paidAmount, 2),
+            'balance'          => inr($balance, 2),
             'last_payment_date'=> $lastPayment ? optional($lastPayment->entry_date)->format('d-m-Y') : '-',
-            'last_payment_amt' => $lastPayment ? number_format((float)$lastPayment->amount, 2) : '-',
+            'last_payment_amt' => $lastPayment ? inr((float)$lastPayment->amount, 2) : '-',
             'cheques' => $customer_bond->cheques->map(fn ($c) => [
                 'id'           => $c->id,
                 'cheque_number'=> $c->cheque_number,
                 'cheque_date'  => optional($c->cheque_date)->format('d-m-Y'),
-                'amount'       => number_format((float)$c->amount, 2),
+                'amount'       => inr((float)$c->amount, 2),
                 'status'       => $c->status,
                 'type'         => $c->type ?? 'mentioned',
                 'notes'        => $c->notes,
@@ -634,7 +634,7 @@ class CustomerBondController extends Controller
             'customer'   => $bond->customer?->name ?? '-',
             'arazi_code' => $araziLabel,
             'plots'      => $plotsLabel,
-            'amount'     => number_format((float) $bond->bond_amount, 2),
+            'amount'     => inr((float) $bond->bond_amount, 2),
             'bond_date'  => optional($bond->bond_date)->format('d-m-Y') ?? '-',
         ]);
     }

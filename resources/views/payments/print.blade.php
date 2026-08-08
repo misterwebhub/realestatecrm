@@ -183,13 +183,13 @@
                 <div class="col-lg-8">
                     <div class="row g-2">
                         <div class="col-sm-5 field-label">Total Land Value</div>
-                        <div class="col-sm-7"><div class="field-box">{{ number_format((float) ($registry?->registry_amount ?? 0), 2) }}</div></div>
+                        <div class="col-sm-7"><div class="field-box">{{ inr((float) ($registry?->registry_amount ?? 0), 2) }}</div></div>
 
                         <div class="col-sm-5 field-label">Balance Amount Rs.</div>
-                        <div class="col-sm-7"><div class="field-box">{{ number_format((float) (($registry?->registry_amount ?? 0) - $amount), 2) }}</div></div>
+                        <div class="col-sm-7"><div class="field-box">{{ inr((float) (($registry?->registry_amount ?? 0) - $amount), 2) }}</div></div>
 
                         <div class="col-sm-5 field-label">Amount Received</div>
-                        <div class="col-sm-7"><div class="field-box">{{ number_format($amount, 2) }}</div></div>
+                        <div class="col-sm-7"><div class="field-box">{{ inr($amount, 2) }}</div></div>
 
                         <div class="col-sm-5 field-label">2% Late Charges</div>
                         <div class="col-sm-7"><div class="field-box">0.00</div></div>
@@ -198,7 +198,7 @@
                         <div class="col-sm-7"><div class="field-box">0.00</div></div>
 
                         <div class="col-sm-5 field-label text-danger">Balance Received Amount</div>
-                        <div class="col-sm-7"><div class="field-box text-danger">{{ number_format($amount, 2) }}</div></div>
+                        <div class="col-sm-7"><div class="field-box text-danger">{{ inr($amount, 2) }}</div></div>
                     </div>
                 </div>
 

@@ -97,7 +97,7 @@
                             <tr>
                                 <td>{{ $payment->registry?->arazi?->legacy_arazi_code ?? '-' }}</td>
                                 <td>{{ $payment->customer?->name ?? $payment->kisan?->name ?? '-' }}</td>
-                                <td>{{ number_format((float) $payment->amount, 2) }}</td>
+                                <td>{{ inr((float) $payment->amount, 2) }}</td>
                                 <td>{{ optional($payment->payment_date)->format('d-m-Y') }}</td>
                             </tr>
                         @empty

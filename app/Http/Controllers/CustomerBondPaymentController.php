@@ -520,7 +520,7 @@ class CustomerBondPaymentController extends Controller
                     ->latest()
                     ->get()
                     ->mapWithKeys(function (CustomerBond $bond) {
-                        return [$bond->id => $bond->bond_no . ' - ' . number_format((float) ($bond->total_amount ?? $bond->bond_amount ?? 0), 2)];
+                        return [$bond->id => $bond->bond_no . ' - ' . inr((float) ($bond->total_amount ?? $bond->bond_amount ?? 0), 2)];
                     })
                     ->all(),
                 'value' => $item?->customer_bond_id,
@@ -542,7 +542,7 @@ class CustomerBondPaymentController extends Controller
                             }
                         })
                         ->orderByDesc('id')->get()->mapWithKeys(function ($c) {
-                            return [$c->id => ($c->cheque_number ? $c->cheque_number . ' — ' : '') . '₹' . number_format((float)$c->amount, 2) . ' — ' . ucfirst($c->status)];
+                            return [$c->id => ($c->cheque_number ? $c->cheque_number . ' — ' : '') . '₹' . inr((float)$c->amount, 2) . ' — ' . ucfirst($c->status)];
                         })->all()
                     : [],
                 'value' => $item?->customer_bond_cheque_id,
@@ -815,8 +815,8 @@ class CustomerBondPaymentController extends Controller
                 (string) ($item->land_size ?? '-'),
                 optional($item->entry_date)->format('d-m-Y') ?? '-',
                 ucfirst($item->entry_type),
-                in_array($item->entry_type, ['return', 'discount']) ? '—' : number_format((float) $item->amount, 2),
-                in_array($item->entry_type, ['return', 'discount']) ? number_format((float) $item->amount, 2) : '—',
+                in_array($item->entry_type, ['return', 'discount']) ? '—' : inr((float) $item->amount, 2),
+                in_array($item->entry_type, ['return', 'discount']) ? inr((float) $item->amount, 2) : '—',
                 $item->payment_method ? strtoupper($item->payment_method) : '—',
                 strtolower((string) $item->payment_method) === 'cheque'
                     ? ($item->cheque?->cheque_number ?: ($item->mtr_transaction_no ?: '—'))
@@ -997,7 +997,7 @@ class CustomerBondPaymentController extends Controller
             'customer'    => $customerName,
             'arazi_code'  => $payment->arazi_code ?? '-',
             'entry_type'  => ucfirst((string) $payment->entry_type),
-            'amount'      => number_format((float) $payment->amount, 2),
+            'amount'      => inr((float) $payment->amount, 2),
             'entry_date'  => optional($payment->entry_date)->format('d-m-Y') ?? '-',
         ]);
     }

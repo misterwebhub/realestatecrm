@@ -256,7 +256,7 @@
                     </tr>
                     <tr>
                         <td class="text-muted ps-0" style="border:none;">Sale Rate</td>
-                        <td style="border:none;">{{ $bd->sale_rate ? '₹'.number_format((float)$bd->sale_rate, 2).' /Gaz' : '-' }}</td>
+                        <td style="border:none;">{{ $bd->sale_rate ? '₹'.inr((float)$bd->sale_rate, 2).' /Gaz' : '-' }}</td>
                     </tr>
                     <tr>
                         <td class="text-muted ps-0" style="border:none;">Bond Date</td>
@@ -271,7 +271,7 @@
                     @if($bd->no_of_months)
                     <tr>
                         <td class="text-muted ps-0" style="border:none;">Installments</td>
-                        <td style="border:none;">{{ $bd->no_of_months }} months @ ₹{{ number_format((float)$bd->installment_amount, 2) }}</td>
+                        <td style="border:none;">{{ $bd->no_of_months }} months @ ₹{{ inr((float)$bd->installment_amount, 2) }}</td>
                     </tr>
                     @endif
                 </table>
@@ -283,31 +283,31 @@
                 <div class="d-flex flex-column gap-2">
                     <div class="d-flex justify-content-between align-items-center p-2 rounded" style="background:#f8fafc;">
                         <span class="text-muted small">Total Bond Amount</span>
-                        <span class="fw-bold">₹{{ number_format($bdTotal, 2) }}</span>
+                        <span class="fw-bold">₹{{ inr($bdTotal, 2) }}</span>
                     </div>
                     <div class="d-flex justify-content-between align-items-center p-2 rounded" style="background:#dcfce7;">
                         <span class="text-success small fw-semibold">Total Paid</span>
-                        <span class="fw-bold text-success">₹{{ number_format($bdPaid, 2) }}</span>
+                        <span class="fw-bold text-success">₹{{ inr($bdPaid, 2) }}</span>
                     </div>
                     <div class="d-flex justify-content-between align-items-center p-2 rounded" style="background:{{ $bdBalance > 0 ? '#fee2e2' : '#dcfce7' }};">
                         <span class="{{ $bdBalance > 0 ? 'text-danger' : 'text-success' }} small fw-semibold">Balance Remaining</span>
                         <span class="fw-bold {{ $bdBalance > 0 ? 'text-danger' : 'text-success' }}">
-                            @if($bdBalance > 0) ₹{{ number_format($bdBalance, 2) }}
+                            @if($bdBalance > 0) ₹{{ inr($bdBalance, 2) }}
                             @else <span class="badge bg-success">Cleared ✓</span>
                             @endif
                         </span>
                     </div>
                     <div class="d-flex justify-content-between align-items-center p-2 rounded" style="background:#f1f5f9;">
                         <span class="text-secondary small fw-semibold"><i class="bi bi-bank me-1"></i>Total Cheque Amount</span>
-                        <span class="fw-bold text-secondary">₹{{ number_format((float)($chequeSummary['total'] ?? 0), 2) }}</span>
+                        <span class="fw-bold text-secondary">₹{{ inr((float)($chequeSummary['total'] ?? 0), 2) }}</span>
                     </div>
                     <div class="d-flex justify-content-between align-items-center p-2 rounded" style="background:#eff6ff;">
                         <span class="text-primary small fw-semibold"><i class="bi bi-bank me-1"></i>Paid Cheque Amount</span>
-                        <span class="fw-bold text-primary">₹{{ number_format((float)($chequeSummary['cleared'] ?? 0), 2) }}</span>
+                        <span class="fw-bold text-primary">₹{{ inr((float)($chequeSummary['cleared'] ?? 0), 2) }}</span>
                     </div>
                     <div class="d-flex justify-content-between align-items-center p-2 rounded" style="background:#fef3c7;">
                         <span class="small fw-semibold" style="color:#92400e;"><i class="bi bi-bank me-1"></i>Balance Cheque Amount</span>
-                        <span class="fw-bold" style="color:#92400e;">₹{{ number_format((float)($chequeSummary['balance'] ?? 0), 2) }}</span>
+                        <span class="fw-bold" style="color:#92400e;">₹{{ inr((float)($chequeSummary['balance'] ?? 0), 2) }}</span>
                     </div>
                     {{-- Progress bar --}}
                     <div class="mt-1">
@@ -322,7 +322,7 @@
                     @if($bd->bayana_mode || $bd->amount)
                     <div class="d-flex justify-content-between align-items-center p-2 rounded" style="background:#f1f5f9;font-size:12px;">
                         <span class="text-muted">Advance (Bayana)</span>
-                        <span>₹{{ number_format((float)($bd->amount ?? 0), 2) }}</span>
+                        <span>₹{{ inr((float)($bd->amount ?? 0), 2) }}</span>
                     </div>
                     @endif
                 </div>
@@ -366,25 +366,25 @@
                     <div class="col-6 col-md">
                         <div class="p-2 rounded text-center" style="background:#eef2ff;">
                             <div class="text-muted small">Total Amount</div>
-                            <div class="fw-bold">₹{{ number_format($chSummary['total'], 2) }}</div>
+                            <div class="fw-bold">₹{{ inr($chSummary['total'], 2) }}</div>
                         </div>
                     </div>
                     <div class="col-6 col-md">
                         <div class="p-2 rounded text-center" style="background:#dcfce7;">
                             <div class="text-success small">Cleared (Paid)</div>
-                            <div class="fw-bold text-success">₹{{ number_format($chSummary['cleared'], 2) }}</div>
+                            <div class="fw-bold text-success">₹{{ inr($chSummary['cleared'], 2) }}</div>
                         </div>
                     </div>
                     <div class="col-6 col-md">
                         <div class="p-2 rounded text-center" style="background:#fef9c3;">
                             <div class="small" style="color:#92400e;">Balance (Pending)</div>
-                            <div class="fw-bold" style="color:#92400e;">₹{{ number_format($chSummary['balance'], 2) }}</div>
+                            <div class="fw-bold" style="color:#92400e;">₹{{ inr($chSummary['balance'], 2) }}</div>
                         </div>
                     </div>
                     <div class="col-6 col-md">
                         <div class="p-2 rounded text-center" style="background:#fee2e2;">
                             <div class="text-danger small">Bounced</div>
-                            <div class="fw-bold text-danger">₹{{ number_format($chSummary['bounced'], 2) }}</div>
+                            <div class="fw-bold text-danger">₹{{ inr($chSummary['bounced'], 2) }}</div>
                         </div>
                     </div>
                 </div>
@@ -414,7 +414,7 @@
                                 <td>{{ $ch['account'] }}</td>
                                 <td style="white-space:nowrap;">{{ $ch['cheque_date'] }}</td>
                                 <td style="white-space:nowrap;">{{ $ch['due_date'] }}</td>
-                                <td class="text-end fw-semibold">₹{{ number_format($ch['amount'], 2) }}</td>
+                                <td class="text-end fw-semibold">₹{{ inr($ch['amount'], 2) }}</td>
                                 <td><span class="badge {{ $statusBadge[$ch['status']] ?? 'bg-secondary' }}">{{ ucfirst($ch['status']) }}</span></td>
                                 <td class="text-muted small" style="max-width:160px;">{{ $ch['notes'] }}</td>
                             </tr>
@@ -428,7 +428,7 @@
                         <tfoot>
                             <tr style="background:#f8fafc;font-weight:600;">
                                 <td colspan="6" class="text-end text-muted">TOTAL</td>
-                                <td class="text-end">₹{{ number_format($chSummary['total'], 2) }}</td>
+                                <td class="text-end">₹{{ inr($chSummary['total'], 2) }}</td>
                                 <td colspan="2"></td>
                             </tr>
                         </tfoot>
@@ -539,16 +539,16 @@
     <div class="col-sm-4">
         <div class="ledger-stat bg-primary bg-opacity-10 border border-primary border-opacity-25">
             <div class="stat-label text-primary">Total Bond Value</div>
-            <div class="stat-value text-primary">₹{{ number_format($overallTotal, 2) }}</div>
+            <div class="stat-value text-primary">₹{{ inr($overallTotal, 2) }}</div>
             <div class="stat-sub text-primary">Across {{ $bonds->count() }} bond(s)</div>
         </div>
     </div>
     <div class="col-sm-4">
         <div class="ledger-stat bg-success bg-opacity-10 border border-success border-opacity-25">
             <div class="stat-label text-success">Net Collected</div>
-            <div class="stat-value text-success">₹{{ number_format($netCollected, 2) }}</div>
+            <div class="stat-value text-success">₹{{ inr($netCollected, 2) }}</div>
             @if($totalDebit > 0)
-                <div class="stat-sub text-success">Credit ₹{{ number_format($totalCredit,2) }} − Debit ₹{{ number_format($totalDebit,2) }}</div>
+                <div class="stat-sub text-success">Credit ₹{{ inr($totalCredit,2) }} − Debit ₹{{ inr($totalDebit,2) }}</div>
             @elseif($overallTotal > 0)
                 <div class="stat-sub text-success">{{ number_format(($netCollected / $overallTotal) * 100, 1) }}% of total</div>
             @endif
@@ -557,7 +557,7 @@
     <div class="col-sm-4">
         <div class="ledger-stat bg-danger bg-opacity-10 border border-danger border-opacity-25">
             <div class="stat-label text-danger">Total Outstanding</div>
-            <div class="stat-value text-danger">₹{{ number_format($overallBalance, 2) }}</div>
+            <div class="stat-value text-danger">₹{{ inr($overallBalance, 2) }}</div>
             @if($overallTotal > 0)
                 <div class="stat-sub text-danger">{{ number_format(($overallBalance / $overallTotal) * 100, 1) }}% remaining</div>
             @endif
@@ -575,17 +575,17 @@
 <div class="print-stats" style="display:none;">
     <div class="ps-item">
         <span>Total Bond Value</span>
-        <strong>₹{{ number_format($overallTotal, 2) }}</strong>
+        <strong>₹{{ inr($overallTotal, 2) }}</strong>
         <span>{{ $bonds->count() }} bond(s)</span>
     </div>
     <div class="ps-item">
         <span>Net Collected</span>
-        <strong style="color:#15803d;">₹{{ number_format($overallPaid, 2) }}</strong>
+        <strong style="color:#15803d;">₹{{ inr($overallPaid, 2) }}</strong>
         @if($overallTotal > 0)<span>{{ number_format(($overallPaid / $overallTotal) * 100, 1) }}% of total</span>@endif
     </div>
     <div class="ps-item">
         <span>Total Outstanding</span>
-        <strong style="color:#b91c1c;">₹{{ number_format($overallBalance, 2) }}</strong>
+        <strong style="color:#b91c1c;">₹{{ inr($overallBalance, 2) }}</strong>
         @if($overallTotal > 0)<span>{{ number_format(($overallBalance / $overallTotal) * 100, 1) }}% remaining</span>@endif
     </div>
 </div>
@@ -645,10 +645,10 @@
                         @if($isCustomerLedger)
                             <td class="text-muted" style="font-size:12px;">{{ $bond['plots'] ?? '-' }}</td>
                         @endif
-                        <td class="text-end">₹{{ number_format($bond['total'], 2) }}</td>
-                        <td class="text-end text-success fw-semibold">₹{{ number_format($bond['paid'], 2) }}</td>
+                        <td class="text-end">₹{{ inr($bond['total'], 2) }}</td>
+                        <td class="text-end text-success fw-semibold">₹{{ inr($bond['paid'], 2) }}</td>
                         <td class="text-end {{ $bond['balance'] > 0 ? 'text-danger fw-semibold' : 'text-success' }}">
-                            @if($bond['balance'] > 0) ₹{{ number_format($bond['balance'], 2) }}
+                            @if($bond['balance'] > 0) ₹{{ inr($bond['balance'], 2) }}
                             @else <span class="badge bg-success-subtle text-success">Cleared</span>
                             @endif
                         </td>
@@ -685,9 +685,9 @@
         </div>
         {{-- mini totals for visible entries --}}
         <div class="d-flex gap-3 ms-auto" style="font-size:12px;">
-            <span>Credit: <strong class="text-success">₹{{ number_format($totalCredit, 2) }}</strong></span>
-            <span>Debit: <strong class="text-danger">₹{{ number_format($totalDebit, 2) }}</strong></span>
-            <span>Net: <strong class="{{ ($totalCredit - $totalDebit) >= 0 ? 'text-primary' : 'text-danger' }}">₹{{ number_format($totalCredit - $totalDebit, 2) }}</strong></span>
+            <span>Credit: <strong class="text-success">₹{{ inr($totalCredit, 2) }}</strong></span>
+            <span>Debit: <strong class="text-danger">₹{{ inr($totalDebit, 2) }}</strong></span>
+            <span>Net: <strong class="{{ ($totalCredit - $totalDebit) >= 0 ? 'text-primary' : 'text-danger' }}">₹{{ inr($totalCredit - $totalDebit, 2) }}</strong></span>
         </div>
     </div>
     @else
@@ -703,9 +703,9 @@
         </div>
         <div style="display:flex;gap:20px;margin-bottom:8px;padding:5px 8px;background:#f4f4f4;border:1px solid #ddd;border-radius:3px;font-size:10px;">
             <span>Bond: <strong>{{ $selectedBond->bond_no }}</strong></span>
-            <span>Total: <strong>₹{{ number_format((float)($selectedBond->total_amount ?? $selectedBond->bond_amount ?? 0), 2) }}</strong></span>
-            <span>Paid: <strong>₹{{ number_format($totalCredit, 2) }}</strong></span>
-            <span>Balance: <strong>₹{{ number_format(max((float)($selectedBond->total_amount ?? $selectedBond->bond_amount ?? 0) - $totalCredit, 0), 2) }}</strong></span>
+            <span>Total: <strong>₹{{ inr((float)($selectedBond->total_amount ?? $selectedBond->bond_amount ?? 0), 2) }}</strong></span>
+            <span>Paid: <strong>₹{{ inr($totalCredit, 2) }}</strong></span>
+            <span>Balance: <strong>₹{{ inr(max((float)($selectedBond->total_amount ?? $selectedBond->bond_amount ?? 0) - $totalCredit, 0), 2) }}</strong></span>
         </div>
     </div>
     @endif
@@ -747,13 +747,13 @@
                         </td>
                         @if(!empty($entry['is_debit']))
                             <td class="text-end text-muted">—</td>
-                            <td class="text-end text-danger fw-semibold">−₹{{ number_format($entry['amount'], 2) }}</td>
+                            <td class="text-end text-danger fw-semibold">−₹{{ inr($entry['amount'], 2) }}</td>
                         @else
-                            <td class="text-end text-success fw-semibold">₹{{ number_format($entry['amount'], 2) }}</td>
+                            <td class="text-end text-success fw-semibold">₹{{ inr($entry['amount'], 2) }}</td>
                             <td class="text-end text-muted">—</td>
                         @endif
                         <td class="text-end running-bal {{ $entry['running_balance'] >= 0 ? 'text-primary' : 'text-danger' }}">
-                            ₹{{ number_format($entry['running_balance'], 2) }}
+                            ₹{{ inr($entry['running_balance'], 2) }}
                         </td>
                         <td style="font-size:12px;">
                             {{ $entry['method'] !== '-' ? $entry['method'] : '' }}
@@ -784,9 +784,9 @@
                 <tfoot>
                     <tr style="background:#f8fafc; font-weight:600; font-size:12px; border-top:2px solid #e2e8f0;">
                         <td colspan="{{ $selectedBondId ? 4 : 7 }}" class="ps-3 py-2 text-end text-muted">TOTAL</td>
-                        <td class="text-end text-success">₹{{ number_format($totalCredit, 2) }}</td>
-                        <td class="text-end text-danger">₹{{ number_format($totalDebit, 2) }}</td>
-                        <td class="text-end text-primary">₹{{ number_format($totalCredit - $totalDebit, 2) }}</td>
+                        <td class="text-end text-success">₹{{ inr($totalCredit, 2) }}</td>
+                        <td class="text-end text-danger">₹{{ inr($totalDebit, 2) }}</td>
+                        <td class="text-end text-primary">₹{{ inr($totalCredit - $totalDebit, 2) }}</td>
                         <td colspan="5"></td>
                     </tr>
                 </tfoot>

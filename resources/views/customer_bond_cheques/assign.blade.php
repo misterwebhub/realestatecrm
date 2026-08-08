@@ -154,7 +154,7 @@
                                 <tr class="cheque-row" data-cheque="{{ strtolower($c->cheque_number) }}">
                                     <td class="text-center"><input type="checkbox" class="row-check" name="cheque_ids[]" value="{{ $c->id }}"></td>
                                     <td>{{ $c->cheque_number }}</td>
-                                    <td>{{ number_format((float)$c->amount, 2) }}</td>
+                                    <td>{{ inr((float)$c->amount, 2) }}</td>
                                     <td>
                                         @if($c->customer_bond_id)
                                             <span class="badge bg-success">Assigned</span>

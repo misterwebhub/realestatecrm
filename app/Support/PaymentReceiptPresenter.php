@@ -28,7 +28,7 @@ class PaymentReceiptPresenter
             return $words;
         }
 
-        return number_format($amount, 2).' INR';
+        return inr($amount, 2).' INR';
     }
 
     /**
@@ -84,7 +84,7 @@ class PaymentReceiptPresenter
             'received_from' => $receivedFrom,
             'hand_in' => $desc,
             'amount' => $amount,
-            'amount_formatted' => 'Rs. '.number_format($amount, 2),
+            'amount_formatted' => 'Rs. '.inr($amount, 2),
             'amount_in_words' => self::amountInWordsInr($amount),
             'method_flags' => self::paymentMethodFlags($method),
             'method_raw' => $method !== '' ? $method : '-',
@@ -128,7 +128,7 @@ class PaymentReceiptPresenter
             'received_from'    => $customer?->name ?? '-',
             'hand_in'          => $desc,
             'amount'           => $amount,
-            'amount_formatted' => 'Rs. '.number_format($amount, 2),
+            'amount_formatted' => 'Rs. '.inr($amount, 2),
             'amount_in_words'  => self::amountInWordsInr($amount),
             'method_flags'     => self::paymentMethodFlags($method),
             'method_raw'       => $method !== '' ? $method : '-',

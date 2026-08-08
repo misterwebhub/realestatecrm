@@ -35,7 +35,7 @@
             <th>Name, D.O.B and Address of Associate</th>
             <td style="text-align:left">{{ $registry->customer?->name ?? '-' }}<br>{{ $registry->associate_address ?? $registry->customer?->address ?? '' }}</td>
             <th>Registry Amount</th>
-            <td>{{ number_format((float) ($registry->registry_amount ?? 0), 2) }}</td>
+            <td>{{ inr((float) ($registry->registry_amount ?? 0), 2) }}</td>
         </tr>
     </table>
 

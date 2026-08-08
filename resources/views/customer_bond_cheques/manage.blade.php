@@ -60,20 +60,20 @@
         </div>
         <div class="col-6 col-md-3">
             <div class="text-muted" style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;">Total Amount</div>
-            <div class="fw-bold text-primary" style="font-size:15px;">₹{{ number_format((float)($b->total_amount ?? 0), 2) }}</div>
+            <div class="fw-bold text-primary" style="font-size:15px;">₹{{ inr((float)($b->total_amount ?? 0), 2) }}</div>
         </div>
         <div class="col-6 col-md-3">
             <div class="text-muted" style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;">Paid</div>
-            <div class="fw-bold text-success" style="font-size:15px;">₹{{ number_format($netPaid, 2) }}</div>
+            <div class="fw-bold text-success" style="font-size:15px;">₹{{ inr($netPaid, 2) }}</div>
         </div>
         <div class="col-6 col-md-3">
             <div class="text-muted" style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;">Balance</div>
-            <div class="fw-bold {{ $balance > 0 ? 'text-danger' : 'text-success' }}" style="font-size:15px;">₹{{ number_format($balance, 2) }}</div>
+            <div class="fw-bold {{ $balance > 0 ? 'text-danger' : 'text-success' }}" style="font-size:15px;">₹{{ inr($balance, 2) }}</div>
         </div>
         <div class="col-6 col-md-3">
             <div class="text-muted" style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;">Installments Paid</div>
             <div class="fw-semibold" style="font-size:15px;">{{ $installmentNo }}
-                @if($b->installment_amount)<span class="text-muted fw-normal" style="font-size:12px;">· ₹{{ number_format((float)$b->installment_amount,2) }}/inst</span>@endif
+                @if($b->installment_amount)<span class="text-muted fw-normal" style="font-size:12px;">· ₹{{ inr((float)$b->installment_amount,2) }}/inst</span>@endif
             </div>
         </div>
         @if($witnesses->count())
@@ -232,7 +232,7 @@
                             <td class="fw-bold text-primary align-middle" id="chequeTotalCell">₹0.00</td>
                             <td colspan="7" class="align-middle">
                                 <div class="d-flex flex-wrap gap-3" style="font-size:13px;">
-                                    <span>Bond Total: <span class="fw-semibold">₹{{ number_format((float)($bond->total_amount ?? 0), 2) }}</span></span>
+                                    <span>Bond Total: <span class="fw-semibold">₹{{ inr((float)($bond->total_amount ?? 0), 2) }}</span></span>
                                     <span>Cheques Total: <span class="fw-semibold text-primary" id="chequeTotalInline">₹0.00</span></span>
                                     <span>Balance (Total − Cheques): <span class="fw-bold" id="chequeBalanceInline">₹0.00</span></span>
                                 </div>

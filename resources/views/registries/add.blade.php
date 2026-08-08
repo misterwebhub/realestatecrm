@@ -165,7 +165,7 @@
                 <div class="col-md-2">
                     <label class="form-label small fw-semibold">Bond Amount</label>
                     <input type="text" class="form-control form-control-sm bg-light" id="d_bond_amount"
-                        value="{{ $item->registry_amount ? number_format($item->registry_amount,2) : '' }}" readonly placeholder="Auto-filled">
+                        value="{{ $item->registry_amount ? inr($item->registry_amount,2) : '' }}" readonly placeholder="Auto-filled">
                 </div>
                 <div class="col-md-2">
                     <label class="form-label small fw-semibold">Balance Amount</label>

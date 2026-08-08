@@ -82,7 +82,7 @@
             <td>{{ $bond->bond_date ? $bond->bond_date->format('d-m-Y') : '' }}</td>
             <td>{{ $bond->bond_type ?? '-' }}</td>
             <td>{{ ucfirst($bond->bayana_mode ?? '-') }}</td>
-            <td class="num">{{ number_format($consideration, 2) }}</td>
+            <td class="num">{{ inr($consideration, 2) }}</td>
             <td>{{ $installmentMonths !== null && $installmentMonths !== '' ? (int) $installmentMonths : '-' }}</td>
         </tr>
     </table>
@@ -97,7 +97,7 @@
         </tr>
         <tr>
             <td>{{ $bond->last_date ? $bond->last_date->format('d-m-Y') : '-' }}</td>
-            <td class="num">{{ number_format($booking, 2) }}</td>
+            <td class="num">{{ inr($booking, 2) }}</td>
             <td>{{ isset($lastPaymentDate) && $lastPaymentDate ? $fmtDate($lastPaymentDate) : '-' }}</td>
             <td>{{ $bond->expiry_date ? $bond->expiry_date->format('d-m-Y') : '-' }}</td>
             <td style="text-align:left">{{ $bond->broker?->name ?? '-' }}</td>
@@ -142,7 +142,7 @@
     <table>
         <tr>
             <th>EXPECTED SUM PAYABLE RUPEES</th>
-            <td class="num">{{ number_format($expectedSumPayable, 2) }}</td>
+            <td class="num">{{ inr($expectedSumPayable, 2) }}</td>
         </tr>
         <tr>
             <td rowspan="2" style="font-weight:bold;">Date</td>
@@ -177,7 +177,7 @@
         </tr>
         <tr>
             <th>Amount in words Rs.</th>
-            <td colspan="3" class="num">{{ number_format($consideration, 2) }}</td>
+            <td colspan="3" class="num">{{ inr($consideration, 2) }}</td>
         </tr>
     </table>
 
