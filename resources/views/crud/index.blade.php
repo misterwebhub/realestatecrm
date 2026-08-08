@@ -79,6 +79,12 @@
 
         @if(!empty($isCustomerPaymentIndex))
             <div class="card-body border-top py-2 px-3">
+                @if(empty($cp_show_all))
+                    <div class="small text-muted mb-2">
+                        <i class="bi bi-info-circle"></i>
+                        Showing entries for the current month ({{ now()->format('F Y') }}) by default (fastest). Pick a date range or click <strong>Show All</strong> to widen it.
+                    </div>
+                @endif
                 <form method="GET" class="row g-2 align-items-end">
                     <div class="col-md-3">
                         <label class="form-label small fw-semibold mb-1">Name / Mobile</label>
@@ -139,6 +145,14 @@
                     <div class="col-auto d-flex gap-2">
                         <button type="submit" class="btn btn-primary btn-sm">Search</button>
                         <a href="{{ route('customer-bond-payments.index') }}" class="btn btn-outline-secondary btn-sm">Clear</a>
+                        @if(empty($cp_show_all))
+                            <a href="{{ route('customer-bond-payments.index', array_merge(request()->except(['date_from','date_to','page']), ['all' => 1])) }}"
+                               class="btn btn-outline-warning btn-sm" title="Load every entry regardless of date — may be slow">
+                                Show All
+                            </a>
+                        @else
+                            <span class="badge text-bg-warning align-self-center">Showing all dates</span>
+                        @endif
                     </div>
                     <div class="col-auto ms-auto">
                         <label class="form-label small fw-semibold mb-1">Delete by Entry No</label>
@@ -392,11 +406,156 @@
                         <input type="text" name="plot" value="{{ $filter_plot ?? '' }}" class="form-control form-control-sm" placeholder="Plot title…">
                     </div>
                     <div class="col-auto">
+                        <label class="form-label small">Customer</label>
+                        <input type="text" name="q" value="{{ $filter_q ?? '' }}" class="form-control form-control-sm" placeholder="Name or mobile…">
+                    </div>
+                    <div class="col-auto">
+                        <label class="form-label small">Bond No</label>
+                        <input type="text" name="bond_no" value="{{ $filter_bond_no ?? '' }}" class="form-control form-control-sm" placeholder="Bond no…">
+                    </div>
+                    <div class="col-2">
+                        <label class="form-label small">Broker</label>
+                        <select id="filter-broker" name="broker_id" class="form-select form-select-sm">
+                            <option value="">All</option>
+                            @foreach($brokers ?? [] as $b)
+                                <option value="{{ $b->id }}" @selected((string)($filter_broker_id ?? '') === (string)$b->id)>{{ $b->name }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <script>
+                        (function(){
+                            try{
+                                if(window.jQuery && jQuery.fn.select2){
+                                    jQuery(function(){
+                                        jQuery('#filter-broker').select2({
+                                            theme: 'bootstrap-5',
+                                            placeholder: 'All Brokers',
+                                            allowClear: true,
+                                            dropdownParent: jQuery(document.body)
+                                        });
+                                    });
+                                }
+                            }catch(e){ /* ignore */ }
+                        })();
+                    </script>
+                    <div class="col-auto">
+                        <label class="form-label small">Bond Date From</label>
+                        <input type="date" name="date_from" value="{{ $filter_date_from ?? '' }}" class="form-control form-control-sm">
+                    </div>
+                    <div class="col-auto">
+                        <label class="form-label small">Bond Date To</label>
+                        <input type="date" name="date_to" value="{{ $filter_date_to ?? '' }}" class="form-control form-control-sm">
+                    </div>
+                    <div class="col-auto">
                         <button class="btn btn-sm btn-primary">Filter</button>
                         <a href="{{ route('customer-bonds.index') }}" class="btn btn-sm btn-outline-secondary ms-1">Clear</a>
                     </div>
+                    <div class="col-auto ms-auto">
+                        <label class="form-label small fw-semibold mb-1">Delete by Bond No</label>
+                        <div class="d-flex gap-1">
+                            <input type="text" id="del-bond-no" class="form-control form-control-sm"
+                                   placeholder="e.g. CB00001" style="max-width:140px;">
+                            <button type="button" id="del-bond-btn" class="btn btn-danger btn-sm">
+                                <i class="bi bi-trash"></i> Delete
+                            </button>
+                        </div>
+                    </div>
                 </form>
             </div>
+
+            {{-- Delete-by-bond-no confirmation modal --}}
+            <div class="modal fade" id="deleteBondModal" tabindex="-1" aria-hidden="true">
+                <div class="modal-dialog modal-dialog-centered">
+                    <div class="modal-content">
+                        <div class="modal-header bg-danger text-white">
+                            <h5 class="modal-title">Confirm Delete Bond</h5>
+                            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                        </div>
+                        <div class="modal-body">
+                            <div id="del-bond-loading" class="text-center py-3 d-none">
+                                <div class="spinner-border text-danger" role="status"></div>
+                            </div>
+                            <div id="del-bond-notfound" class="alert alert-warning mb-0 d-none">
+                                No bond found for that bond number.
+                            </div>
+                            <div id="del-bond-details" class="d-none">
+                                <p class="mb-2">Do you want to delete this bond?</p>
+                                <table class="table table-sm mb-2">
+                                    <tbody>
+                                        <tr><th style="width:130px;">Bond No</th><td id="db-bond-no" class="fw-semibold"></td></tr>
+                                        <tr><th>Customer</th><td id="db-customer"></td></tr>
+                                        <tr><th>Arazi</th><td id="db-arazi"></td></tr>
+                                        <tr><th>Plots</th><td id="db-plots"></td></tr>
+                                        <tr><th>Amount</th><td id="db-amount" class="fw-semibold text-danger"></td></tr>
+                                        <tr><th>Bond Date</th><td id="db-date"></td></tr>
+                                    </tbody>
+                                </table>
+                                <div class="small text-muted">This action cannot be undone. All plots, payments and cheques linked to this bond may be affected.</div>
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+                            <form id="del-bond-form" action="{{ route('customer-bonds.delete-by-bond') }}" method="POST" class="d-inline">
+                                @csrf
+                                @method('DELETE')
+                                <input type="hidden" name="bond_no" id="del-bond-hidden">
+                                <button type="submit" id="del-bond-proceed" class="btn btn-danger btn-sm" disabled>Proceed &amp; Delete</button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <script>
+                (function(){
+                    var LOOKUP_URL = @json(route('customer-bonds.lookup-bond'));
+                    var input   = document.getElementById('del-bond-no');
+                    var btn     = document.getElementById('del-bond-btn');
+                    var modalEl = document.getElementById('deleteBondModal');
+                    if(!btn || !modalEl) return;
+
+                    var elLoading  = document.getElementById('del-bond-loading');
+                    var elNotFound = document.getElementById('del-bond-notfound');
+                    var elDetails  = document.getElementById('del-bond-details');
+                    var elProceed  = document.getElementById('del-bond-proceed');
+                    var elHidden   = document.getElementById('del-bond-hidden');
+
+                    function show(el, on){ el.classList.toggle('d-none', !on); }
+
+                    function openModal(){
+                        if(window.bootstrap && bootstrap.Modal){
+                            bootstrap.Modal.getOrCreateInstance(modalEl).show();
+                        }
+                    }
+
+                    function lookup(){
+                        var bondNo = (input.value || '').trim();
+                        if(!bondNo){ input.focus(); return; }
+                        show(elLoading, true); show(elNotFound, false); show(elDetails, false);
+                        elProceed.disabled = true;
+                        openModal();
+                        fetch(LOOKUP_URL + '?bond_no=' + encodeURIComponent(bondNo), {headers:{'Accept':'application/json'}})
+                            .then(function(r){ return r.json(); })
+                            .then(function(d){
+                                show(elLoading, false);
+                                if(!d || !d.found){ show(elNotFound, true); return; }
+                                document.getElementById('db-bond-no').textContent  = d.bond_no;
+                                document.getElementById('db-customer').textContent = d.customer;
+                                document.getElementById('db-arazi').textContent    = d.arazi_code;
+                                document.getElementById('db-plots').textContent    = d.plots;
+                                document.getElementById('db-amount').textContent   = d.amount;
+                                document.getElementById('db-date').textContent     = d.bond_date;
+                                elHidden.value = d.bond_no;
+                                show(elDetails, true);
+                                elProceed.disabled = false;
+                            })
+                            .catch(function(){ show(elLoading, false); show(elNotFound, true); });
+                    }
+
+                    btn.addEventListener('click', lookup);
+                    input.addEventListener('keydown', function(e){ if(e.key === 'Enter'){ e.preventDefault(); lookup(); } });
+                })();
+            </script>
         @endif
 
         @if(!empty($isPlotIndex))
@@ -622,7 +781,7 @@
                             @if($canEdit && !empty($row['edit_url']))
                                 <a href="{{ $row['edit_url'] }}" @if(!empty($row['open_in_new_tab'])) target="_blank" rel="noopener" @endif class="btn btn-outline-secondary btn-sm">Edit</a>
                             @endif
-                            @if($canDelete && !empty($row['delete_url']) && empty($isCustomerPaymentIndex))
+                            @if($canDelete && !empty($row['delete_url']) && empty($isCustomerBondIndex))
                                 <form action="{{ $row['delete_url'] }}" method="POST" class="d-inline-block" onsubmit="return confirm('Delete this record?');">
                                     @csrf
                                     @method('DELETE')
@@ -639,6 +798,15 @@
                 </tbody>
             </table>
         </div>
+        @if(!empty($paginator) && $paginator->hasPages())
+            <div class="card-footer d-flex justify-content-between align-items-center flex-wrap gap-2">
+                <div class="small text-muted">
+                    Showing {{ number_format($paginator->firstItem() ?? 0) }}–{{ number_format($paginator->lastItem() ?? 0) }}
+                    of {{ number_format($paginator->total()) }}
+                </div>
+                <div>{{ $paginator->links() }}</div>
+            </div>
+        @endif
     </div>
 
     @if(!empty($isCustomerPaymentIndex))

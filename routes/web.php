@@ -113,6 +113,8 @@ Route::middleware(['auth', 'office-hours'])->group(function () {
     Route::get('customer-bonds/by-bond-no', [CustomerBondController::class, 'byBondNo'])->name('customer-bonds.by-bond-no');
     Route::get('customer-bonds/{customer_bond}/payment-context', [CustomerBondController::class, 'paymentContext'])->name('customer-bonds.payment-context');
     Route::get('customer-bonds/{customer_bond}/cheques-modal', [CustomerBondController::class, 'chequesModal'])->name('customer-bonds.cheques-modal');
+    Route::get('customer-bonds/lookup-bond', [CustomerBondController::class, 'lookupBond'])->name('customer-bonds.lookup-bond');
+    Route::delete('customer-bonds/delete-by-bond', [CustomerBondController::class, 'deleteByBondNo'])->name('customer-bonds.delete-by-bond');
     Route::resource('customer-bonds', CustomerBondController::class)->except(['show']);
     Route::get('kisan-bonds/{kisan_bond}/print', [KisanBondController::class, 'print'])->name('kisan-bonds.print');
     Route::get('kisan-bonds/{kisan_bond}/pdf', [KisanBondController::class, 'pdf'])->name('kisan-bonds.pdf');

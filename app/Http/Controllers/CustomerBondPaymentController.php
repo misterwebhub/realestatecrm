@@ -79,8 +79,21 @@ class CustomerBondPaymentController extends Controller
         $brokerId    = trim((string) $request->input('broker_id', ''));
         $entryType   = trim((string) $request->input('entry_type', ''));
         $creditDebit = trim((string) $request->input('credit_debit', ''));
-        $dateFrom    = trim((string) $request->input('date_from', ''));
-        $dateTo      = trim((string) $request->input('date_to', ''));
+        $dateFromRaw = trim((string) $request->input('date_from', ''));
+        $dateToRaw   = trim((string) $request->input('date_to', ''));
+        $showAll     = $request->boolean('all');
+
+        // This page used to load every payment ever entered (7,000+ rows, each
+        // eager-loading 7 relations) with no pagination — that's what made it
+        // slow. Default to the current calendar month (1st to last day) unless
+        // the user picked an explicit date range or hit "Show All".
+        if (!$showAll && $dateFromRaw === '' && $dateToRaw === '') {
+            $dateFrom = now()->startOfMonth()->format('Y-m-d');
+            $dateTo   = now()->endOfMonth()->format('Y-m-d');
+        } else {
+            $dateFrom = $dateFromRaw;
+            $dateTo   = $dateToRaw;
+        }
 
         $query = $this->resourceQuery();
 
@@ -144,15 +157,20 @@ class CustomerBondPaymentController extends Controller
             $query->whereDate('entry_date', '<=', $dateTo);
         }
 
-        $records   = $query->get();
         $routeName = $this->resourceRouteName();
 
-        // ── Cumulative summary of the filtered result set ─────────────────────
-        $debitTypes  = ['return', 'discount'];
-        $sumCredit   = (float) $records->whereNotIn('entry_type', $debitTypes)->sum('amount');
-        $sumDebit    = (float) $records->whereIn('entry_type', $debitTypes)->sum('amount');
+        // ── Cumulative summary over the FULL filtered set (not just the
+        // current page) — computed via DB aggregates on cloned copies of the
+        // query, before paginate() below mutates/executes the original.
+        $debitTypes = ['return', 'discount'];
+        $sumCredit  = (float) (clone $query)->whereNotIn('entry_type', $debitTypes)->sum('amount');
+        $sumDebit   = (float) (clone $query)->whereIn('entry_type', $debitTypes)->sum('amount');
+
+        $paginator = $query->paginate(50)->withQueryString();
+        $records   = $paginator->getCollection();
+
         $summary = [
-            'count'   => $records->count(),
+            'count'   => $paginator->total(),
             'credit'  => round($sumCredit, 2),
             'debit'   => round($sumDebit, 2),
             'net'     => round($sumCredit - $sumDebit, 2),
@@ -174,6 +192,7 @@ class CustomerBondPaymentController extends Controller
             'title'                  => $this->resourceTitle(),
             'columns'                => $this->resourceColumns(),
             'rows'                   => $rows,
+            'paginator'              => $paginator,
             'createUrl'              => route($routeName . '.create'),
             'exportCsvUrl'           => $this->allowsCsvExport() ? route($routeName.'.export.csv') : null,
             'isCustomerPaymentIndex' => true,
@@ -188,6 +207,7 @@ class CustomerBondPaymentController extends Controller
             'cp_credit_debit'        => $creditDebit,
             'cp_date_from'           => $dateFrom,
             'cp_date_to'             => $dateTo,
+            'cp_show_all'            => $showAll,
             'permModule'             => $this->resourcePermModule(),
         ]);
     }

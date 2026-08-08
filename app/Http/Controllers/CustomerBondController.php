@@ -330,8 +330,13 @@ class CustomerBondController extends Controller
 
     public function index(\Illuminate\Http\Request $request)
     {
-        $araziCode = $request->query('arazi_code');
-        $plotQuery = trim((string) $request->query('plot'));
+        $araziCode  = $request->query('arazi_code');
+        $plotQuery  = trim((string) $request->query('plot'));
+        $customerQ  = trim((string) $request->query('q', ''));
+        $bondNoQ    = trim((string) $request->query('bond_no', ''));
+        $brokerId   = trim((string) $request->query('broker_id', ''));
+        $dateFrom   = trim((string) $request->query('date_from', ''));
+        $dateTo     = trim((string) $request->query('date_to', ''));
 
         $query = $this->resourceQuery();
         if ($araziCode) {
@@ -348,6 +353,30 @@ class CustomerBondController extends Controller
             });
         }
 
+        // Filter by customer name or mobile.
+        if ($customerQ !== '') {
+            $query->whereHas('customer', fn ($c) => $c->where('name', 'like', '%'.$customerQ.'%')
+                ->orWhere('mobile', 'like', '%'.$customerQ.'%'));
+        }
+
+        // Filter by bond no.
+        if ($bondNoQ !== '') {
+            $query->where('bond_no', 'like', '%'.$bondNoQ.'%');
+        }
+
+        // Filter by the bond's assigned broker (exact id — select2 dropdown).
+        if ($brokerId !== '') {
+            $query->where('broker_id', $brokerId);
+        }
+
+        // Filter by bond date.
+        if ($dateFrom !== '') {
+            $query->whereDate('bond_date', '>=', $dateFrom);
+        }
+        if ($dateTo !== '') {
+            $query->whereDate('bond_date', '<=', $dateTo);
+        }
+
         $records = $query->get();
         $routeName = $this->resourceRouteName();
 
@@ -358,7 +387,8 @@ class CustomerBondController extends Controller
             ]);
         })->all();
 
-        $arazis = $this->uniqueArazisList();
+        $arazis  = $this->uniqueArazisList();
+        $brokers = Agent::where('broker_type', 'customer')->orderBy('name')->get(['id', 'name']);
 
         return view('crud.index', [
             'title' => $this->resourceTitle(),
@@ -369,7 +399,13 @@ class CustomerBondController extends Controller
             'isCustomerBondIndex' => true,
             'filter_arazi' => $araziCode,
             'filter_plot' => $plotQuery,
+            'filter_q' => $customerQ,
+            'filter_bond_no' => $bondNoQ,
+            'filter_broker_id' => $brokerId,
+            'filter_date_from' => $dateFrom,
+            'filter_date_to' => $dateTo,
             'arazis' => $arazis,
+            'brokers' => $brokers,
         ]);
     }
 
@@ -550,6 +586,70 @@ class CustomerBondController extends Controller
         }
 
         return response()->json(array_merge(['found' => true], $this->bondPaymentContext($bond)));
+    }
+
+    /**
+     * Lookup a bond by its bond number for the "Delete by Bond No" confirmation
+     * box on the index page (mirrors CustomerBondPaymentController::lookupEntry).
+     */
+    public function lookupBond(\Illuminate\Http\Request $request)
+    {
+        $bondNo = trim((string) $request->query('bond_no', ''));
+        $bond   = $this->findBondByNo($bondNo);
+
+        if (! $bond) {
+            return response()->json(['found' => false]);
+        }
+
+        $araziLabel = $bond->arazi ? $bond->arazi->araziNoCode() : ($bond->arazi_code ?: '-');
+        $plotsLabel = $bond->plots->isNotEmpty()
+            ? $bond->plots->map(fn ($p) => $p->title ?? ('Plot-' . $p->id))->implode(', ')
+            : '-';
+
+        return response()->json([
+            'found'      => true,
+            'bond_no'    => $bond->bond_no,
+            'customer'   => $bond->customer?->name ?? '-',
+            'arazi_code' => $araziLabel,
+            'plots'      => $plotsLabel,
+            'amount'     => number_format((float) $bond->bond_amount, 2),
+            'bond_date'  => optional($bond->bond_date)->format('d-m-Y') ?? '-',
+        ]);
+    }
+
+    /**
+     * Delete a bond identified by its bond number (from the listing's
+     * delete-by-bond-no box — mirrors CustomerBondPaymentController::deleteByEntry).
+     */
+    public function deleteByBondNo(\Illuminate\Http\Request $request)
+    {
+        $bondNo = trim((string) $request->input('bond_no', ''));
+        $bond   = $this->findBondByNo($bondNo);
+
+        if (! $bond) {
+            return redirect()
+                ->route('customer-bonds.index')
+                ->with('error', 'No bond found for bond number "' . $bondNo . '".');
+        }
+
+        $bond->delete();
+
+        return redirect()
+            ->route('customer-bonds.index')
+            ->with('success', 'Bond "' . $bondNo . '" deleted successfully.');
+    }
+
+    private function findBondByNo(string $bondNo): ?CustomerBond
+    {
+        if ($bondNo === '') {
+            return null;
+        }
+
+        return $this->applyOwnershipScope(
+            CustomerBond::with(['arazi', 'plots', 'customer'])
+                ->where('bond_no', $bondNo)
+                ->latest()
+        )->first();
     }
 
     /**
