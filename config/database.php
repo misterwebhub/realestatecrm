@@ -93,6 +93,41 @@ return [
             // 'trust_server_certificate' => env('DB_TRUST_SERVER_CERTIFICATE', 'false'),
         ],
 
+        // Old ASP.NET (oldcodereference) SQL Server source database.
+        // Fill in LEGACY_DB_* in .env with the REAL reachable host/port of that
+        // SQL Server (the old web.config's "amar" connection uses a local
+        // ".\MSSQLSERVER2022" instance name, which is NOT reachable remotely as-is).
+        'legacy' => [
+            'driver' => 'sqlsrv',
+            'host' => env('LEGACY_DB_HOST', ''),
+            'port' => env('LEGACY_DB_PORT', '1433'),
+            'database' => env('LEGACY_DB_DATABASE', 'amar'),
+            'username' => env('LEGACY_DB_USERNAME', ''),
+            'password' => env('LEGACY_DB_PASSWORD', ''),
+            'charset' => 'utf8',
+            'prefix' => '',
+            'trust_server_certificate' => true,
+        ],
+
+        // New, separate MySQL database that the legacy import writes into.
+        // Keeps imported/legacy data isolated from the live app database
+        // (DB_DATABASE) until it's verified.
+        'heeddatabase' => [
+            'driver' => 'mysql',
+            'host' => env('HEED_DB_HOST', '127.0.0.1'),
+            'port' => env('HEED_DB_PORT', '3306'),
+            'database' => env('HEED_DB_DATABASE', 'heeddatabase'),
+            'username' => env('HEED_DB_USERNAME', 'root'),
+            'password' => env('HEED_DB_PASSWORD', ''),
+            'unix_socket' => env('DB_SOCKET', ''),
+            'charset' => 'utf8mb4',
+            'collation' => 'utf8mb4_unicode_ci',
+            'prefix' => '',
+            'prefix_indexes' => true,
+            'strict' => true,
+            'engine' => null,
+        ],
+
     ],
 
     /*
