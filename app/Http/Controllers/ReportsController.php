@@ -232,9 +232,23 @@ class ReportsController extends Controller
             return true;
         };
 
+        // "Date wise Balance" — the outstanding balance as it stood on a given
+        // cut-off date, computed from only the payments made on or before that
+        // date. Defaults to today when no "Date To" filter is applied, so it
+        // reads as "balance as of now"; set Date To in the past to see what
+        // was still outstanding as of that historical date.
+        $asOfDate = $dateTo !== '' ? $dateTo : now()->format('Y-m-d');
+        $onOrBeforeAsOf = function ($date) use ($asOfDate) {
+            if (! $date) return false;
+            $d = $date instanceof \Carbon\Carbon ? $date->format('Y-m-d') : (string) $date;
+            return $d <= $asOfDate;
+        };
+
         $debitTypes = ['return', 'discount'];
         $rows = [];
         $gTotal = $gPaid = $gBalance = $gChequePaid = $gChequeBal = $gPaidAll = $gChequeTotal = 0;
+        $gDateBalance = 0;
+        $gPaidAsOfDate = 0;
         $gPlotArea = $gSoldArea = 0.0;
 
         foreach ($bonds as $bond) {
@@ -284,6 +298,14 @@ class ReportsController extends Controller
             $total   = (float) ($bond->total_amount ?? $bond->bond_amount ?? 0);
             $balance = round($total - $paidAll, 2);
 
+            // Balance as of $asOfDate — same total, but only netting payments
+            // dated on or before the cut-off (independent of the Date From /
+            // Date To row-filter above, which only decides which bonds show up).
+            $paymentsAsOfDate = $bond->payments->filter(fn ($p) => $onOrBeforeAsOf($p->entry_date));
+            $paidAsOfDate = (float) $paymentsAsOfDate->whereNotIn('entry_type', $debitTypes)->sum('amount')
+                          - (float) $paymentsAsOfDate->whereIn('entry_type', $debitTypes)->sum('amount');
+            $dateBalance = round($total - $paidAsOfDate, 2);
+
             // Cheques.
             $clearedCheques = $bond->cheques->where('status', 'cleared');
             $pendingCheques = $bond->cheques->where('status', 'pending');
@@ -317,6 +339,8 @@ class ReportsController extends Controller
                 'total'          => round($total, 2),
                 'paid'           => round($paidPeriod, 2),
                 'balance'        => $balance,
+                'date_balance'   => $dateBalance,
+                'paid_as_of_date' => round($paidAsOfDate, 2),
                 'cheque_paid'    => round($chequePaid, 2),
                 'cheque_balance' => round($chequeBalance, 2),
                 'cheque_paid_all'    => round($chequePaidAll, 2),
@@ -331,6 +355,8 @@ class ReportsController extends Controller
             $gTotal += $total;
             $gPaid += $paidPeriod;
             $gBalance += $balance;
+            $gDateBalance += $dateBalance;
+            $gPaidAsOfDate += $paidAsOfDate;
             $gChequePaid += $chequePaid;
             $gChequeBal += $chequeBalance;
             $gPaidAll += $paidAll;
@@ -358,7 +384,7 @@ class ReportsController extends Controller
 
             $filename = 'bond-cumulative-' . now()->format('Ymd-His') . '.csv';
 
-            return response()->streamDownload(function () use ($rows, $filters, $gTotal, $gPaid, $gChequePaid, $gChequeBal, $gChequeTotal, $gPaidAll, $gBalance, $gPlotArea, $gSoldArea) {
+            return response()->streamDownload(function () use ($rows, $filters, $gTotal, $gPaid, $gChequePaid, $gChequeBal, $gChequeTotal, $gPaidAll, $gBalance, $gDateBalance, $gPlotArea, $gSoldArea, $asOfDate) {
                 $out = fopen('php://output', 'w');
                 // UTF-8 BOM for Excel.
                 fwrite($out, "\xEF\xBB\xBF");
@@ -374,7 +400,7 @@ class ReportsController extends Controller
 
                 fputcsv($out, [
                     '#', 'Bond Date', 'Bond', 'Customer', 'Arazi', 'Plots (gaz)', 'Sold Area (gaz)', 'Broker',
-                    'Bond Amount', 'Paid (cash)', 'Cheque Paid', 'Cheque Balance', 'Registry',
+                    'Bond Amount', 'Paid (cash)', 'Cheque Paid', 'Cheque Balance', 'Balance (as of ' . $asOfDate . ')', 'Registry',
                     'Cheque Name', 'Cheque Paid (all)', 'Cheque Unpaid (all)', 'Cheque Total',
                     'Total Paid (all)', 'Total Balance (all)',
                 ]);
@@ -394,6 +420,7 @@ class ReportsController extends Controller
                         number_format($r['paid'], 2, '.', ''),
                         number_format($r['cheque_paid'], 2, '.', ''),
                         number_format($r['cheque_balance'], 2, '.', ''),
+                        number_format($r['date_balance'], 2, '.', ''),
                         $r['reg_status'] ?? '-',
                         $r['account_name'] ?? '',
                         number_format($r['cheque_paid_all'], 2, '.', ''),
@@ -416,6 +443,7 @@ class ReportsController extends Controller
                     number_format($gPaid, 2, '.', ''),
                     number_format($gChequePaid, 2, '.', ''),
                     number_format($gChequeBal, 2, '.', ''),
+                    number_format($gDateBalance, 2, '.', ''),
                     '', '',
                     number_format($gChequePaidAll, 2, '.', ''),
                     number_format($gChequeUnpaidAll, 2, '.', ''),
@@ -461,6 +489,9 @@ class ReportsController extends Controller
             'g_paid_all'      => round($gPaidAll, 2),
             'g_plot_area'     => round($gPlotArea, 2),
             'g_sold_area'     => round($gSoldArea, 2),
+            'g_date_balance'  => round($gDateBalance, 2),
+            'g_paid_as_of_date' => round($gPaidAsOfDate, 2),
+            'as_of_date'      => $asOfDate,
         ]);
     }
 
@@ -898,6 +929,73 @@ class ReportsController extends Controller
                 'cleared' => round((float) $cheques->where('status', 'cleared')->sum('amount'), 2),
                 'pending' => round((float) $cheques->where('status', 'pending')->sum('amount'), 2),
             ],
+        ]);
+    }
+
+    /**
+     * AJAX: itemised payment-by-payment breakdown behind a bond's "Balance
+     * (as of <date>)" figure on the Bond Cumulative report — every credit
+     * and debit entry up to the cut-off date, with a running balance, so
+     * the user can see exactly how the final number was arrived at.
+     */
+    public function bondBalanceBreakdown(Request $request)
+    {
+        $bondId  = $request->query('bond_id', '');
+        $asOfDate = $request->query('as_of_date', '') ?: now()->format('Y-m-d');
+
+        $bond = $this->ownScope(CustomerBond::with(['payments' => function ($q) {
+            $q->orderBy('entry_date')->orderBy('id');
+        }]))->find($bondId);
+
+        if (! $bond) {
+            return response()->json(['found' => false, 'entries' => []]);
+        }
+
+        $debitTypes = ['return', 'discount'];
+        $total = (float) ($bond->total_amount ?? $bond->bond_amount ?? 0);
+
+        $allPayments = $bond->payments;
+        $upToDate = $allPayments->filter(function ($p) use ($asOfDate) {
+            if (! $p->entry_date) return false;
+            $d = $p->entry_date instanceof \Carbon\Carbon ? $p->entry_date->format('Y-m-d') : (string) $p->entry_date;
+            return $d <= $asOfDate;
+        })->values();
+
+        $futureCount = $allPayments->count() - $upToDate->count();
+
+        $running = 0.0;
+        $entries = $upToDate->map(function ($p) use (&$running, $debitTypes, $total) {
+            $isDebit = in_array($p->entry_type, $debitTypes, true);
+            $amount = (float) $p->amount;
+            $running += $isDebit ? -$amount : $amount;
+
+            return [
+                'date'           => optional($p->entry_date)->format('d-m-Y') ?? '—',
+                'entry_type'     => $p->entry_type ? ucfirst($p->entry_type) : '—',
+                'payment_method' => $p->payment_method ?: '—',
+                'direction'      => $isDebit ? 'Debit' : 'Credit',
+                'amount'         => round($amount, 2),
+                'signed_amount'  => round($isDebit ? -$amount : $amount, 2),
+                'running_paid'   => round($running, 2),
+                'running_balance'=> round($total - $running, 2),
+                'note'           => $p->remarks ?? null,
+            ];
+        })->values()->all();
+
+        $paidAsOfDate = round($running, 2);
+        $balance = round($total - $paidAsOfDate, 2);
+
+        return response()->json([
+            'found'          => true,
+            'bond_no'        => $bond->bond_no ?? ('BOND-' . $bond->id),
+            'bond_date'      => optional($bond->bond_date)->format('d-m-Y'),
+            'customer'       => $bond->customer?->name ?? '—',
+            'as_of_date'     => \Carbon\Carbon::parse($asOfDate)->format('d-m-Y'),
+            'total'          => round($total, 2),
+            'paid_as_of_date'=> $paidAsOfDate,
+            'balance'        => $balance,
+            'entries'        => $entries,
+            'future_count'   => $futureCount,
         ]);
     }
 

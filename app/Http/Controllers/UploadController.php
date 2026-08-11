@@ -5,6 +5,8 @@ namespace App\Http\Controllers;
 use App\Models\Upload;
 use App\Models\UploadCategory;
 use App\Models\Arazi;
+use App\Models\Kisan;
+use App\Models\Partner;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 
@@ -12,10 +14,12 @@ class UploadController extends Controller
 {
     public function index()
     {
-        $query = Upload::with('category','arazi')->latest();
+        $query = Upload::with('category','arazi','kisan','partner')->latest();
 
         $category = request()->input('category');
         $araziCode  = trim((string) request()->input('arazi_code', ''));
+        $kisanId    = request()->input('kisan_id');
+        $partnerId  = request()->input('partner_id');
         $unassigned = request()->boolean('unassigned');
         $q = request()->input('q');
         $dateFrom = request()->input('date_from');
@@ -29,8 +33,16 @@ class UploadController extends Controller
             $query->where('arazi_code', $araziCode);
         }
 
+        if ($kisanId) {
+            $query->where('kisan_id', $kisanId);
+        }
+
+        if ($partnerId) {
+            $query->where('partner_id', $partnerId);
+        }
+
         if ($unassigned) {
-            $query->whereNull('arazi_code');
+            $query->whereNull('arazi_code')->whereNull('kisan_id')->whereNull('partner_id');
         }
 
         if ($q) {
@@ -57,8 +69,10 @@ class UploadController extends Controller
             ->pluck('legacy_arazi_code')
             ->unique()
             ->values();
+        $kisans   = Kisan::orderBy('name')->pluck('name', 'id');
+        $partners = Partner::orderBy('name')->pluck('name', 'id');
 
-        return view('uploads.index', compact('uploads', 'categories', 'araziOptions', 'araziCode'));
+        return view('uploads.index', compact('uploads', 'categories', 'araziOptions', 'araziCode', 'kisans', 'partners', 'kisanId', 'partnerId'));
     }
 
     public function create()
@@ -70,7 +84,10 @@ class UploadController extends Controller
             ->pluck('legacy_arazi_code')
             ->unique()
             ->values();
-        return view('uploads.create', compact('categories', 'araziOptions'));
+        $kisans   = Kisan::orderBy('name')->pluck('name', 'id');
+        $partners = Partner::orderBy('name')->pluck('name', 'id');
+
+        return view('uploads.create', compact('categories', 'araziOptions', 'kisans', 'partners'));
     }
 
     public function store(Request $request)
@@ -78,6 +95,8 @@ class UploadController extends Controller
         $validated = $request->validate([
             'upload_category_id' => 'required|exists:upload_categories,id',
             'arazi_code'         => 'nullable|string|max:40',
+            'kisan_id'           => 'nullable|exists:kisans,id',
+            'partner_id'         => 'nullable|exists:partners,id',
             'label'              => 'nullable|string|max:191',
             'file'               => 'required|file|max:10240',
         ]);
@@ -89,6 +108,8 @@ class UploadController extends Controller
         $upload = Upload::create([
             'upload_category_id' => $validated['upload_category_id'],
             'arazi_code'         => $validated['arazi_code'] ?? null,
+            'kisan_id'           => $validated['kisan_id'] ?? null,
+            'partner_id'         => $validated['partner_id'] ?? null,
             'label' => $validated['label'] ?? null,
             'file_path' => $path,
             'mime' => $file->getClientMimeType(),
@@ -115,5 +136,19 @@ class UploadController extends Controller
     public function download(Upload $upload)
     {
         return Storage::disk('public')->download($upload->file_path);
+    }
+
+    /**
+     * Stream the file inline (Content-Disposition: inline) so previewable
+     * types (PDF, images) open/render directly in a new browser tab instead
+     * of forcing a download.
+     */
+    public function view(Upload $upload)
+    {
+        if (! Storage::disk('public')->exists($upload->file_path)) {
+            abort(404);
+        }
+
+        return Storage::disk('public')->response($upload->file_path);
     }
 }

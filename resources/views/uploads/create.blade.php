@@ -41,6 +41,28 @@
             </div>
 
             <div class="mb-3">
+                <label class="form-label fw-semibold">Kisan <span class="text-muted fw-normal">(optional)</span></label>
+                <select name="kisan_id" id="kisan-select" class="form-select @error('kisan_id') is-invalid @enderror">
+                    <option value="">-- None --</option>
+                    @foreach($kisans as $id => $name)
+                        <option value="{{ $id }}" {{ (string) old('kisan_id') === (string) $id ? 'selected' : '' }}>{{ $name }}</option>
+                    @endforeach
+                </select>
+                @error('kisan_id')<div class="invalid-feedback">{{ $message }}</div>@enderror
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label fw-semibold">Partner <span class="text-muted fw-normal">(optional)</span></label>
+                <select name="partner_id" id="partner-select" class="form-select @error('partner_id') is-invalid @enderror">
+                    <option value="">-- None --</option>
+                    @foreach($partners as $id => $name)
+                        <option value="{{ $id }}" {{ (string) old('partner_id') === (string) $id ? 'selected' : '' }}>{{ $name }}</option>
+                    @endforeach
+                </select>
+                @error('partner_id')<div class="invalid-feedback">{{ $message }}</div>@enderror
+            </div>
+
+            <div class="mb-3">
                 <label class="form-label fw-semibold">Label</label>
                 <input type="text" name="label" value="{{ old('label') }}" class="form-control" placeholder="Optional description">
             </div>
@@ -64,7 +86,7 @@
 @push('scripts')
 <script>
 $(function(){
-    $('#arazi-select').select2({
+    $('#arazi-select, #kisan-select, #partner-select').select2({
         theme: 'bootstrap-5',
         placeholder: '-- None --',
         allowClear: true,

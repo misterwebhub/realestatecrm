@@ -8,7 +8,7 @@
         </div>
         <div class="card-body border-bottom">
             <form method="get" class="row g-2">
-                <div class="col-md-3">
+                <div class="col-md-2">
                     <label class="form-label small">Category</label>
                     <select name="category" class="form-select form-select-sm">
                         <option value="">All</option>
@@ -18,12 +18,32 @@
                     </select>
                 </div>
 
-                <div class="col-md-3">
+                <div class="col-md-2">
                     <label class="form-label small">Arazi No.</label>
                     <select name="arazi_code" id="filter-arazi" class="form-select form-select-sm">
                         <option value="">Any</option>
                         @foreach($araziOptions as $code)
                             <option value="{{ $code }}" {{ $code === ($araziCode ?? '') ? 'selected' : '' }}>{{ $code }}</option>
+                        @endforeach
+                    </select>
+                </div>
+
+                <div class="col-md-2">
+                    <label class="form-label small">Kisan</label>
+                    <select name="kisan_id" id="filter-kisan" class="form-select form-select-sm">
+                        <option value="">Any</option>
+                        @foreach($kisans as $id => $name)
+                            <option value="{{ $id }}" {{ (string) $id === (string) ($kisanId ?? '') ? 'selected' : '' }}>{{ $name }}</option>
+                        @endforeach
+                    </select>
+                </div>
+
+                <div class="col-md-2">
+                    <label class="form-label small">Partner</label>
+                    <select name="partner_id" id="filter-partner" class="form-select form-select-sm">
+                        <option value="">Any</option>
+                        @foreach($partners as $id => $name)
+                            <option value="{{ $id }}" {{ (string) $id === (string) ($partnerId ?? '') ? 'selected' : '' }}>{{ $name }}</option>
                         @endforeach
                     </select>
                 </div>
@@ -36,13 +56,17 @@
                     </select>
                 </div>
 
-                <div class="col-md-4">
-                    <label class="form-label small">Search</label>
+                <div class="col-md-2">
+                    <label class="form-label small">&nbsp;</label>
                     <div class="input-group input-group-sm">
-                        <input type="text" name="q" value="{{ request('q') }}" class="form-control" placeholder="label or filename">
-                        <button class="btn btn-outline-secondary" type="submit">Filter</button>
+                        <button class="btn btn-outline-secondary" type="submit"><i class="bi bi-funnel"></i> Filter</button>
                         <a href="{{ route('uploads.index') }}" class="btn btn-outline-danger">Clear</a>
                     </div>
+                </div>
+
+                <div class="col-md-12">
+                    <label class="form-label small">Search</label>
+                    <input type="text" name="q" value="{{ request('q') }}" class="form-control form-control-sm" placeholder="label or filename">
                 </div>
             </form>
         </div>
@@ -56,8 +80,8 @@
                         <tr>
                             <th>#</th>
                             <th>Category</th>
-                            <th>Arazi</th>
-                            <th>Label / File</th>
+                            <th>Linked To</th>
+                            <th>Attachment</th>
                             <th>MIME</th>
                             <th class="text-end">Size (KB)</th>
                             <th>Uploaded</th>
@@ -67,36 +91,49 @@
                     <tbody>
                         @php
                             $palette = ['primary','success','info','warning','danger','secondary','dark'];
+                            $previewable = ['pdf','jpg','jpeg','png','gif','bmp','webp'];
                         @endphp
                         @foreach($uploads as $u)
                             @php
                                 $color = $palette[$u->upload_category_id % count($palette)];
                                 $ext = strtolower(pathinfo($u->file_path, PATHINFO_EXTENSION));
-                                if (str_contains($u->mime,'image')) { $icon = 'bi-image'; }
-                                elseif ($ext === 'pdf') { $icon = 'bi-file-earmark-pdf-fill'; }
-                                elseif (in_array($ext, ['xls','xlsx','csv'])) { $icon = 'bi-file-earmark-excel-fill'; }
-                                elseif (in_array($ext, ['doc','docx'])) { $icon = 'bi-file-earmark-word-fill'; }
-                                else { $icon = 'bi-file-earmark-fill'; }
+                                if ($ext === 'pdf') { $icon = 'bi-file-earmark-pdf-fill'; $iconColor = 'text-danger'; $typeLabel = 'PDF'; }
+                                elseif (str_contains($u->mime,'image') || in_array($ext, ['jpg','jpeg','png','gif','bmp','webp'])) { $icon = 'bi-file-earmark-image-fill'; $iconColor = 'text-info'; $typeLabel = 'Image'; }
+                                elseif (in_array($ext, ['xls','xlsx','csv'])) { $icon = 'bi-file-earmark-excel-fill'; $iconColor = 'text-success'; $typeLabel = 'Excel'; }
+                                elseif (in_array($ext, ['doc','docx'])) { $icon = 'bi-file-earmark-word-fill'; $iconColor = 'text-primary'; $typeLabel = 'Word'; }
+                                else { $icon = 'bi-file-earmark-fill'; $iconColor = 'text-muted'; $typeLabel = strtoupper($ext ?: 'File'); }
                             @endphp
                             <tr class="align-middle">
                                 <td class="text-muted">{{ $u->id }}</td>
                                 <td><span class="badge bg-{{ $color }} text-white">{{ $u->category->name }}</span></td>
                                 <td>
-                                    @if($u->arazi)
-                                        <span class="text-muted small">{{ $u->arazi->legacy_arazi_code ?? ('Arazi '.$u->arazi->id) }}</span>
-                                    @else
-                                        <span class="text-muted small">—</span>
-                                    @endif
+                                    <div class="d-flex flex-column gap-1">
+                                        @if($u->arazi)
+                                            <span class="badge bg-light text-dark border"><i class="bi bi-geo-alt"></i> <strong>Arazi:</strong> {{ $u->arazi->legacy_arazi_code ?? ('Arazi '.$u->arazi->id) }}</span>
+                                        @endif
+                                        @if($u->kisan)
+                                            <span class="badge bg-light text-dark border"><i class="bi bi-person"></i> <strong>Kisan:</strong> {{ $u->kisan->name }}</span>
+                                        @endif
+                                        @if($u->partner)
+                                            <span class="badge bg-light text-dark border"><i class="bi bi-people"></i> <strong>Partner:</strong> {{ $u->partner->name }}</span>
+                                        @endif
+                                        @if(!$u->arazi && !$u->kisan && !$u->partner)
+                                            <span class="text-muted small">—</span>
+                                        @endif
+                                    </div>
                                 </td>
                                 <td>
-                                    <i class="bi {{ $icon }} text-muted me-2" style="font-size:1.05rem"></i>
-                                    <strong>{{ $u->label ?? basename($u->file_path) }}</strong>
-                                    <div class="text-muted small">{{ basename($u->file_path) }}</div>
+                                    <i class="bi {{ $icon }} {{ $iconColor }} me-2" style="font-size:1.3rem" title="{{ basename($u->file_path) }}"></i>
+                                    <strong title="{{ basename($u->file_path) }}">{{ $u->label ?: 'Attachment' }}</strong>
+                                    <div class="text-muted small">{{ $typeLabel }}</div>
                                 </td>
                                 <td class="text-muted small">{{ $u->mime }}</td>
                                 <td class="text-end"><span class="text-muted small">{{ number_format($u->size/1024,2) }}</span></td>
                                 <td class="text-nowrap">{{ $u->created_at->format('M d, Y H:i') }}</td>
                                 <td class="text-end" style="white-space:nowrap;">
+                                    @if(in_array($ext, $previewable))
+                                        <a href="{{ route('uploads.view', $u) }}" target="_blank" class="btn btn-sm btn-outline-secondary" title="View"><i class="bi bi-eye"></i> View</a>
+                                    @endif
                                     <a href="{{ route('uploads.download', $u) }}" class="btn btn-sm btn-primary" title="Download"><i class="bi bi-download"></i> Download</a>
                                 </td>
                             </tr>
@@ -115,6 +152,18 @@ $(function(){
     $('#filter-arazi').select2({
         theme: 'bootstrap-5',
         placeholder: 'Any Arazi',
+        allowClear: true,
+        width: '100%'
+    });
+    $('#filter-kisan').select2({
+        theme: 'bootstrap-5',
+        placeholder: 'Any Kisan',
+        allowClear: true,
+        width: '100%'
+    });
+    $('#filter-partner').select2({
+        theme: 'bootstrap-5',
+        placeholder: 'Any Partner',
         allowClear: true,
         width: '100%'
     });

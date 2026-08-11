@@ -174,6 +174,18 @@
                 </div>
             </div>
         </div>
+        @php
+            $asOfLabel = \Carbon\Carbon::parse($as_of_date)->format('d-m-Y');
+        @endphp
+        <div class="col-6 col-md-3">
+            <div class="card shadow-sm border-start border-4 border-danger h-100">
+                <div class="card-body py-2">
+                    <div class="small text-muted text-uppercase">Balance <span class="text-muted">(as of {{ $asOfLabel }})</span></div>
+                    <div class="fs-6 fw-bold {{ $g_date_balance > 0 ? 'text-danger' : 'text-success' }}">₹{{ inr($g_date_balance,2) }}</div>
+                    <div class="small text-muted">Click any row's balance below for its payment breakdown</div>
+                </div>
+            </div>
+        </div>
         <div class="col-6 col-md-3">
             <div class="card shadow-sm border-start border-4 border-danger h-100">
                 <div class="card-body py-2">
@@ -210,6 +222,7 @@
                         <th class="text-end">Paid <span class="text-muted">(cash)</span></th>
                         <th class="text-end">Paid Cheque <span class="text-muted">(cleared)</span></th>
                         <th class="text-end">Pending Cheque</th>
+                        <th class="text-end">Balance <span class="text-muted">(as of {{ $asOfLabel }})</span></th>
                         <th class="text-center">Registry</th>
                         <th class="text-center">Cheque / Account</th>
                         <th class="text-end">Total Paid <span class="text-muted">(all)</span></th>
@@ -269,6 +282,11 @@
                             <td class="text-end text-success">{{ inr($r['paid'],2) }}</td>
                             <td class="text-end text-success">{{ inr($r['cheque_paid'],2) }}</td>
                             <td class="text-end {{ $r['cheque_balance'] > 0 ? 'text-warning-emphasis' : '' }}">{{ inr($r['cheque_balance'],2) }}</td>
+                            <td class="text-end fw-semibold {{ $r['date_balance'] > 0 ? 'text-danger' : 'text-success' }}">
+                                <a href="#" class="js-see-balance text-decoration-underline {{ $r['date_balance'] > 0 ? 'text-danger' : 'text-success' }}"
+                                   data-bond="{{ $r['bond_id'] }}" data-bondno="{{ $r['bond_no'] }}"
+                                   title="Click to see the payment-by-payment breakdown">{{ inr($r['date_balance'],2) }}</a>
+                            </td>
                             <td class="text-center">
                                 @if($r['reg_status'] === 'Done')
                                     <span class="badge bg-success">Done</span>
@@ -341,7 +359,7 @@
                             </td>
                         </tr>
                     @empty
-                        <tr><td colspan="17" class="text-center text-muted py-4">No bonds found.</td></tr>
+                        <tr><td colspan="18" class="text-center text-muted py-4">No bonds found.</td></tr>
                     @endforelse
                 </tbody>
                 @if(count($rows))
@@ -368,6 +386,10 @@
                         <td class="text-end">
                             <div class="small text-muted fw-normal text-uppercase" style="font-size:9px;">Pending Cheque</div>
                             <div>{{ inr($g_cheque_balance,2) }}</div>
+                        </td>
+                        <td class="text-end {{ $g_date_balance > 0 ? 'text-danger' : 'text-success' }}">
+                            <div class="small text-muted fw-normal text-uppercase" style="font-size:9px;">Balance (as of)</div>
+                            <div>{{ inr($g_date_balance,2) }}</div>
                         </td>
                         <td></td>
                         <td class="text-center">
@@ -437,13 +459,128 @@
         </div>
     </div>
 </div>
+
+{{-- Balance breakdown modal — itemised credit/debit entries behind a bond's "Balance (as of ...)" figure --}}
+<div class="modal fade" id="balanceModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header py-2">
+                <h6 class="modal-title mb-0">Balance Breakdown — Bond <span id="bm-bondno"></span></h6>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div id="bm-loading" class="text-center py-3 text-muted">Loading…</div>
+                <div id="bm-content" class="d-none">
+                    <div class="d-flex flex-wrap gap-3 mb-2 small">
+                        <span>Customer: <strong id="bm-customer">—</strong></span>
+                        <span>Bond Date: <strong id="bm-bonddate">—</strong></span>
+                        <span>As of: <strong id="bm-asof">—</strong></span>
+                    </div>
+                    <table class="table table-sm table-bordered mb-2" style="font-size:12px;">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Date</th>
+                                <th>Type</th>
+                                <th>Method</th>
+                                <th class="text-center">Credit / Debit</th>
+                                <th class="text-end">Amount</th>
+                                <th class="text-end">Running Paid</th>
+                                <th class="text-end">Running Balance</th>
+                            </tr>
+                        </thead>
+                        <tbody id="bm-rows"></tbody>
+                    </table>
+                    <div id="bm-empty" class="text-center text-muted py-3 d-none">No payment entries on or before this date.</div>
+                    <div id="bm-future" class="small text-muted fst-italic d-none"></div>
+                    <table class="table table-sm mb-0">
+                        <tfoot class="table-light fw-bold">
+                            <tr>
+                                <td>Bond Amount</td>
+                                <td class="text-end" id="bm-total">0</td>
+                            </tr>
+                            <tr>
+                                <td>Total Paid <span class="text-muted fw-normal">(as of date)</span></td>
+                                <td class="text-end text-success" id="bm-paid">0</td>
+                            </tr>
+                            <tr>
+                                <td>Balance</td>
+                                <td class="text-end" id="bm-balance">0</td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
 @endsection
 
 @push('styles')
 <style>
 @media print {
-    .no-print { display: none !important; }
+    @page { size: A4 landscape; margin: 8mm 6mm; }
+
+    /* Hide the app chrome and anything print-excluded */
+    .app-sidebar, .app-header, .app-footer, .no-print { display: none !important; }
+
+    /* Let the report take the full printed page width instead of the
+       fixed on-screen layout width */
+    body, .app-wrapper, .app-main, .app-content, .container-fluid {
+        display: block !important;
+        width: 100% !important;
+        max-width: 100% !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        background: #fff !important;
+    }
+
     .card { box-shadow: none !important; border: 1px solid #ddd !important; }
+
+    /* Bootstrap's .table-responsive scrolls horizontally on screen; if left
+       as-is, printing only captures the visible/scrolled-to slice and every
+       column past the fold is silently cut off. Turning off the scroll
+       container for print lets the (now shrunk-down) table lay out and
+       print in full across the landscape page. */
+    .table-responsive {
+        overflow: visible !important;
+        width: 100% !important;
+    }
+
+    table.table {
+        width: 100% !important;
+        font-size: 8px !important;
+    }
+    table.table th,
+    table.table td {
+        padding: 2px 3px !important;
+    }
+
+    /* Nested Plot/Gaz and Cheque mini-tables inside cells */
+    table.table td table {
+        font-size: 7.5px !important;
+    }
+
+    /* Force background colors/badges to actually print (browsers drop them
+       by default even when they're visually present on screen) */
+    table.table, table.table * {
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+        color-adjust: exact !important;
+    }
+
+    tr { page-break-inside: avoid; }
+
+    /* The "Total Paid (all)" cell is a clickable link on screen (opens the
+       payment entries), but Bootstrap's print stylesheet turns every link
+       into underlined text and appends its full URL in parentheses after
+       it -- ugly and useless on paper. Render it as plain text in print. */
+    table.table a[href] {
+        color: inherit !important;
+        text-decoration: none !important;
+    }
+    table.table a[href]::after {
+        content: none !important;
+    }
 }
 </style>
 @endpush
@@ -507,6 +644,75 @@
                 $('#cm-loading').addClass('d-none');
                 $('#cm-content').removeClass('d-none');
                 $('#cm-empty').removeClass('d-none').text('Failed to load cheques.');
+            });
+        });
+
+        // Balance (as of date) breakdown modal — itemised credit/debit entries
+        var balanceUrl = "{{ route('reports.bond-balance-breakdown') }}";
+        var asOfDate = "{{ $as_of_date }}";
+        var balanceModalEl = document.getElementById('balanceModal');
+        var balanceModal = balanceModalEl ? bootstrap.Modal.getOrCreateInstance(balanceModalEl) : null;
+        function fmt(n){ return Number(n||0).toLocaleString('en-IN',{minimumFractionDigits:2}); }
+
+        $(document).on('click', '.js-see-balance', function(e){
+            e.preventDefault();
+            var bondId = $(this).data('bond');
+            $('#bm-bondno').text($(this).data('bondno'));
+            $('#bm-loading').removeClass('d-none');
+            $('#bm-content').addClass('d-none');
+            $('#bm-rows').empty();
+            $('#bm-future').addClass('d-none').text('');
+            if(balanceModal) balanceModal.show();
+
+            $.getJSON(balanceUrl, { bond_id: bondId, as_of_date: asOfDate }).done(function(res){
+                $('#bm-loading').addClass('d-none');
+                $('#bm-content').removeClass('d-none');
+
+                if(!res.found){
+                    $('#bm-empty').removeClass('d-none').text('Bond not found.');
+                    return;
+                }
+
+                $('#bm-customer').text(res.customer || '—');
+                $('#bm-bonddate').text(res.bond_date || '—');
+                $('#bm-asof').text(res.as_of_date || '—');
+                $('#bm-total').text('₹' + fmt(res.total));
+                $('#bm-paid').text('₹' + fmt(res.paid_as_of_date));
+                var balEl = $('#bm-balance');
+                balEl.text('₹' + fmt(res.balance));
+                balEl.toggleClass('text-danger', res.balance > 0).toggleClass('text-success', res.balance <= 0);
+
+                var rows = res.entries || [];
+                if(!rows.length){
+                    $('#bm-empty').removeClass('d-none');
+                } else {
+                    $('#bm-empty').addClass('d-none');
+                    $.each(rows, function(i,en){
+                        var badge = en.direction === 'Debit' ? 'bg-danger' : 'bg-success';
+                        var sign = en.direction === 'Debit' ? '−' : '+';
+                        $('#bm-rows').append(
+                            '<tr>'+
+                                '<td>'+en.date+'</td>'+
+                                '<td>'+en.entry_type+'</td>'+
+                                '<td>'+en.payment_method+'</td>'+
+                                '<td class="text-center"><span class="badge '+badge+'">'+en.direction+'</span></td>'+
+                                '<td class="text-end">'+sign+'₹'+fmt(en.amount)+'</td>'+
+                                '<td class="text-end">₹'+fmt(en.running_paid)+'</td>'+
+                                '<td class="text-end">₹'+fmt(en.running_balance)+'</td>'+
+                            '</tr>'
+                        );
+                    });
+                }
+
+                if(res.future_count > 0){
+                    $('#bm-future').removeClass('d-none').text(
+                        res.future_count + ' payment entrie(s) exist after ' + res.as_of_date + ' and are excluded from this balance.'
+                    );
+                }
+            }).fail(function(){
+                $('#bm-loading').addClass('d-none');
+                $('#bm-content').removeClass('d-none');
+                $('#bm-empty').removeClass('d-none').text('Failed to load balance breakdown.');
             });
         });
     });

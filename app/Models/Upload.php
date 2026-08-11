@@ -15,6 +15,8 @@ class Upload extends Model
         'upload_category_id',
         'arazi_id',
         'arazi_code',
+        'kisan_id',
+        'partner_id',
         'label',
         'file_path',
         'mime',
@@ -29,5 +31,15 @@ class Upload extends Model
     public function arazi()
     {
         return $this->belongsTo(Arazi::class, 'arazi_code', 'legacy_arazi_code');
+    }
+
+    public function kisan()
+    {
+        return $this->belongsTo(Kisan::class);
+    }
+
+    public function partner()
+    {
+        return $this->belongsTo(Partner::class);
     }
 }

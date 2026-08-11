@@ -158,6 +158,7 @@ Route::middleware(['auth', 'office-hours'])->group(function () {
     Route::get('uploads/create', [UploadController::class, 'create'])->name('uploads.create');
     Route::post('uploads', [UploadController::class, 'store'])->name('uploads.store');
     Route::get('uploads/{upload}/download', [UploadController::class, 'download'])->name('uploads.download');
+    Route::get('uploads/{upload}/view', [UploadController::class, 'view'])->name('uploads.view');
     Route::get('ajax/arazi-search', [UploadController::class, 'ajaxAraziSearch'])->name('ajax.arazi.search');
     Route::get('ajax/kisans-by-arazi', [KisanController::class, 'byArazi'])->name('ajax.kisans.by-arazi');
 
@@ -219,6 +220,7 @@ Route::middleware(['auth', 'office-hours'])->group(function () {
     Route::get('reports/deeds-by-arazi', [\App\Http\Controllers\ReportsController::class, 'deedsByArazi'])->name('reports.deeds-by-arazi');
     Route::get('reports/bonds-cumulative', [\App\Http\Controllers\ReportsController::class, 'bondsCumulative'])->name('reports.bonds-cumulative');
     Route::get('reports/bond-cheques', [\App\Http\Controllers\ReportsController::class, 'bondCheques'])->name('reports.bond-cheques');
+    Route::get('reports/bond-balance-breakdown', [\App\Http\Controllers\ReportsController::class, 'bondBalanceBreakdown'])->name('reports.bond-balance-breakdown');
     Route::get('reports/partners', [\App\Http\Controllers\ReportsController::class, 'partners'])->name('reports.partners');
     Route::get('reports/arazis', [\App\Http\Controllers\ReportsController::class, 'arazis'])->name('reports.arazis');
     Route::get('reports/brokers', [\App\Http\Controllers\ReportsController::class, 'brokers'])->name('reports.brokers');
