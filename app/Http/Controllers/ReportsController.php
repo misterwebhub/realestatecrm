@@ -941,6 +941,8 @@ class ReportsController extends Controller
     public function bondBalanceBreakdown(Request $request)
     {
         $bondId  = $request->query('bond_id', '');
+        $mode    = $request->query('mode', 'asof'); // 'asof' = as-of-date cutoff, 'all' = lifetime (no cutoff)
+        $isAll   = $mode === 'all';
         $asOfDate = $request->query('as_of_date', '') ?: now()->format('Y-m-d');
 
         $bond = $this->ownScope(CustomerBond::with(['payments' => function ($q) {
@@ -955,13 +957,13 @@ class ReportsController extends Controller
         $total = (float) ($bond->total_amount ?? $bond->bond_amount ?? 0);
 
         $allPayments = $bond->payments;
-        $upToDate = $allPayments->filter(function ($p) use ($asOfDate) {
+        $upToDate = $isAll ? $allPayments : $allPayments->filter(function ($p) use ($asOfDate) {
             if (! $p->entry_date) return false;
             $d = $p->entry_date instanceof \Carbon\Carbon ? $p->entry_date->format('Y-m-d') : (string) $p->entry_date;
             return $d <= $asOfDate;
         })->values();
 
-        $futureCount = $allPayments->count() - $upToDate->count();
+        $futureCount = $isAll ? 0 : ($allPayments->count() - $upToDate->count());
 
         $running = 0.0;
         $entries = $upToDate->map(function ($p) use (&$running, $debitTypes, $total) {
@@ -987,10 +989,11 @@ class ReportsController extends Controller
 
         return response()->json([
             'found'          => true,
+            'mode'           => $isAll ? 'all' : 'asof',
             'bond_no'        => $bond->bond_no ?? ('BOND-' . $bond->id),
             'bond_date'      => optional($bond->bond_date)->format('d-m-Y'),
             'customer'       => $bond->customer?->name ?? '—',
-            'as_of_date'     => \Carbon\Carbon::parse($asOfDate)->format('d-m-Y'),
+            'as_of_date'     => $isAll ? null : \Carbon\Carbon::parse($asOfDate)->format('d-m-Y'),
             'total'          => round($total, 2),
             'paid_as_of_date'=> $paidAsOfDate,
             'balance'        => $balance,

@@ -337,7 +337,11 @@
                                    target="_blank" rel="noopener"
                                    title="View payments for this bond">{{ inr($r['paid_all'],2) }}</a>
                             </td>
-                            <td class="text-end fw-bold {{ $r['balance'] > 0 ? 'text-danger' : '' }}">{{ inr($r['balance'],2) }}</td>
+                            <td class="text-end fw-bold {{ $r['balance'] > 0 ? 'text-danger' : '' }}">
+                                <a href="#" class="js-see-balance-all text-decoration-underline {{ $r['balance'] > 0 ? 'text-danger' : '' }}"
+                                   data-bond="{{ $r['bond_id'] }}" data-bondno="{{ $r['bond_no'] }}"
+                                   title="Click to see the full payment-by-payment breakdown">{{ inr($r['balance'],2) }}</a>
+                            </td>
                             <td class="text-center no-print">
                                 @php
                                     $entriesUrl = url('/customer-bond-payments') . '?' . http_build_query([
@@ -482,7 +486,7 @@
                     <div class="d-flex flex-wrap gap-3 mb-2 small">
                         <span>Customer: <strong id="bm-customer">—</strong></span>
                         <span>Bond Date: <strong id="bm-bonddate">—</strong></span>
-                        <span>As of: <strong id="bm-asof">—</strong></span>
+                        <span id="bm-asof-row">As of: <strong id="bm-asof">—</strong></span>
                     </div>
                     <table class="table table-sm table-bordered mb-2" style="font-size:12px;">
                         <thead class="table-light">
@@ -498,7 +502,7 @@
                         </thead>
                         <tbody id="bm-rows"></tbody>
                     </table>
-                    <div id="bm-empty" class="text-center text-muted py-3 d-none">No payment entries on or before this date.</div>
+                    <div id="bm-empty" class="text-center text-muted py-3 d-none">No payment entries found.</div>
                     <div id="bm-future" class="small text-muted fst-italic d-none"></div>
                     <table class="table table-sm mb-0">
                         <tfoot class="table-light fw-bold">
@@ -507,7 +511,7 @@
                                 <td class="text-end" id="bm-total">0</td>
                             </tr>
                             <tr>
-                                <td>Total Paid <span class="text-muted fw-normal">(as of date)</span></td>
+                                <td>Total Paid <span class="text-muted fw-normal" id="bm-paid-label">(as of date)</span></td>
                                 <td class="text-end text-success" id="bm-paid">0</td>
                             </tr>
                             <tr>
@@ -701,9 +705,10 @@
         var lastBreakdown = null;
         function fmt(n){ return Number(n||0).toLocaleString('en-IN',{minimumFractionDigits:2}); }
 
-        $(document).on('click', '.js-see-balance', function(e){
+        $(document).on('click', '.js-see-balance, .js-see-balance-all', function(e){
             e.preventDefault();
             var bondId = $(this).data('bond');
+            var mode = $(this).hasClass('js-see-balance-all') ? 'all' : 'asof';
             lastBreakdown = null;
             $('#bm-print, #bm-export').addClass('d-none').prop('disabled', true);
             $('#bm-bondno').text($(this).data('bondno'));
@@ -713,7 +718,7 @@
             $('#bm-future').addClass('d-none').text('');
             if(balanceModal) balanceModal.show();
 
-            $.getJSON(balanceUrl, { bond_id: bondId, as_of_date: asOfDate }).done(function(res){
+            $.getJSON(balanceUrl, { bond_id: bondId, as_of_date: asOfDate, mode: mode }).done(function(res){
                 $('#bm-loading').addClass('d-none');
                 $('#bm-content').removeClass('d-none');
 
@@ -724,6 +729,10 @@
 
                 lastBreakdown = res;
                 $('#bm-print, #bm-export').removeClass('d-none').prop('disabled', false);
+
+                var isAll = res.mode === 'all';
+                $('#bm-asof-row').toggleClass('d-none', isAll);
+                $('#bm-paid-label').text(isAll ? '(all)' : '(as of date)');
 
                 $('#bm-customer').text(res.customer || '—');
                 $('#bm-bonddate').text(res.bond_date || '—');
@@ -736,7 +745,7 @@
 
                 var rows = res.entries || [];
                 if(!rows.length){
-                    $('#bm-empty').removeClass('d-none');
+                    $('#bm-empty').removeClass('d-none').text(isAll ? 'No payment entries.' : 'No payment entries on or before this date.');
                 } else {
                     $('#bm-empty').addClass('d-none');
                     $.each(rows, function(i,en){
@@ -756,7 +765,7 @@
                     });
                 }
 
-                if(res.future_count > 0){
+                if(!isAll && res.future_count > 0){
                     $('#bm-future').removeClass('d-none').text(
                         res.future_count + ' payment entrie(s) exist after ' + res.as_of_date + ' and are excluded from this balance.'
                     );
@@ -790,12 +799,13 @@
             }
             function csvRow(arr){ return arr.map(csvCell).join(','); }
 
+            var isAll = res.mode === 'all';
             var lines = [];
             lines.push(csvRow(['Balance Breakdown']));
             lines.push(csvRow(['Bond', res.bond_no]));
             lines.push(csvRow(['Customer', res.customer]));
             lines.push(csvRow(['Bond Date', res.bond_date]));
-            lines.push(csvRow(['As of', res.as_of_date]));
+            if(!isAll){ lines.push(csvRow(['As of', res.as_of_date])); }
             lines.push('');
             lines.push(csvRow(['Date', 'Type', 'Method', 'Credit/Debit', 'Amount', 'Running Paid', 'Running Balance', 'Note']));
             (res.entries || []).forEach(function(en){
@@ -809,9 +819,9 @@
             });
             lines.push('');
             lines.push(csvRow(['Bond Amount', Number(res.total || 0).toFixed(2)]));
-            lines.push(csvRow(['Total Paid (as of date)', Number(res.paid_as_of_date || 0).toFixed(2)]));
+            lines.push(csvRow(['Total Paid ' + (isAll ? '(all)' : '(as of date)'), Number(res.paid_as_of_date || 0).toFixed(2)]));
             lines.push(csvRow(['Balance', Number(res.balance || 0).toFixed(2)]));
-            if (res.future_count > 0) {
+            if (!isAll && res.future_count > 0) {
                 lines.push('');
                 lines.push(csvRow([res.future_count + ' payment entrie(s) exist after ' + res.as_of_date + ' and are excluded above.']));
             }
@@ -821,7 +831,7 @@
             var url = URL.createObjectURL(blob);
             var a = document.createElement('a');
             a.href = url;
-            a.download = 'balance-breakdown-' + res.bond_no + '.csv';
+            a.download = 'balance-breakdown-' + (isAll ? 'all-' : '') + res.bond_no + '.csv';
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);
