@@ -466,7 +466,15 @@
         <div class="modal-content">
             <div class="modal-header py-2">
                 <h6 class="modal-title mb-0">Balance Breakdown — Bond <span id="bm-bondno"></span></h6>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                <div class="d-flex align-items-center gap-2 ms-auto">
+                    <button type="button" id="bm-print" class="btn btn-outline-secondary btn-sm d-none" disabled>
+                        <i class="bi bi-printer"></i> Print
+                    </button>
+                    <button type="button" id="bm-export" class="btn btn-outline-success btn-sm d-none" disabled>
+                        <i class="bi bi-filetype-csv"></i> Export CSV
+                    </button>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
             </div>
             <div class="modal-body">
                 <div id="bm-loading" class="text-center py-3 text-muted">Loading…</div>
@@ -582,6 +590,44 @@
         content: none !important;
     }
 }
+
+/* Printing the Balance Breakdown popup: hide everything else on the page
+   and print only the modal's content, instead of the full report. Toggled
+   via the "printing-balance-modal" class added to <body> right before
+   window.print() is called from the popup's Print button. */
+@media print {
+    body.printing-balance-modal * {
+        visibility: hidden !important;
+    }
+    body.printing-balance-modal #balanceModal,
+    body.printing-balance-modal #balanceModal * {
+        visibility: visible !important;
+    }
+    body.printing-balance-modal #balanceModal {
+        display: block !important;
+        position: absolute !important;
+        inset: 0 !important;
+        width: 100% !important;
+        background: #fff !important;
+    }
+    body.printing-balance-modal #balanceModal .modal-dialog {
+        max-width: 100% !important;
+        margin: 0 !important;
+    }
+    body.printing-balance-modal #balanceModal .modal-content {
+        border: none !important;
+        box-shadow: none !important;
+    }
+    body.printing-balance-modal #balanceModal .modal-body {
+        max-height: none !important;
+        overflow: visible !important;
+    }
+    body.printing-balance-modal #balanceModal .btn-close,
+    body.printing-balance-modal #balanceModal #bm-print,
+    body.printing-balance-modal #balanceModal #bm-export {
+        display: none !important;
+    }
+}
 </style>
 @endpush
 
@@ -652,11 +698,14 @@
         var asOfDate = "{{ $as_of_date }}";
         var balanceModalEl = document.getElementById('balanceModal');
         var balanceModal = balanceModalEl ? bootstrap.Modal.getOrCreateInstance(balanceModalEl) : null;
+        var lastBreakdown = null;
         function fmt(n){ return Number(n||0).toLocaleString('en-IN',{minimumFractionDigits:2}); }
 
         $(document).on('click', '.js-see-balance', function(e){
             e.preventDefault();
             var bondId = $(this).data('bond');
+            lastBreakdown = null;
+            $('#bm-print, #bm-export').addClass('d-none').prop('disabled', true);
             $('#bm-bondno').text($(this).data('bondno'));
             $('#bm-loading').removeClass('d-none');
             $('#bm-content').addClass('d-none');
@@ -672,6 +721,9 @@
                     $('#bm-empty').removeClass('d-none').text('Bond not found.');
                     return;
                 }
+
+                lastBreakdown = res;
+                $('#bm-print, #bm-export').removeClass('d-none').prop('disabled', false);
 
                 $('#bm-customer').text(res.customer || '—');
                 $('#bm-bonddate').text(res.bond_date || '—');
@@ -714,6 +766,66 @@
                 $('#bm-content').removeClass('d-none');
                 $('#bm-empty').removeClass('d-none').text('Failed to load balance breakdown.');
             });
+        });
+
+        // Print just the open Balance Breakdown popup (not the full report page underneath).
+        $('#bm-print').on('click', function(){
+            if(!lastBreakdown) return;
+            document.body.classList.add('printing-balance-modal');
+            window.print();
+        });
+        window.addEventListener('afterprint', function(){
+            document.body.classList.remove('printing-balance-modal');
+        });
+
+        // Export the currently-open breakdown (header info + every entry + totals) as CSV.
+        $('#bm-export').on('click', function(){
+            if(!lastBreakdown) return;
+            var res = lastBreakdown;
+
+            function csvCell(v){
+                v = (v === undefined || v === null) ? '' : String(v);
+                if (/[",\r\n]/.test(v)) { v = '"' + v.replace(/"/g, '""') + '"'; }
+                return v;
+            }
+            function csvRow(arr){ return arr.map(csvCell).join(','); }
+
+            var lines = [];
+            lines.push(csvRow(['Balance Breakdown']));
+            lines.push(csvRow(['Bond', res.bond_no]));
+            lines.push(csvRow(['Customer', res.customer]));
+            lines.push(csvRow(['Bond Date', res.bond_date]));
+            lines.push(csvRow(['As of', res.as_of_date]));
+            lines.push('');
+            lines.push(csvRow(['Date', 'Type', 'Method', 'Credit/Debit', 'Amount', 'Running Paid', 'Running Balance', 'Note']));
+            (res.entries || []).forEach(function(en){
+                lines.push(csvRow([
+                    en.date, en.entry_type, en.payment_method, en.direction,
+                    Number(en.amount || 0).toFixed(2),
+                    Number(en.running_paid || 0).toFixed(2),
+                    Number(en.running_balance || 0).toFixed(2),
+                    en.note || ''
+                ]));
+            });
+            lines.push('');
+            lines.push(csvRow(['Bond Amount', Number(res.total || 0).toFixed(2)]));
+            lines.push(csvRow(['Total Paid (as of date)', Number(res.paid_as_of_date || 0).toFixed(2)]));
+            lines.push(csvRow(['Balance', Number(res.balance || 0).toFixed(2)]));
+            if (res.future_count > 0) {
+                lines.push('');
+                lines.push(csvRow([res.future_count + ' payment entrie(s) exist after ' + res.as_of_date + ' and are excluded above.']));
+            }
+
+            var csv = lines.join('\r\n');
+            var blob = new Blob([String.fromCharCode(0xFEFF) + csv], { type: 'text/csv;charset=utf-8;' });
+            var url = URL.createObjectURL(blob);
+            var a = document.createElement('a');
+            a.href = url;
+            a.download = 'balance-breakdown-' + res.bond_no + '.csv';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
         });
     });
 })();
