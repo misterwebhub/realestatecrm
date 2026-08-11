@@ -1,6 +1,6 @@
 /.phpunit.cache
 /backup
-/arazis-map
+arazis-map/db-config.php
 .claude
 /node_modules
 /public/build

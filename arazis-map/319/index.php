@@ -548,7 +548,7 @@
 "><span>45</span></div>
 <div style="
     width: 100px;
-    height: 100px;
+    height: 50px;
     background: yellow;
     position: absolute;
     /* padding: 20px; */
@@ -557,6 +557,18 @@
     top: 45.9%;
     left: 56.1%;
 "><span>10</span></div>
+<div style="
+    width: 100px;
+    height: 50px;
+    background: yellow;
+    position: absolute;
+    /* padding: 20px; */
+    text-align: center;
+    vertical-align: middle;
+    top: 51.9%;
+    left: 56.1%;
+"><span>10A</span></div>
+
 <div style="
     width: 100px;
     height: 52px;

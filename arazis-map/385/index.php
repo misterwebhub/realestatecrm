@@ -6,57 +6,49 @@
         padding-left: 10%;
         margin: 0;
     }
-
     #form1 {
         width: 1420px;
         position: relative;
     }
-
     @media screen and (max-width: 1496px) {
         body {
             padding-top: 30% !important;
             padding-left: 2%;
         }
-
         #form1 {
             transform: scale(0.8);
             transform-origin: top left;
         }
     }
-
     @media screen and (max-width: 1200px) {
         #form1 {
             transform: scale(0.65);
             transform-origin: top left;
         }
-
         body {
             padding-top: 20%;
         }
     }
-
     @media screen and (max-width: 992px) {
         #form1 {
             transform: scale(0.5);
             transform-origin: top left;
         }
-
-      
+     
     }
 </style>
-    
-
+   
 <form style="width: 1420px;position: relative;margin-top:10%" method="post" action="./arazi319.aspx" id="form1">
  <img src="road-v1.png" style="position: absolute;
     left: 14%;
     bottom:8.8em;
-    
+   
 ">
  <img src="road-h.png" style="position: absolute;
     left: 90%;
   bottom:-31.2em;">
-	  
-   
+ 
+  
 <div style="
     width: 60px;
     height: 45px;
@@ -225,11 +217,10 @@
     left: 19.3%;
     border:1px solid;
 "><span>14</span></div>
-
  <img src="road-v1.png" style="position: absolute;
     left: 13.6%;
     top:6em;
-    
+   
 ">
 <div style="
     width: 80px;
@@ -459,7 +450,7 @@
     left: 13.5%;
     border: 1px solid;
     "><span>15</span></div>
-  
+ 
   <div style="
     width: 80px;
     height: 5em;
@@ -472,13 +463,11 @@
     left: 95.7%;
     border: 1px solid;
     "><span>34</span></div>
-
  <img src="small-r.png" style="
     position: absolute;
     left: 95%;
     top: 3px;
 ">
-
   <div style="width: 70px;height: 5.5em;background: yellow;position: absolute;/* padding: 20px; */text-align: center;vertical-align: middle;bottom: -10.8em;left: 95.7%;border: 1px solid;"><span>35</span></div>
      <div style="width: 55px;height: 7.5em;background: yellow;position: absolute;/* padding: 20px; */text-align: center;vertical-align: middle;bottom: -18.8em;left: 95.7%;border: 1px solid;"><span>73</span></div>
  <img src="small-r.png" style="
@@ -715,11 +704,10 @@ top: -12.5px;
     left: 13.5%;
     border: 1px solid;
     "><span>54</span></div>
-
  <img src="road-v1.png" style="position: absolute;
     left: 13.6%;
     top:26.3em;
-    
+   
 ">
 <div style="
 width: 40px;
@@ -782,7 +770,7 @@ width: 40px;
     border: 1px solid;
     "><span>69</span></div>
     <div style="
-    width: 50px;
+    width: 25px;
     height: 7.5em;
     background: yellow;
     position: absolute;
@@ -791,6 +779,18 @@ width: 40px;
     vertical-align: middle;
     top: 11em;
     left: 67.2%;
+    border: 1px solid;
+    "><span>68A</span></div>
+        <div style="
+    width: 25px;
+    height: 7.5em;
+    background: yellow;
+    position: absolute;
+    /* padding: 20px; */
+    text-align: center;
+    vertical-align: middle;
+    top: 11em;
+    left: 69.2%;
     border: 1px solid;
     "><span>68</span></div>
      <div style="
@@ -949,9 +949,22 @@ width: 40px;
     left: 16%;
     border: 1px solid;
     "><span>55</span></div>
-
     <div style="
-    width: 100px;
+    width: 50px;
+    height: 6.8em;
+    background: yellow;
+    position: absolute;
+    /* padding: 20px; */
+    text-align: center;
+    vertical-align: middle;
+    /* bottom: -5.9em; */
+    left: 86.1%;
+    border: 1px solid;
+    top: 19em;
+    "><span>75</span></div>
+   
+     <div style="
+    width: 50px;
     height: 6.8em;
     background: yellow;
     position: absolute;
@@ -962,7 +975,8 @@ width: 40px;
     left: 82.6%;
     border: 1px solid;
     top: 19em;
-    "><span>75</span></div>   
+    "><span>76A</span></div>
+   
     <div style="
     width: 50px;
      height: 6.8em;
@@ -1438,9 +1452,7 @@ width: 40px;
     left: 13.5%;
     border: 1px solid;
     "><span>93</span></div>
-	</form>
-
-
+</form>
 <?php
 // Load shared DB credentials
 require __DIR__ . '/../db-config.php';
@@ -1449,13 +1461,11 @@ $dbPort = MAP_DB_PORT;
 $dbName = MAP_DB_NAME;
 $dbUser = MAP_DB_USER;
 $dbPass = MAP_DB_PASS;
-
 $plots = [];
 $serverDebug = [];
 try {
     $dsn = "mysql:host={$dbHost};port={$dbPort};dbname={$dbName};charset=utf8mb4";
     $pdo = new PDO($dsn, $dbUser, $dbPass, [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]);
-
     // treat file number as legacy_arazi_code and resolve actual arazi id
     $legacyCode = 385;
     $araziId = null;
@@ -1471,7 +1481,6 @@ try {
         $serverDebug['resolved_arazi_id'] = $araziId;
         $serverDebug['resolved_arazi_row'] = null;
     }
-
     // Try to fetch plots by joining arazis using legacy_arazi_code first
     $stmt = $pdo->prepare('SELECT p.id, p.plot_number, p.area, p.status, p.title, p.description FROM plots p JOIN arazis a ON p.arazi_id = a.id WHERE a.legacy_arazi_code = ?');
     $stmt->execute([$legacyCode]);
@@ -1484,7 +1493,6 @@ try {
         $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
         $serverDebug['query_used'] = 'fallback_by_arazi_id';
     }
-
     foreach ($rows as $r) {
         $plotId = $r['id'];
         $dbStatus = strtolower((string) ($r['status'] ?? ''));
@@ -1493,7 +1501,6 @@ try {
         if ($dbStatus !== '' && in_array($dbStatus, $explicit, true)) {
             $status = $dbStatus;
         }
-
         if ($status === null || $status === 'available') {
             // check registry
             $regStmt = $pdo->prepare("SELECT COUNT(*) FROM registries WHERE plot_id = ? AND (status = 'completed' OR payment_status = 'completed' OR status IS NULL)");
@@ -1511,17 +1518,14 @@ try {
                 }
             }
         }
-
         $desc = strtolower((string) ($r['description'] ?? ''));
         // if (strpos($desc, 'issue') !== false || empty($r['area']) || (float)($r['area'] ?? 0) <= 0) {
-        //     $status = 'issue';
+        // $status = 'issue';
         // }
-
         if ($status === null) $status = 'available';
-
         $plots[] = [
             'id' => $plotId,
-            'plot_number' => ($r['plot_number']) ?  $r['plot_number'] :  $r['title'],
+            'plot_number' => ($r['title']) ? $r['title'] : $r['title'],
             'status' => $status,
             'area' => $r['area'],
         ];
@@ -1536,6 +1540,7 @@ window.plots = <?php echo json_encode($plots, JSON_UNESCAPED_SLASHES|JSON_UNESCA
 document.addEventListener('DOMContentLoaded', function(){
     const serverDebug = <?php echo json_encode($serverDebug, JSON_UNESCAPED_SLASHES|JSON_UNESCAPED_UNICODE); ?> || {};
     console.log('serverDebug', serverDebug);
+
     const colorMap = {
         'available':'#FFC107',
         'booked':'#28A745',
@@ -1550,18 +1555,26 @@ document.addEventListener('DOMContentLoaded', function(){
     };
 
     const plots = window.plots || [];
-    // build lookup by numeric part of plot_number; normalize status (fix typos like adwance)
+
+    // Use the FULL plot_number (e.g. "76A") as the key (normalized to uppercase)
     const plotStatusByNumber = {};
     plots.forEach(p => {
-        const numMatch = String(p.plot_number || p.id || '').match(/\d+/);
+        let key = String(p.plot_number || p.id || '').trim().toUpperCase();
+        if (!key) return;
+
         const rawStatus = String(p.status || 'available').toLowerCase().replace(/adwance/g,'advance');
         const statusKey = rawStatus.replace(/[_\s]+/g,'-');
-        if (numMatch) plotStatusByNumber[numMatch[0]] = statusKey || 'available';
+        plotStatusByNumber[key] = statusKey || 'available';
     });
 
-    // detect offset similar to /397
+    // Optional offset detection (only for pure numeric plots)
     let detectedOffset = null;
-    const numericKeys = Object.keys(plotStatusByNumber).map(k => parseInt(k, 10)).filter(n => !isNaN(n)).sort((a,b) => a - b);
+    const numericKeys = Object.keys(plotStatusByNumber)
+        .filter(k => /^\d+$/.test(k))
+        .map(k => parseInt(k, 10))
+        .filter(n => !isNaN(n))
+        .sort((a,b) => a - b);
+
     if (numericKeys.length) {
         const minK = numericKeys[0];
         const maxK = numericKeys[numericKeys.length - 1];
@@ -1573,31 +1586,38 @@ document.addEventListener('DOMContentLoaded', function(){
 
     function mapTileNumberToPlotNumber(tileNumStr) {
         if (!tileNumStr) return tileNumStr;
-        if (plotStatusByNumber[tileNumStr]) return tileNumStr;
-        if (detectedOffset !== null) {
-            const candidate = String((parseInt(tileNumStr, 10) || 0) + detectedOffset);
+        const upper = tileNumStr.toUpperCase();
+
+        // Exact match first (handles both "76" and "76A")
+        if (plotStatusByNumber[upper]) return upper;
+
+        // Offset only for pure numbers
+        if (detectedOffset !== null && /^\d+$/.test(upper)) {
+            const candidate = String((parseInt(upper, 10) || 0) + detectedOffset);
             if (plotStatusByNumber[candidate]) return candidate;
         }
-        return tileNumStr;
+        return upper;
     }
 
-    // Find all span elements containing only digits and color their parent divs
+    // Process spans that are pure digits OR digits + optional letter (e.g. 76A)
     const spans = Array.from(document.querySelectorAll('form span'));
     spans.forEach(sp => {
         const txt = (sp.textContent || '').trim();
-        const m = txt.match(/^\d+$/);
-        if (!m) return;
-        const tileNum = m[0];
+        // Accept "76", "76A", "113", etc.
+        if (!/^\d+[A-Za-z]?$/.test(txt)) return;
+
+        const tileNum = txt;
         const mapped = mapTileNumberToPlotNumber(tileNum);
-        const status = (mapped && plotStatusByNumber[mapped]) ? plotStatusByNumber[mapped] : 'available';
+        const status = plotStatusByNumber[mapped] || 'available';
+
         const parent = sp.closest('div');
         if (!parent) return;
+
         parent.style.backgroundImage = 'none';
         const clr = colorMap[status] || colorMap['available'];
         parent.style.backgroundColor = clr;
         parent.style.color = (['#212529', '#28A745', '#E53935', '#A0522D'].includes(clr)) ? '#fff' : '#000';
     });
-
 });
 </script>
 </body></html>
