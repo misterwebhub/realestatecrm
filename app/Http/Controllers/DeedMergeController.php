@@ -340,10 +340,10 @@ class DeedMergeController extends Controller
         // A merge's Deed No is locked (can't be edited/unmerged) once it's
         // been used on a Customer Registry row. Batch-check once per unique
         // merged Deed No rather than per row.
-        $mergedDeedNos = $rows->pluck('merged_deed_no')->filter()->unique()->values();
+        $mergedDeedNos = $rows->pluck('merged_deed_no')->filter()->unique(fn ($c) => (string) $c)->values();
         $lockedDeedNos = $mergedDeedNos->isEmpty()
             ? collect()
-            : Registry::whereIn('deed_no', $mergedDeedNos)->pluck('deed_no')->unique();
+            : Registry::whereIn('deed_no', $mergedDeedNos)->pluck('deed_no')->unique(fn ($c) => (string) $c);
 
         $mergeGroupSizes = $rows->filter(fn ($r) => $r['merge_id'])->countBy('merge_id');
 

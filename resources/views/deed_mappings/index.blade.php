@@ -73,9 +73,9 @@
     @endif
 
     @forelse($summary as $group)
-        <div class="card shadow-sm mb-3">
+        <div class="card shadow-sm mb-3 deed-arazi-card">
             <div class="card-header d-flex align-items-center gap-2">
-                <span class="fw-bold">Arazi {{ $group['code'] }}</span>
+                <span class="badge bg-primary text-white fs-6 fw-semibold px-3 py-2">Arazi {{ $group['code'] }}</span>
                 <span class="badge {{ $group['mapped'] > 0 ? 'bg-success-subtle text-success border border-success-subtle' : 'bg-secondary-subtle text-secondary border border-secondary-subtle' }}">
                     {{ $group['mapped'] }} / {{ $group['total'] }} kisan row(s) mapped
                 </span>
@@ -85,22 +85,27 @@
             </div>
             @if($group['rows']->isNotEmpty())
                 <div class="table-responsive">
-                    <table class="table table-sm mb-0 align-middle">
+                    <table class="table table-sm mb-0 align-middle deed-rows-table">
                         <thead class="table-light">
                             <tr>
-                                <th class="ps-3" style="width:60px;">#</th>
-                                <th>Kisan</th>
-                                <th>Deed No</th>
-                                <th>Partner</th>
-                                <th style="width:120px;">Status</th>
+                                <th class="ps-3 text-center" style="width:50px;">#</th>
+                                <th style="width:22%;">Kisan</th>
+                                <th class="text-center" style="width:18%;">Deed No</th>
+                                <th style="width:22%;">Partner</th>
+                                <th class="text-center" style="width:120px;">Status</th>
                             </tr>
                         </thead>
                         <tbody>
-                            @foreach($group['rows'] as $i => $row)
-                                <tr>
-                                    <td class="ps-3">{{ $i + 1 }}</td>
-                                    <td>{{ optional($row->kisan)->name ?? '—' }}</td>
-                                    <td>
+                            @foreach($group['rows'] as $i => $entry)
+                                @php $row = $entry['arazi']; @endphp
+                                <tr class="{{ $entry['is_group_start'] ? 'kisan-group-start' : 'kisan-group-cont' }}">
+                                    <td class="ps-3 text-center text-muted">{{ $i + 1 }}</td>
+                                    @if($entry['is_group_start'])
+                                        <td rowspan="{{ $entry['span'] }}" class="fw-semibold align-middle kisan-cell">
+                                            {{ optional($row->kisan)->name ?? '—' }}
+                                        </td>
+                                    @endif
+                                    <td class="text-center">
                                         @if($row->deedMapping)
                                             <span class="badge bg-primary-subtle text-primary-emphasis">{{ $row->deedMapping->deed_no }}</span>
                                         @else
@@ -108,7 +113,7 @@
                                         @endif
                                     </td>
                                     <td>{{ optional($row->deedMapping?->partner)->name ?? '—' }}</td>
-                                    <td>
+                                    <td class="text-center">
                                         @if($row->deedMapping)
                                             <span class="badge bg-success-subtle text-success border border-success-subtle">Mapped</span>
                                         @else
@@ -135,3 +140,31 @@
     @endforelse
 </div>
 @endsection
+
+@push('styles')
+<style>
+    .deed-arazi-card .card-header { background: #f8fafc; }
+    .deed-rows-table thead th {
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: .3px;
+        color: #6b7280;
+        border-bottom-width: 2px;
+    }
+    /* Kisan cell (rowspan) gets a soft left accent so every deed line under
+       the same kisan reads as one indented group, not a repeated block. */
+    .deed-rows-table .kisan-cell {
+        border-left: 3px solid #cfe0fb;
+        background: #fbfdff;
+    }
+    /* Continuation rows (2nd+ deed no for the same kisan) get a lighter,
+       slightly indented look so they visually nest under the kisan above. */
+    .deed-rows-table .kisan-group-cont td:not(.kisan-cell) {
+        background: #fcfdff;
+    }
+    .deed-rows-table .kisan-group-start:not(:first-child) td {
+        border-top: 1px solid #e5e9f0;
+    }
+    .deed-rows-table td, .deed-rows-table th { vertical-align: middle; }
+</style>
+@endpush

@@ -188,7 +188,7 @@ class AraziController extends Controller
         })->values()->all();
 
         // totals across the current result set
-        $araziCodes = $records->pluck('legacy_arazi_code')->filter()->unique()->all();
+        $araziCodes = $records->pluck('legacy_arazi_code')->filter()->unique(fn ($c) => (string) $c)->all();
         $totalPlots = \App\Models\Plot::whereIn('arazi_code', $araziCodes)->count();
         $totalSaleArea = 0.0;
         foreach ($records as $a) {

@@ -109,7 +109,7 @@ class RegistryController extends Controller
                 'label' => 'Arazi',
                 'type' => 'select',
                 'options' => Arazi::whereNotNull('legacy_arazi_code')->where('legacy_arazi_code', '<>', '')
-                    ->orderBy('legacy_arazi_code')->pluck('legacy_arazi_code')->unique()
+                    ->orderBy('legacy_arazi_code')->pluck('legacy_arazi_code')->unique(fn ($c) => (string) $c)
                     ->mapWithKeys(fn($c) => [$c => $c])->all(),
                 'value' => $item?->arazi_code,
                 'required' => true,
@@ -584,7 +584,7 @@ class RegistryController extends Controller
             ->where('legacy_arazi_code', '!=', '')
             ->orderBy('legacy_arazi_code')
             ->pluck('legacy_arazi_code')
-            ->unique()
+            ->unique(fn ($c) => (string) $c)
             ->values();
 
         // Brokers — same source list used for the bond's own broker_id field

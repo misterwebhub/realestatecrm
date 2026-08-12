@@ -23,7 +23,10 @@ class ExpenseController extends Controller
         }
         $expenses = $query->paginate(30)->withQueryString();
         $arazis = Arazi::whereNotNull('legacy_arazi_code')->where('legacy_arazi_code','<>','')
-            ->orderBy('legacy_arazi_code')->pluck('legacy_arazi_code')->unique()->values();
+            // bare ->unique() takes array_unique(SORT_REGULAR), which can miss
+            // dupes when codes mix numeric ("137") and alphanumeric ("161GHA")
+            // forms; a callback forces the safe pairwise dedup instead.
+            ->orderBy('legacy_arazi_code')->pluck('legacy_arazi_code')->unique(fn ($c) => (string) $c)->values();
         $types = \App\Models\ExpenseType::orderBy('name')->pluck('name','id');
         return view('expenses.index', compact('expenses','arazis','types'));
     }
@@ -31,7 +34,10 @@ class ExpenseController extends Controller
     public function create(Request $request)
     {
         $arazis = Arazi::whereNotNull('legacy_arazi_code')->where('legacy_arazi_code','<>','')
-            ->orderBy('legacy_arazi_code')->pluck('legacy_arazi_code')->unique()->values();
+            // bare ->unique() takes array_unique(SORT_REGULAR), which can miss
+            // dupes when codes mix numeric ("137") and alphanumeric ("161GHA")
+            // forms; a callback forces the safe pairwise dedup instead.
+            ->orderBy('legacy_arazi_code')->pluck('legacy_arazi_code')->unique(fn ($c) => (string) $c)->values();
         $types = \App\Models\ExpenseType::orderBy('name')->pluck('name','id');
         $selectedType = $request->query('selected_type');
         return view('expenses.create', compact('arazis','types','selectedType'));

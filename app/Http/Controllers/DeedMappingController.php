@@ -43,7 +43,18 @@ class DeedMappingController extends Controller
             ->where('legacy_arazi_code', '!=', '')
             ->orderBy('legacy_arazi_code')
             ->pluck('legacy_arazi_code')
-            ->unique()
+            // NOTE: plain ->unique() takes Collection's array_unique(SORT_REGULAR)
+            // fast path when there's no key/strict arg. That path sorts values
+            // internally and only compares *adjacent* items, which silently
+            // leaves duplicates behind when the list mixes purely-numeric codes
+            // ("137") with alphanumeric ones ("161GHA") — PHP's SORT_REGULAR
+            // compares two numeric-looking strings numerically but falls back
+            // to a string compare once an alphanumeric value is involved, so
+            // the sort order isn't consistent and equal values can end up
+            // non-adjacent. Passing a callback forces the safe, pairwise
+            // reject()-based dedup instead. Always dedup free-form codes
+            // (arazi codes, deed nos, etc.) this way, never bare ->unique().
+            ->unique(fn ($c) => (string) $c)
             ->values();
 
         // Which arazi codes have at least one *mapped* row matching the
@@ -97,11 +108,36 @@ class DeedMappingController extends Controller
         $summary = $codes->map(function ($code) use ($arazisByCode) {
             $rows = ($arazisByCode->get($code) ?? collect())->values();
 
+            // Rows are ordered by arazi id, so a kisan with several deed
+            // mappings under one arazi code lands as consecutive rows. Mark
+            // the first row of each consecutive same-kisan run with how many
+            // rows it spans, so the table can merge the Kisan cell (rowspan)
+            // instead of repeating the same name on every line — which is
+            // what reads as "duplicated" even though each row is a distinct,
+            // real deed mapping.
+            $displayRows = $rows->values()->map(function ($row, $i) use ($rows) {
+                $prevKisanId = $i > 0 ? $rows[$i - 1]->kisan_id : null;
+                $isGroupStart = $row->kisan_id !== $prevKisanId || $row->kisan_id === null;
+
+                $span = 1;
+                if ($isGroupStart) {
+                    for ($j = $i + 1; $j < $rows->count() && $rows[$j]->kisan_id === $row->kisan_id && $row->kisan_id !== null; $j++) {
+                        $span++;
+                    }
+                }
+
+                return [
+                    'arazi'          => $row,
+                    'is_group_start' => $isGroupStart,
+                    'span'           => $span,
+                ];
+            });
+
             return [
                 'code'   => $code,
                 'total'  => $rows->count(),
                 'mapped' => $rows->filter(fn ($a) => $a->deedMapping !== null)->count(),
-                'rows'   => $rows,
+                'rows'   => $displayRows,
             ];
         });
 
@@ -111,7 +147,7 @@ class DeedMappingController extends Controller
             'hasFilter'  => $hasFilter,
             'araziCodes' => $araziCodes,
             'kisans'     => Kisan::orderBy('name')->get(['id', 'name']),
-            'deedNos'    => DeedMapping::whereNotNull('deed_no')->where('deed_no', '!=', '')->orderBy('deed_no')->pluck('deed_no')->unique()->values(),
+            'deedNos'    => DeedMapping::whereNotNull('deed_no')->where('deed_no', '!=', '')->orderBy('deed_no')->pluck('deed_no')->unique(fn ($c) => (string) $c)->values(),
             'partners'   => Partner::orderBy('name')->get(['id', 'name']),
             'filters'    => [
                 'arazi_code' => $araziCode,
