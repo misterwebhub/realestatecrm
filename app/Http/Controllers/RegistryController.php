@@ -90,7 +90,7 @@ class RegistryController extends Controller
 
     protected function resourceColumns(): array
     {
-        return ['Reg Code', 'Bond No', 'Customer', 'Bond Arazi', 'Registry Arazi', 'Plot', 'Registry Date', 'Deed No', 'Circle Value', 'Amount', 'Status'];
+        return ['Reg Code', 'Bond No', 'Customer', 'Bond Arazi', 'Registry Arazi', 'Plot', 'Registry Date', 'Deed No', 'Circle Value', 'Amount', 'Payment Status', 'Status'];
     }
 
     protected function resourceFields(?Model $item = null): array
@@ -748,6 +748,7 @@ class RegistryController extends Controller
         if ($item->customer_id && $plots->isNotEmpty()) {
             $plotIds = $plots->pluck('id')->all();
             $bond = \App\Models\CustomerBond::with(['plots', 'broker'])
+                ->withSum('payments as paid_amount', 'amount')
                 ->where('customer_id', $item->customer_id)
                 ->whereHas('plots', fn ($q) => $q->whereIn('plots.id', $plotIds))
                 ->first();
@@ -755,6 +756,20 @@ class RegistryController extends Controller
 
         $brokerName = $bond?->broker?->name ?: '-';
         $bondPlots  = $bond ? $bond->plots : $plots;
+
+        // Payment Status column — simple two-state readout ("Completed" once
+        // fully paid, otherwise "Pending" with how much of the linked bond's
+        // amount is still outstanding), based on the same bond-payment
+        // matching used by registryPaymentProgress()/waitingPayments().
+        $bondTotal = (float) ($bond?->total_amount ?? $bond?->bond_amount ?? 0);
+        $bondPaid  = (float) ($bond?->paid_amount ?? 0);
+        $paidPct   = $bondTotal > 0 ? min(100.0, ($bondPaid / $bondTotal) * 100) : 0.0;
+        $pendingPct = max(0.0, 100 - $paidPct);
+
+        $isPaymentDone = $item->payment_status === 'completed' || ($bondTotal > 0 && $paidPct >= 100);
+        $paymentStatusLabel = $isPaymentDone
+            ? 'Completed'
+            : 'Pending' . ($bondTotal > 0 ? ' (' . number_format($pendingPct, 0) . '%)' : '');
 
         // Styled the same as the "Plots" mini-table on the Customer Bonds index
         // (resources/views/crud/index.blade.php ~line 538) — blue gradient
@@ -792,7 +807,11 @@ class RegistryController extends Controller
                 $item->deed_no ?? '—',
                 $item->circle_value !== null ? inr((float) $item->circle_value, 2) : '—',
                 number_format((float) ($item->registry_amount ?? $item->land_size), 2),
-                ucfirst($item->status),
+                $paymentStatusLabel,
+                // A registry that exists (has been uploaded/saved) is simply
+                // "Done" — the app no longer surfaces pending/cancelled here;
+                // that lifecycle detail now lives entirely in Payment Status.
+                'Done',
             ],
             'broker_id' => $bond?->broker_id,
             'land_size' => (float) ($item->land_size ?? 0),

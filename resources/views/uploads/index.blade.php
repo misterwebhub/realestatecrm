@@ -80,10 +80,10 @@
                         <tr>
                             <th>#</th>
                             <th>Category</th>
-                            <th>Linked To</th>
+                            <th>Arazi</th>
+                            <th>Kisan</th>
+                            <th>Partner</th>
                             <th>Attachment</th>
-                            <th>MIME</th>
-                            <th class="text-end">Size (KB)</th>
                             <th>Uploaded</th>
                             <th class="text-end">Actions</th>
                         </tr>
@@ -106,29 +106,14 @@
                             <tr class="align-middle">
                                 <td class="text-muted">{{ $u->id }}</td>
                                 <td><span class="badge bg-{{ $color }} text-white">{{ $u->category->name }}</span></td>
-                                <td>
-                                    <div class="d-flex flex-column gap-1">
-                                        @if($u->arazi)
-                                            <span class="badge bg-light text-dark border"><i class="bi bi-geo-alt"></i> <strong>Arazi:</strong> {{ $u->arazi->legacy_arazi_code ?? ('Arazi '.$u->arazi->id) }}</span>
-                                        @endif
-                                        @if($u->kisan)
-                                            <span class="badge bg-light text-dark border"><i class="bi bi-person"></i> <strong>Kisan:</strong> {{ $u->kisan->name }}</span>
-                                        @endif
-                                        @if($u->partner)
-                                            <span class="badge bg-light text-dark border"><i class="bi bi-people"></i> <strong>Partner:</strong> {{ $u->partner->name }}</span>
-                                        @endif
-                                        @if(!$u->arazi && !$u->kisan && !$u->partner)
-                                            <span class="text-muted small">—</span>
-                                        @endif
-                                    </div>
-                                </td>
+                                <td>{{ $u->arazi?->legacy_arazi_code ?? ($u->arazi ? 'Arazi '.$u->arazi->id : '—') }}</td>
+                                <td>{{ $u->kisan->name ?? '—' }}</td>
+                                <td>{{ $u->partner->name ?? '—' }}</td>
                                 <td>
                                     <i class="bi {{ $icon }} {{ $iconColor }} me-2" style="font-size:1.3rem" title="{{ basename($u->file_path) }}"></i>
                                     <strong title="{{ basename($u->file_path) }}">{{ $u->label ?: 'Attachment' }}</strong>
                                     <div class="text-muted small">{{ $typeLabel }}</div>
                                 </td>
-                                <td class="text-muted small">{{ $u->mime }}</td>
-                                <td class="text-end"><span class="text-muted small">{{ number_format($u->size/1024,2) }}</span></td>
                                 <td class="text-nowrap">{{ $u->created_at->format('M d, Y H:i') }}</td>
                                 <td class="text-end" style="white-space:nowrap;">
                                     @if(in_array($ext, $previewable))
