@@ -72,7 +72,7 @@
             <input type="hidden" name="registry_amount"   id="h_bond_amount"  value="{{ old('registry_amount', $item->registry_amount ?? '') }}">
             <input type="hidden" name="pending_amount"    id="h_pending"      value="">
             <input type="hidden" name="booking_mode"      value="other">
-            <input type="hidden" name="land_size"         value="0">
+            <input type="hidden" name="land_size"         value="{{ old('land_size', $item->land_size ?? 0) }}">
             <input type="hidden" name="status"            value="pending">
             <input type="hidden" name="payment_status"    value="pending">
             <input type="hidden" name="lock_status"       value="unlock">
@@ -519,19 +519,39 @@
     });
 
     /* ── Plot Sizes table (editable — submitted with the form, saved on click Save) ── */
-    function recomputeLandSize(){
+    function plotsSizeTotal(){
         let total = 0;
         $('plotsSizeBody')?.querySelectorAll('input.plot-size-input').forEach(inp => {
             const v = parseFloat(inp.value);
             if (!isNaN(v)) total += v;
         });
+        return total;
+    }
+
+    // Recomputes the *submitted* land_size from the Plot Sizes table. Only
+    // call this in response to an actual user edit (typing in a plot-size
+    // input, or picking/changing a bond on the create form) — never on a
+    // passive page load, otherwise opening/saving an Edit Registry form
+    // would silently overwrite the registry's saved land_size (and the
+    // "Total Gaz (Sold)" summary that's derived from it) with whatever the
+    // linked plot's *current* area happens to be, even if the user changed
+    // nothing.
+    function recomputeLandSize(){
+        const total = plotsSizeTotal();
         const landSizeEl = document.querySelector('input[name="land_size"]');
         if (landSizeEl) landSizeEl.value = total;
         const totalEl = $('plotsSizeTotal');
         if (totalEl) totalEl.textContent = fmt(total);
     }
 
-    function renderPlotsSizeTable(plots){
+    // Refreshes only the on-screen total display, without touching the
+    // hidden land_size input that actually gets submitted.
+    function refreshPlotsSizeDisplay(){
+        const totalEl = $('plotsSizeTotal');
+        if (totalEl) totalEl.textContent = fmt(plotsSizeTotal());
+    }
+
+    function renderPlotsSizeTable(plots, syncLandSize = true){
         const section = $('plotsSizeSection');
         const body    = $('plotsSizeBody');
         if (!section || !body) return;
@@ -539,7 +559,7 @@
         if (!plots.length) {
             section.classList.add('d-none');
             body.innerHTML = '';
-            recomputeLandSize();
+            if (syncLandSize) recomputeLandSize();
             return;
         }
 
@@ -557,7 +577,11 @@
         }).join('');
 
         section.classList.remove('d-none');
-        recomputeLandSize();
+        if (syncLandSize) {
+            recomputeLandSize();
+        } else {
+            refreshPlotsSizeDisplay();
+        }
 
         body.querySelectorAll('input.plot-size-input').forEach(inp => {
             inp.addEventListener('input', recomputeLandSize);
@@ -780,10 +804,13 @@
         loadPartners(presetArazi);
     }
 
-    // Edit mode: show the plot(s) already linked to this registry in the Plot Sizes table
+    // Edit mode: show the plot(s) already linked to this registry in the Plot Sizes
+    // table for display/editing, but don't let this initial load recompute and
+    // overwrite the registry's already-saved land_size — only an actual edit to
+    // one of these inputs should change it (see recomputeLandSize() above).
     const plotsForSize = @json($plotsForSize ?? []);
     if (plotsForSize.length) {
-        renderPlotsSizeTable(plotsForSize);
+        renderPlotsSizeTable(plotsForSize, false);
     }
 
     /* ── Area Converter (UI only — nothing submitted) ── */

@@ -39,6 +39,13 @@
             'color' => '#0891b2',
         ],
         [
+            'title' => 'Bonds Pending Registry',
+            'desc'  => 'Bonds with plots that don\'t have a completed registry yet, and how much payment is still pending.',
+            'url'   => route('reports.bonds-pending-registry'),
+            'icon'  => 'bi-hourglass-split',
+            'color' => '#dc2626',
+        ],
+        [
             'title' => 'Partner-wise Report',
             'desc'  => 'Area purchased &amp; sold by each partner, per arazi, with remaining area and registry status.',
             'url'   => route('reports.partners'),

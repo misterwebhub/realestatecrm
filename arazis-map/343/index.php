@@ -784,7 +784,7 @@
     
      <div style="
     width: 60px;
-    height: 6.5em;
+    height: 3em;
     background: yellow;
     position: absolute;
     /* padding: 20px; */
@@ -794,6 +794,19 @@
     left: 27.1%;
     border: 1px solid;
     "><span>30</span></div>
+    
+      <div style="
+    width: 60px;
+    height: 3em;
+    background: yellow;
+    position: absolute;
+    /* padding: 20px; */
+    text-align: center;
+    vertical-align: middle;
+    top: 55.5px;
+    left: 27.1%;
+    border: 1px solid;
+    "><span>30A</span></div>
     
           <div style="
     width: 80px;

@@ -496,6 +496,147 @@ class ReportsController extends Controller
     }
 
     /**
+     * Bonds Pending Registry report: one row per bond that has at least one
+     * plot with NO completed Registry yet, along with how much payment is
+     * still pending (bond amount minus lifetime net payments). A bond drops
+     * off this report as soon as every one of its plots has a completed
+     * registry.
+     */
+    public function bondsPendingRegistry(Request $request)
+    {
+        $customerId = $request->query('customer_id', '');
+        $araziCode  = $request->query('arazi_code', '');
+        $brokerId   = $request->query('broker_id', '');
+        $q          = trim((string) $request->query('q', ''));
+
+        $bondsQuery = CustomerBond::with(['customer', 'arazi', 'plots', 'broker', 'payments'])
+            ->when($customerId, fn ($qr) => $qr->where('customer_id', $customerId))
+            ->when($araziCode !== '', fn ($qr) => $qr->where('arazi_code', $araziCode))
+            ->when($brokerId,  fn ($qr) => $qr->where('broker_id', $brokerId))
+            ->when($q !== '', fn ($qr) => $qr->where('bond_no', 'like', '%' . $q . '%'))
+            ->orderBy('bond_no');
+
+        // Non-admins only see their own bonds; admins see everything.
+        $bonds = $this->ownScope($bondsQuery)->get();
+
+        // Plot ids that already have a COMPLETED registry — a bond is only
+        // "registry done" once every one of its plots is in this set.
+        $plotIdsWithCompletedRegistry = Registry::whereNotNull('plot_id')
+            ->where('status', 'completed')
+            ->distinct()->pluck('plot_id')
+            ->merge(
+                \Illuminate\Support\Facades\DB::table('registry_plot')
+                    ->join('registries', 'registries.id', '=', 'registry_plot.registry_id')
+                    ->where('registries.status', 'completed')
+                    ->distinct()->pluck('registry_plot.plot_id')
+            )
+            ->unique()->flip()->all();
+
+        $debitTypes = ['return', 'discount'];
+        $rows = [];
+        $gTotal = $gPaid = $gBalance = 0.0;
+
+        foreach ($bonds as $bond) {
+            $plotsData = $bond->plots->map(fn ($pl) => [
+                'label'    => $pl->title ?: ('Plot-' . $pl->id),
+                'gaz'      => (float) ($pl->area ?? 0),
+                'registry' => isset($plotIdsWithCompletedRegistry[$pl->id]) ? 'Y' : 'N',
+            ])->values()->all();
+
+            // Registry pending = at least one plot without a completed
+            // registry (bonds with zero plots also count as pending, since
+            // nothing has been registered for them yet).
+            $hasPendingPlot = $plotsData === []
+                ? true
+                : collect($plotsData)->contains(fn ($p) => $p['registry'] === 'N');
+
+            if (! $hasPendingPlot) {
+                continue;
+            }
+
+            $paidAll = (float) $bond->payments->whereNotIn('entry_type', $debitTypes)->sum('amount')
+                     - (float) $bond->payments->whereIn('entry_type', $debitTypes)->sum('amount');
+            $total   = (float) ($bond->total_amount ?? $bond->bond_amount ?? 0);
+            $balance = round($total - $paidAll, 2);
+
+            $code = $bond->arazi_code ?: ($bond->arazi?->legacy_arazi_code ?? '-');
+
+            $pendingPlots = collect($plotsData)->where('registry', 'N')->pluck('label')->values()->all();
+
+            $rows[] = [
+                'bond_id'        => $bond->id,
+                'bond_no'        => $bond->bond_no ?? ('BOND-' . $bond->id),
+                'bond_date'      => optional($bond->bond_date)->format('d-m-Y'),
+                'customer'       => $bond->customer?->name ?? '—',
+                'arazi'          => $code,
+                'plots'          => $plotsData,
+                'pending_plots'  => $pendingPlots,
+                'broker'         => $bond->broker?->name ?? '—',
+                'total'          => round($total, 2),
+                'paid'           => round($paidAll, 2),
+                'balance'        => $balance,
+            ];
+
+            $gTotal += $total;
+            $gPaid += $paidAll;
+            $gBalance += $balance;
+        }
+
+        if (strtolower((string) $request->query('export')) === 'csv') {
+            $filename = 'bonds-pending-registry-' . now()->format('Ymd-His') . '.csv';
+
+            return response()->streamDownload(function () use ($rows, $gTotal, $gPaid, $gBalance) {
+                $out = fopen('php://output', 'w');
+                fwrite($out, "\xEF\xBB\xBF");
+
+                fputcsv($out, ['Bonds Pending Registry Report']);
+                fputcsv($out, ['Generated', now()->format('d-m-Y H:i')]);
+                fputcsv($out, []);
+
+                fputcsv($out, [
+                    '#', 'Bond Date', 'Bond', 'Customer', 'Arazi', 'Pending Plots',
+                    'Broker', 'Bond Amount', 'Total Paid', 'Pending Payment',
+                ]);
+
+                foreach ($rows as $i => $r) {
+                    fputcsv($out, [
+                        $i + 1,
+                        $r['bond_date'] ?: '-',
+                        $r['bond_no'],
+                        $r['customer'],
+                        $r['arazi'],
+                        implode('; ', $r['pending_plots']),
+                        $r['broker'],
+                        number_format($r['total'], 2, '.', ''),
+                        number_format($r['paid'], 2, '.', ''),
+                        number_format($r['balance'], 2, '.', ''),
+                    ]);
+                }
+
+                fputcsv($out, []);
+                fputcsv($out, ['', '', '', '', '', '', 'GRAND TOTAL',
+                    number_format($gTotal, 2, '.', ''),
+                    number_format($gPaid, 2, '.', ''),
+                    number_format($gBalance, 2, '.', ''),
+                ]);
+
+                fclose($out);
+            }, $filename, ['Content-Type' => 'text/csv']);
+        }
+
+        return view('reports.bonds_pending_registry', [
+            'rows'       => $rows,
+            'customerId' => $customerId,
+            'araziCode'  => $araziCode,
+            'brokerId'   => $brokerId,
+            'q'          => $q,
+            'g_total'    => round($gTotal, 2),
+            'g_paid'     => round($gPaid, 2),
+            'g_balance'  => round($gBalance, 2),
+        ]);
+    }
+
+    /**
      * Pending Installments / EMI report: one row per bond with a valid EMI
      * schedule (installment count + first due date). Everything — Finance
      * Amount, Monthly EMI, Expected-till-date, Outstanding, Credit, last/next

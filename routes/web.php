@@ -157,6 +157,9 @@ Route::middleware(['auth', 'office-hours'])->group(function () {
     Route::get('uploads', [UploadController::class, 'index'])->name('uploads.index');
     Route::get('uploads/create', [UploadController::class, 'create'])->name('uploads.create');
     Route::post('uploads', [UploadController::class, 'store'])->name('uploads.store');
+    Route::get('uploads/{upload}/edit', [UploadController::class, 'edit'])->name('uploads.edit');
+    Route::put('uploads/{upload}', [UploadController::class, 'update'])->name('uploads.update');
+    Route::delete('uploads/{upload}', [UploadController::class, 'destroy'])->name('uploads.destroy');
     Route::get('uploads/{upload}/download', [UploadController::class, 'download'])->name('uploads.download');
     Route::get('uploads/{upload}/view', [UploadController::class, 'view'])->name('uploads.view');
     Route::get('ajax/arazi-search', [UploadController::class, 'ajaxAraziSearch'])->name('ajax.arazi.search');
@@ -219,6 +222,7 @@ Route::middleware(['auth', 'office-hours'])->group(function () {
     Route::get('reports/customer-payments-by-user', [\App\Http\Controllers\ReportsController::class, 'customerPaymentsByUser'])->name('reports.customer-payments.by-user');
     Route::get('reports/deeds-by-arazi', [\App\Http\Controllers\ReportsController::class, 'deedsByArazi'])->name('reports.deeds-by-arazi');
     Route::get('reports/bonds-cumulative', [\App\Http\Controllers\ReportsController::class, 'bondsCumulative'])->name('reports.bonds-cumulative');
+    Route::get('reports/bonds-pending-registry', [\App\Http\Controllers\ReportsController::class, 'bondsPendingRegistry'])->name('reports.bonds-pending-registry');
     Route::get('reports/bond-cheques', [\App\Http\Controllers\ReportsController::class, 'bondCheques'])->name('reports.bond-cheques');
     Route::get('reports/bond-balance-breakdown', [\App\Http\Controllers\ReportsController::class, 'bondBalanceBreakdown'])->name('reports.bond-balance-breakdown');
     Route::get('reports/partners', [\App\Http\Controllers\ReportsController::class, 'partners'])->name('reports.partners');

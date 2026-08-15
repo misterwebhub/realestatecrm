@@ -20,32 +20,17 @@
 
                 <div class="col-md-2">
                     <label class="form-label small">Arazi No.</label>
-                    <select name="arazi_code" id="filter-arazi" class="form-select form-select-sm">
-                        <option value="">Any</option>
-                        @foreach($araziOptions as $code)
-                            <option value="{{ $code }}" {{ $code === ($araziCode ?? '') ? 'selected' : '' }}>{{ $code }}</option>
-                        @endforeach
-                    </select>
+                    <input type="text" name="arazi_code" value="{{ $araziCode ?? '' }}" class="form-control form-control-sm" placeholder="Any">
                 </div>
 
                 <div class="col-md-2">
                     <label class="form-label small">Kisan</label>
-                    <select name="kisan_id" id="filter-kisan" class="form-select form-select-sm">
-                        <option value="">Any</option>
-                        @foreach($kisans as $id => $name)
-                            <option value="{{ $id }}" {{ (string) $id === (string) ($kisanId ?? '') ? 'selected' : '' }}>{{ $name }}</option>
-                        @endforeach
-                    </select>
+                    <input type="text" name="kisan_name" value="{{ $kisanName ?? '' }}" class="form-control form-control-sm" placeholder="Any">
                 </div>
 
                 <div class="col-md-2">
                     <label class="form-label small">Partner</label>
-                    <select name="partner_id" id="filter-partner" class="form-select form-select-sm">
-                        <option value="">Any</option>
-                        @foreach($partners as $id => $name)
-                            <option value="{{ $id }}" {{ (string) $id === (string) ($partnerId ?? '') ? 'selected' : '' }}>{{ $name }}</option>
-                        @endforeach
-                    </select>
+                    <input type="text" name="partner_name" value="{{ $partnerName ?? '' }}" class="form-control form-control-sm" placeholder="Any">
                 </div>
 
                 <div class="col-md-2">
@@ -66,7 +51,7 @@
 
                 <div class="col-md-12">
                     <label class="form-label small">Search</label>
-                    <input type="text" name="q" value="{{ request('q') }}" class="form-control form-control-sm" placeholder="label or filename">
+                    <input type="text" name="q" value="{{ request('q') }}" class="form-control form-control-sm" placeholder="label, reason, or filename">
                 </div>
             </form>
         </div>
@@ -84,6 +69,7 @@
                             <th>Kisan</th>
                             <th>Partner</th>
                             <th>Attachment</th>
+                            <th>Reason</th>
                             <th>Uploaded</th>
                             <th class="text-end">Actions</th>
                         </tr>
@@ -106,20 +92,27 @@
                             <tr class="align-middle">
                                 <td class="text-muted">{{ $u->id }}</td>
                                 <td><span class="badge bg-{{ $color }} text-white">{{ $u->category->name }}</span></td>
-                                <td>{{ $u->arazi?->legacy_arazi_code ?? ($u->arazi ? 'Arazi '.$u->arazi->id : '—') }}</td>
-                                <td>{{ $u->kisan->name ?? '—' }}</td>
-                                <td>{{ $u->partner->name ?? '—' }}</td>
+                                <td>{{ $u->arazi_code ?: '—' }}</td>
+                                <td>{{ $u->kisan_name ?: '—' }}</td>
+                                <td>{{ $u->partner_name ?: '—' }}</td>
                                 <td>
                                     <i class="bi {{ $icon }} {{ $iconColor }} me-2" style="font-size:1.3rem" title="{{ basename($u->file_path) }}"></i>
                                     <strong title="{{ basename($u->file_path) }}">{{ $u->label ?: 'Attachment' }}</strong>
                                     <div class="text-muted small">{{ $typeLabel }}</div>
                                 </td>
+                                <td class="small" style="max-width:220px;white-space:normal;">{{ $u->reason ?: '—' }}</td>
                                 <td class="text-nowrap">{{ $u->created_at->format('M d, Y H:i') }}</td>
                                 <td class="text-end" style="white-space:nowrap;">
                                     @if(in_array($ext, $previewable))
                                         <a href="{{ route('uploads.view', $u) }}" target="_blank" class="btn btn-sm btn-outline-secondary" title="View"><i class="bi bi-eye"></i> View</a>
                                     @endif
                                     <a href="{{ route('uploads.download', $u) }}" class="btn btn-sm btn-primary" title="Download"><i class="bi bi-download"></i> Download</a>
+                                    <a href="{{ route('uploads.edit', $u) }}" class="btn btn-sm btn-outline-secondary" title="Edit"><i class="bi bi-pencil"></i> Edit</a>
+                                    <form action="{{ route('uploads.destroy', $u) }}" method="POST" class="d-inline-block" onsubmit="return confirm('Delete this upload?');">
+                                        @csrf
+                                        @method('DELETE')
+                                        <button type="submit" class="btn btn-sm btn-outline-danger" title="Delete"><i class="bi bi-trash"></i> Delete</button>
+                                    </form>
                                 </td>
                             </tr>
                         @endforeach
@@ -130,31 +123,6 @@
     </div>
 
     <div class="mt-3">{{ $uploads->links() }}</div>
-
-@push('scripts')
-<script>
-$(function(){
-    $('#filter-arazi').select2({
-        theme: 'bootstrap-5',
-        placeholder: 'Any Arazi',
-        allowClear: true,
-        width: '100%'
-    });
-    $('#filter-kisan').select2({
-        theme: 'bootstrap-5',
-        placeholder: 'Any Kisan',
-        allowClear: true,
-        width: '100%'
-    });
-    $('#filter-partner').select2({
-        theme: 'bootstrap-5',
-        placeholder: 'Any Partner',
-        allowClear: true,
-        width: '100%'
-    });
-});
-</script>
-@endpush
 
 @endsection
 

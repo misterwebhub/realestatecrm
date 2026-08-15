@@ -537,14 +537,21 @@ class RegistryController extends Controller
         }
 
         // Summary of the filtered result set (computed before pagination slices it).
+        // "Total Gaz (Sold)" is the *live* sum of the covered plots' current
+        // area (see resourceRow()'s 'live_land_size'), not each registry's
+        // stored land_size snapshot — so it always matches the Plot table's
+        // real, present-day sizes.
         $registrySummary = [
             'count' => count($rows),
-            'gaz'   => array_sum(array_column($rows, 'land_size')),
+            'gaz'   => array_sum(array_column($rows, 'live_land_size')),
         ];
 
         // "Stock" = saleable area still available (not filtered by date — it's a
         // present-day snapshot), scoped to the selected arazi code if any, same
-        // saleable/sold logic used in ReportsController::sales().
+        // saleable/sold logic used in ReportsController::sales(). Sold area is
+        // read live from the Plot table's current area (every plot locked as
+        // 'registry' counts as sold) rather than summing registries.land_size,
+        // so this also always reflects the plots' real, present-day sizes.
         $stockArazis = Arazi::whereNotNull('legacy_arazi_code')
             ->where('legacy_arazi_code', '!=', '')
             ->when($filterAraziCode !== '', fn ($q2) => $q2->where('legacy_arazi_code', $filterAraziCode))
@@ -553,9 +560,22 @@ class RegistryController extends Controller
         foreach ($stockArazis as $a) {
             $totalSaleable += max((float) $a->size - (float) $a->road_area, 0);
         }
-        $totalSoldAllTime = (float) $this->applyOwnershipScope(Registry::query())
+        // Resolve to the distinct set of plots covered by this scope's registries
+        // (pivot table for multi-plot registries + legacy single plot_id column),
+        // then sum each plot's *current* area exactly once — this stays correct
+        // even if a plot's area was edited after its registry was created/saved.
+        $scopedRegistries = $this->applyOwnershipScope(Registry::query())
             ->when($filterAraziCode !== '', fn ($q2) => $q2->where('arazi_code', $filterAraziCode))
-            ->sum('land_size');
+            ->get(['id', 'plot_id']);
+        $soldPlotIds = $scopedRegistries->pluck('plot_id')->filter()->all();
+        if ($scopedRegistries->isNotEmpty()) {
+            $pivotPlotIds = \Illuminate\Support\Facades\DB::table('registry_plot')
+                ->whereIn('registry_id', $scopedRegistries->pluck('id'))
+                ->pluck('plot_id')
+                ->all();
+            $soldPlotIds = array_merge($soldPlotIds, $pivotPlotIds);
+        }
+        $totalSoldAllTime = (float) \App\Models\Plot::whereIn('id', array_unique($soldPlotIds))->sum('area');
         $registrySummary['stock'] = max($totalSaleable - $totalSoldAllTime, 0);
 
         // Paginate the already-filtered rows (broker filter is applied in PHP,
@@ -815,6 +835,13 @@ class RegistryController extends Controller
             ],
             'broker_id' => $bond?->broker_id,
             'land_size' => (float) ($item->land_size ?? 0),
+            // Live area of every plot this registry currently covers — read
+            // straight off the Plot table's current `area`, not the
+            // registry's own (snapshot-at-save-time) land_size column. Used
+            // for the "Total Gaz (Sold)" summary so it always reflects the
+            // plots' real, present-day sizes instead of a stored figure that
+            // can go stale if a plot's area is edited afterwards.
+            'live_land_size' => (float) $plots->sum('area'),
         ];
     }
 
