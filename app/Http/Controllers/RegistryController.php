@@ -904,8 +904,13 @@ class RegistryController extends Controller
      * Apply edits made in the create/edit form's "Plot Sizes" table
      * (input name="plot_sizes[<plot_id>]") on save. Enforces the same lock and
      * saleable-area-cap rules as the regular Plot edit form; changes that would
-     * violate them are skipped and reported back via a flash message. The
-     * global audit log listener records the before/after area on each update.
+     * violate them are skipped and reported back via a flash message pointing
+     * the user at the arazi's Road Area field (the one thing that shrinks
+     * saleable area). The global audit log listener records the before/after
+     * area on the Plot automatically; on top of that we (a) sync the linked
+     * bond's own land_size to the plots' real total, and (b) write an explicit
+     * audit-log entry against the Bond so "what changed and why" is visible
+     * from the bond's own history, not just the plot's.
      */
     private function applyPlotSizeUpdates(Request $request, ?int $currentRegistryId = null): void
     {
@@ -915,6 +920,7 @@ class RegistryController extends Controller
         }
 
         $skipped = [];
+        $changes = [];
 
         foreach ($sizes as $plotId => $rawValue) {
             if ($rawValue === null || $rawValue === '' || !is_numeric($rawValue)) {
@@ -927,8 +933,10 @@ class RegistryController extends Controller
                 continue;
             }
 
+            $oldArea = (float) $plot->area;
+
             // Unchanged — nothing to do.
-            if ((float) $plot->area === $value) {
+            if ($oldArea === $value) {
                 continue;
             }
 
@@ -952,16 +960,75 @@ class RegistryController extends Controller
                 $allowed = $arazi->saleable_area - $existing;
 
                 if ($value > $allowed) {
-                    $skipped[] = ($plot->title ?? ('Plot-' . $plot->id)) . ' (exceeds available saleable area, remaining: ' . $allowed . ')';
+                    $editUrl = route('arazis.edit', $arazi->id);
+                    $skipped[] = ($plot->title ?? ('Plot-' . $plot->id))
+                        . " increase to {$value} gaz exceeds available stock for Arazi {$plot->arazi_code}"
+                        . " (remaining: {$allowed} gaz)."
+                        . " Adjust the Road Area on the arazi to free up more saleable stock: {$editUrl}";
                     continue;
                 }
             }
 
             $plot->update(['area' => $value]);
+
+            $changes[] = [
+                'plot_id'    => $plot->id,
+                'plot_title' => $plot->title ?? ('Plot-' . $plot->id),
+                'arazi_code' => $plot->arazi_code,
+                'old_area'   => $oldArea,
+                'new_area'   => $value,
+            ];
         }
 
         if (!empty($skipped)) {
             session()->flash('error', 'Some plot sizes were not updated: ' . implode('; ', $skipped));
+        }
+
+        if (!empty($changes)) {
+            $this->syncBondLandSizeAndLog($request, $changes);
+        }
+    }
+
+    /**
+     * After one or more plot sizes were actually changed above, sync the
+     * linked bond's land_size to the plots' real total (so the bond never
+     * shows a stale figure), and write an explicit audit-log entry against
+     * the Bond itself listing exactly which plots changed and by how much —
+     * so the change is visible from the bond's own history, in addition to
+     * the automatic per-plot log entry the generic audit listener already
+     * writes when Plot::area changes.
+     */
+    private function syncBondLandSizeAndLog(Request $request, array $changes): void
+    {
+        $bondId = $request->input('customer_bond_id');
+        if (!$bondId) {
+            return;
+        }
+
+        $bond = \App\Models\CustomerBond::with('plots')->find($bondId);
+        if (!$bond) {
+            return;
+        }
+
+        \App\Models\AuditLog::create([
+            'user_id'        => auth()->id(),
+            'auditable_type' => \App\Models\CustomerBond::class,
+            'auditable_id'   => $bond->id,
+            'action'         => 'plot_size_updated',
+            'meta'           => [
+                'bond_no' => $bond->bond_no,
+                'changes' => $changes,
+                'source'  => 'Registry plot size edit',
+            ],
+        ]);
+
+        // Recompute the bond's own land_size from the plots' current, real
+        // areas — keeps it from ever going stale after this edit. This save
+        // (if the total actually changed) also triggers the generic audit
+        // listener, adding a second, plain before/after land_size entry.
+        $liveTotal = round((float) $bond->plots->sum('area'), 2);
+        if (round((float) $bond->land_size, 2) !== $liveTotal) {
+            $bond->update(['land_size' => $liveTotal]);
         }
     }
 

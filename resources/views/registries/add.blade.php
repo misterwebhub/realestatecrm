@@ -84,7 +84,11 @@
                 <span><strong>Customer:</strong> <span id="b_customer">{{ $item->customer?->name ?? '-' }}</span></span>
                 <span><strong>Arazi:</strong> <span id="b_arazi">{{ $item->arazi?->legacy_arazi_code ?? '-' }}</span></span>
                 <span><strong>Plot:</strong> <span id="b_plot">{{ $item->plot?->title ?? '-' }}</span></span>
-                <button type="button" id="clearBondBtn" class="btn btn-outline-secondary btn-sm py-0 ms-auto">
+                <a id="bondHistoryLink" href="#" target="_blank"
+                   class="btn btn-outline-primary btn-sm py-0 ms-auto d-none">
+                    <i class="bi bi-clock-history"></i> Bond History
+                </a>
+                <button type="button" id="clearBondBtn" class="btn btn-outline-secondary btn-sm py-0">
                     <i class="bi bi-x"></i> Clear
                 </button>
             </div>
@@ -352,6 +356,8 @@
     const DEEDS_URL  = @json(route('registries.deeds-by-arazi'));
     const AGROUP_URL = @json(route('registries.arazi-group-options'));
     const PARTNERS_URL = @json(route('registries.partners-by-arazi'));
+    const AUDIT_LOGS_URL = @json(route('audit-logs.index'));
+    const BOND_MODEL     = @json(\App\Models\CustomerBond::class);
     const CSRF       = document.querySelector('meta[name="csrf-token"]')?.content ?? '';
 
     /* ── helpers ── */
@@ -599,6 +605,16 @@
         loadDeeds(b.arazi_code || '', b.customer_name || '');
         $('h_pending').value      = b.pending_amount || '';
 
+        // "Bond History" — jump straight to this bond's audit log entries
+        // (plot size edits, land_size syncs, etc.) filtered by model + id.
+        const historyLink = $('bondHistoryLink');
+        if (historyLink && b.bond_id) {
+            historyLink.href = AUDIT_LOGS_URL + '?model=' + encodeURIComponent(BOND_MODEL) + '&q=' + encodeURIComponent(b.bond_id);
+            historyLink.classList.remove('d-none');
+        } else if (historyLink) {
+            historyLink.classList.add('d-none');
+        }
+
         // ── Plot handling: show all as info badges ──
         const plots    = b.plots || [];
         const plotInfo = $('d_plots_info');
@@ -751,6 +767,7 @@
         loadPartners('');
         renderPlotsSizeTable([]);
         $('bondAppliedBanner').classList.add('d-none');
+        $('bondHistoryLink')?.classList.add('d-none');
     });
 
     /* ── Witnesses ── */
