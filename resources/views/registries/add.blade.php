@@ -189,7 +189,8 @@
                         <thead class="table-light">
                             <tr>
                                 <th>Plot</th>
-                                <th style="width:160px;">Size (gaz)</th>
+                                <th style="width:220px;">Size (gaz)</th>
+                                <th style="width:70px;">History</th>
                             </tr>
                         </thead>
                         <tbody id="plotsSizeBody"></tbody>
@@ -197,9 +198,47 @@
                             <tr>
                                 <th>Total</th>
                                 <th id="plotsSizeTotal">0.00</th>
+                                <th></th>
                             </tr>
                         </tfoot>
                     </table>
+                </div>
+            </div>
+            <input type="hidden" name="plot_sizes_confirmed" id="plotSizesConfirmed" value="0">
+
+            {{-- ── Plot size change confirmation modal (nothing is saved until Approve) ── --}}
+            <div class="modal fade" id="plotSizeConfirmModal" tabindex="-1" aria-hidden="true">
+                <div class="modal-dialog modal-lg">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h6 class="modal-title fw-bold">Confirm Plot Size Changes</h6>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                        </div>
+                        <div class="modal-body">
+                            <p class="small text-muted mb-2">
+                                Review the size changes below before saving. Nothing is updated on the
+                                plot or the bond until you click <strong>Approve &amp; Save</strong>.
+                            </p>
+                            <table class="table table-sm table-bordered mb-0">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Plot</th>
+                                        <th>Arazi</th>
+                                        <th>Old Size</th>
+                                        <th>New Size</th>
+                                        <th>Bond</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="plotSizeConfirmBody"></tbody>
+                            </table>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+                            <button type="button" class="btn btn-primary btn-sm" id="plotSizeConfirmApprove">
+                                <i class="bi bi-check2-circle"></i> Approve &amp; Save
+                            </button>
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -358,6 +397,8 @@
     const PARTNERS_URL = @json(route('registries.partners-by-arazi'));
     const AUDIT_LOGS_URL = @json(route('audit-logs.index'));
     const BOND_MODEL     = @json(\App\Models\CustomerBond::class);
+    const PLOT_MODEL     = @json(\App\Models\Plot::class);
+    const STOCK_CHECK_URL = @json(route('registries.plot-stock-check'));
     const CSRF       = document.querySelector('meta[name="csrf-token"]')?.content ?? '';
 
     /* ── helpers ── */
@@ -573,11 +614,18 @@
             const locked = !!p.locked;
             const area   = p.area !== null && p.area !== undefined ? p.area : '';
             return `
-                <tr data-plot-id="${p.id}">
+                <tr data-plot-id="${p.id}" data-arazi-code="${p.arazi_code || ''}" data-plot-title="${(p.title || ('Plot-'+p.id))}">
                     <td>${p.title || ('Plot-'+p.id)}${locked ? ' <span class="text-muted small">(locked — registry done)</span>' : ''}</td>
                     <td>
                         <input type="number" step="0.01" min="0" class="form-control form-control-sm plot-size-input"
-                            name="plot_sizes[${p.id}]" value="${area}" ${locked ? 'disabled' : ''}>
+                            name="plot_sizes[${p.id}]" value="${area}" data-original="${area}" ${locked ? 'disabled' : ''}>
+                        <div class="stock-feedback small mt-1"></div>
+                    </td>
+                    <td class="text-center">
+                        <a href="${AUDIT_LOGS_URL}?model=${encodeURIComponent(PLOT_MODEL)}&q=${encodeURIComponent(p.id)}"
+                           target="_blank" class="btn btn-outline-secondary btn-sm py-0 px-1" title="Plot history">
+                            <i class="bi bi-clock-history"></i>
+                        </a>
                     </td>
                 </tr>`;
         }).join('');
@@ -591,7 +639,49 @@
 
         body.querySelectorAll('input.plot-size-input').forEach(inp => {
             inp.addEventListener('input', recomputeLandSize);
+            inp.addEventListener('input', () => checkPlotStock(inp));
         });
+    }
+
+    /* ── Live stock check while typing a plot size ── */
+    let stockCheckTimers = {};
+    function checkPlotStock(inp){
+        const tr = inp.closest('tr');
+        const feedback = tr?.querySelector('.stock-feedback');
+        if (!tr || !feedback) return;
+
+        const plotId = tr.getAttribute('data-plot-id');
+        const value  = parseFloat(inp.value);
+
+        clearTimeout(stockCheckTimers[plotId]);
+        if (isNaN(value) || value <= 0) {
+            feedback.innerHTML = '';
+            return;
+        }
+
+        // Nothing actually changed vs. the loaded value — no need to check.
+        const original = parseFloat(inp.getAttribute('data-original'));
+        if (!isNaN(original) && original === value) {
+            feedback.innerHTML = '';
+            return;
+        }
+
+        feedback.innerHTML = '<span class="text-muted"><i class="bi bi-arrow-repeat"></i> checking stock…</span>';
+        stockCheckTimers[plotId] = setTimeout(() => {
+            fetch(`${STOCK_CHECK_URL}?plot_id=${encodeURIComponent(plotId)}&value=${encodeURIComponent(value)}`, {
+                headers: { 'X-Requested-With': 'XMLHttpRequest' }
+            })
+            .then(r => r.json())
+            .then(data => {
+                if (data.ok) {
+                    feedback.innerHTML = `<span class="text-success"><i class="bi bi-check-circle"></i> ${data.message || 'Available'}</span>`;
+                } else {
+                    const link = data.edit_url ? ` <a href="${data.edit_url}" target="_blank">Adjust Road Area</a>` : '';
+                    feedback.innerHTML = `<span class="text-danger"><i class="bi bi-exclamation-triangle"></i> ${data.message || 'Not available'}</span>${link}`;
+                }
+            })
+            .catch(() => { feedback.innerHTML = ''; });
+        }, 400);
     }
 
     function applyBond(b){
@@ -853,6 +943,86 @@
         }
         val.addEventListener('input', toGaz);
         unit.addEventListener('change', toGaz);
+    })();
+
+    /* ── Confirm-before-save gate for Plot Size changes ──
+       Nothing gets submitted (and therefore nothing on the plot or the bond
+       gets updated) until the user reviews the exact old→new diff in the
+       modal and clicks "Approve & Save". Cancel leaves the form untouched
+       and unsubmitted. */
+    (function(){
+        const form = $('registryForm');
+        if (!form) return;
+
+        let approved = false;
+
+        function collectPlotSizeChanges(){
+            const rows = [];
+            document.querySelectorAll('#plotsSizeBody tr[data-plot-id]').forEach(tr => {
+                const inp = tr.querySelector('input.plot-size-input');
+                if (!inp || inp.disabled) return;
+                const original = parseFloat(inp.getAttribute('data-original'));
+                const current  = parseFloat(inp.value);
+                if (isNaN(current)) return;
+                if (!isNaN(original) && original === current) return;
+                rows.push({
+                    plotId: tr.getAttribute('data-plot-id'),
+                    title: tr.getAttribute('data-plot-title') || ('Plot-' + tr.getAttribute('data-plot-id')),
+                    arazi: tr.getAttribute('data-arazi-code') || '-',
+                    oldVal: isNaN(original) ? '-' : original,
+                    newVal: current,
+                });
+            });
+            return rows;
+        }
+
+        form.addEventListener('submit', function(e){
+            if (approved) return; // second, programmatic submit after Approve click
+
+            const changes = collectPlotSizeChanges();
+            if (!changes.length) return; // nothing changed, submit normally
+
+            e.preventDefault();
+
+            const bondNo = $('b_bond_no')?.textContent?.trim() || '-';
+            const body = $('plotSizeConfirmBody');
+            if (body) {
+                body.innerHTML = changes.map(c => `
+                    <tr>
+                        <td>${c.title}</td>
+                        <td>${c.arazi}</td>
+                        <td>${c.oldVal}</td>
+                        <td class="fw-bold">${c.newVal}</td>
+                        <td>${bondNo}</td>
+                    </tr>`).join('');
+            }
+
+            const modalEl = $('plotSizeConfirmModal');
+            if (modalEl && window.bootstrap) {
+                const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+                modal.show();
+            } else {
+                // Bootstrap JS unavailable — fall back to a plain confirm() so the
+                // gate still holds instead of silently allowing an unreviewed save.
+                if (confirm('Save these plot size changes?\n' + changes.map(c => `${c.title}: ${c.oldVal} -> ${c.newVal}`).join('\n'))) {
+                    approveAndSubmit();
+                }
+            }
+        });
+
+        function approveAndSubmit(){
+            approved = true;
+            $('plotSizesConfirmed').value = '1';
+            form.requestSubmit ? form.requestSubmit() : form.submit();
+        }
+
+        $('plotSizeConfirmApprove')?.addEventListener('click', function(){
+            const modalEl = $('plotSizeConfirmModal');
+            if (modalEl && window.bootstrap) {
+                bootstrap.Modal.getOrCreateInstance(modalEl).hide();
+            }
+            approveAndSubmit();
+        });
     })();
 })();
 </script>

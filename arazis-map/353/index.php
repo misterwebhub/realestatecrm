@@ -652,3 +652,5 @@ document.addEventListener('DOMContentLoaded', function(){
 </script>
 </body>
 </html>
+
+<script src="../plot-click-popup.js"></script>

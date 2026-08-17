@@ -810,8 +810,9 @@
                                 <a href="{{ $row['add_url'] }}" @if(!empty($row['open_in_new_tab'])) target="_blank" rel="noopener" @endif class="btn btn-outline-primary btn-sm ms-1">Add Bond</a>
                             @endif
                             @foreach($row['action_buttons'] ?? [] as $button)
-                                <a href="{{ $button['url'] }}" 
+                                <a href="{{ $button['url'] }}"
                                    class="btn {{ $button['class'] ?? 'btn-outline-primary' }} btn-sm ms-1"
+                                   @if(!empty($button['target_blank'])) target="_blank" rel="noopener" @endif
                                    @if(!empty($button['data_modal'])) data-bs-toggle="modal" data-bs-target="#{{ $button['data_target'] ?? 'modal' }}" @endif>
                                     {{ $button['label'] }}
                                 </a>

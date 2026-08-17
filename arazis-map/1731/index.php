@@ -2,8 +2,31 @@
 <html xmlns="http://www.w3.org/1999/xhtml">
 <head>
 <meta charset="utf-8" />
+<!-- Allow user pinch-zoom and set sensible max-scale -->
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes">
 <title>Arazi Map 1731</title>
     <style type="text/css">
+        /* Use border-box globally so borders/padding do not expand intrinsic sizes */
+        *, *::before, *::after { box-sizing: border-box; }
+
+        /* Ensure map wrappers and content have no unwanted margins */
+        #map-viewport, #map-wrapper, #map-scale { margin: 0; padding: 0; }
+
+        /* Ensure tables don't add unexpected spacing */
+        table { border-collapse: collapse; margin: 0; padding: 0; }
+
+        body { margin: 0; padding: 25px; }
+
+        @media (min-width: 993px) {
+            #map-viewport { width: 100%; overflow: visible; background: #fff; }
+            #map-scale { width: 100%; height: auto; display: block; transform: none !important; margin: 0 !important; }
+        }
+        @media (max-width: 992px) {
+            #map-viewport { width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; background: #fff; }
+            #map-scale { width: 1200px; display: block; transform-origin: 0 0; }
+        }
+        #map-scale .marker { font-size: 13px; line-height: 1.1; overflow: hidden; }
+
         #rrr1
         {
             float:left;
@@ -197,6 +220,8 @@
 </style>
 </head>
 <body>
+<div id="map-viewport">
+<div id="map-scale">
 <form method="post" action="./index.php" id="form1">
     <div style="height:1000px;width:100%;">
 		<div style="height:880px;width:100%;">
@@ -1142,8 +1167,11 @@
     <div id="er"  class="t3">.</div>
     </div>
 </form>
+</div><!-- close map-scale -->
+</div><!-- close map-viewport -->
 </body>
 </html>
+
 <?php
 // Load shared DB credentials
 require __DIR__ . '/../db-config.php';
@@ -1152,11 +1180,13 @@ $dbPort = MAP_DB_PORT;
 $dbName = MAP_DB_NAME;
 $dbUser = MAP_DB_USER;
 $dbPass = MAP_DB_PASS;
+
 $plots = [];
 $serverDebug = [];
 try {
     $dsn = "mysql:host={$dbHost};port={$dbPort};dbname={$dbName};charset=utf8mb4";
     $pdo = new PDO($dsn, $dbUser, $dbPass, [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]);
+
     // treat file number as legacy_arazi_code and resolve actual arazi id
     $legacyCode = 1731;
     $araziId = null;
@@ -1172,6 +1202,7 @@ try {
         $serverDebug['resolved_arazi_id'] = $araziId;
         $serverDebug['resolved_arazi_row'] = null;
     }
+
     // Try to fetch plots by joining arazis using legacy_arazi_code first
     $stmt = $pdo->prepare('SELECT p.id, p.plot_number, p.area, p.status, p.title, p.description FROM plots p JOIN arazis a ON p.arazi_id = a.id WHERE a.legacy_arazi_code = ?');
     $stmt->execute([$legacyCode]);
@@ -1184,6 +1215,7 @@ try {
         $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
         $serverDebug['query_used'] = 'fallback_by_arazi_id';
     }
+
     foreach ($rows as $r) {
         $plotId = $r['id'];
         $dbStatus = strtolower((string) ($r['status'] ?? ''));
@@ -1192,6 +1224,7 @@ try {
         if ($dbStatus !== '' && in_array($dbStatus, $explicit, true)) {
             $status = $dbStatus;
         }
+
         if ($status === null || $status === 'available') {
             // check registry
             $regStmt = $pdo->prepare("SELECT COUNT(*) FROM registries WHERE plot_id = ? AND (status = 'completed' OR payment_status = 'completed' OR status IS NULL)");
@@ -1209,14 +1242,15 @@ try {
                 }
             }
         }
-        $desc = strtolower((string) ($r['description'] ?? ''));
-        // if (strpos($desc, 'issue') !== false || empty($r['area']) || (float)($r['area'] ?? 0) <= 0) {
-        // $status = 'issue';
-        // }
-        if ($status === null) $status = 'available';
+
+        // 'issue' status removed — never force a plot to 'issue'. Explicit DB
+        // statuses (hold, booked, registry, etc.) resolved above are preserved.
+        if ($status === null || $status === 'issue') $status = 'available';
+
         $plots[] = [
             'id' => $plotId,
-            'plot_number' => ($r['title']) ? $r['title'] : $r['title'],
+            'plot_number' => $r['plot_number'],
+            'title' => $r['title'] ?? null,
             'status' => $status,
             'area' => $r['area'],
         ];
@@ -1231,7 +1265,6 @@ window.plots = <?php echo json_encode($plots, JSON_UNESCAPED_SLASHES|JSON_UNESCA
 document.addEventListener('DOMContentLoaded', function(){
     const serverDebug = <?php echo json_encode($serverDebug, JSON_UNESCAPED_SLASHES|JSON_UNESCAPED_UNICODE); ?> || {};
     console.log('serverDebug', serverDebug);
-
     const colorMap = {
         'available':'#FFC107',
         'booked':'#28A745',
@@ -1246,26 +1279,33 @@ document.addEventListener('DOMContentLoaded', function(){
     };
 
     const plots = window.plots || [];
-
-    // Use the FULL plot_number (e.g. "76A") as the key (normalized to uppercase)
+    function normStatus(s){
+        const raw = String(s || 'available').toLowerCase().replace(/adwance/g,'advance');
+        return raw.replace(/[_\s]+/g,'-') || 'available';
+    }
+    // Lookup by FULL plot_number label (e.g. "216A", "216") so suffixed plots
+    // like 216A and 216 don't collide. Also keep a numeric fallback map.
+    const plotStatusByLabel  = {};
     const plotStatusByNumber = {};
     plots.forEach(p => {
-        let key = String(p.plot_number || p.id || '').trim().toUpperCase();
-        if (!key) return;
-
-        const rawStatus = String(p.status || 'available').toLowerCase().replace(/adwance/g,'advance');
-        const statusKey = rawStatus.replace(/[_\s]+/g,'-');
-        plotStatusByNumber[key] = statusKey || 'available';
+        const statusKey = normStatus(p.status);
+        // Tile labels in this layout can match EITHER plot_number OR title
+        // (e.g. plot "216A" is stored only in the title column).
+        [p.plot_number, p.title].forEach(v => {
+            const label = String(v || '').trim().toUpperCase();
+            if (!label) return;
+            plotStatusByLabel[label] = statusKey;
+            // numeric fallback only for purely-numeric labels, so a suffixed
+            // label like "216A" never colors the plain "216" tile
+            if (/^\d+$/.test(label) && !plotStatusByNumber[label]) {
+                plotStatusByNumber[label] = statusKey;
+            }
+        });
     });
 
-    // Optional offset detection (only for pure numeric plots)
+    // detect numbering offset
     let detectedOffset = null;
-    const numericKeys = Object.keys(plotStatusByNumber)
-        .filter(k => /^\d+$/.test(k))
-        .map(k => parseInt(k, 10))
-        .filter(n => !isNaN(n))
-        .sort((a,b) => a - b);
-
+    const numericKeys = Object.keys(plotStatusByNumber).map(k => parseInt(k, 10)).filter(n => !isNaN(n)).sort((a,b) => a - b);
     if (numericKeys.length) {
         const minK = numericKeys[0];
         const maxK = numericKeys[numericKeys.length - 1];
@@ -1277,38 +1317,60 @@ document.addEventListener('DOMContentLoaded', function(){
 
     function mapTileNumberToPlotNumber(tileNumStr) {
         if (!tileNumStr) return tileNumStr;
-        const upper = tileNumStr.toUpperCase();
-
-        // Exact match first (handles both "76" and "76A")
-        if (plotStatusByNumber[upper]) return upper;
-
-        // Offset only for pure numbers
-        if (detectedOffset !== null && /^\d+$/.test(upper)) {
-            const candidate = String((parseInt(upper, 10) || 0) + detectedOffset);
+        if (plotStatusByNumber[tileNumStr]) return tileNumStr;
+        if (detectedOffset !== null) {
+            const candidate = String((parseInt(tileNumStr, 10) || 0) + detectedOffset);
             if (plotStatusByNumber[candidate]) return candidate;
         }
-        return upper;
+        return tileNumStr;
     }
 
-    // Process spans that are pure digits OR digits + optional letter (e.g. 76A)
-    const spans = Array.from(document.querySelectorAll('form span'));
-    spans.forEach(sp => {
-        const txt = (sp.textContent || '').trim();
-        // Accept "76", "76A", "113", etc.
-        if (!/^\d+[A-Za-z]?$/.test(txt)) return;
-
-        const tileNum = txt;
-        const mapped = mapTileNumberToPlotNumber(tileNum);
-        const status = plotStatusByNumber[mapped] || 'available';
-
-        const parent = sp.closest('div');
-        if (!parent) return;
-
-        parent.style.backgroundImage = 'none';
+    // 1731 layout uses <div class="marker" data-plot="N"> tiles; color each by its plot status
+    const tiles = Array.from(document.querySelectorAll('.marker[data-plot]'));
+    tiles.forEach(el => {
+        const tileNum = String(el.getAttribute('data-plot') || '').trim();
+        if (!tileNum) return;
+        // Prefer matching by the tile's visible label (real plot_number, e.g. "216A").
+        const label = (el.textContent || '').trim().toUpperCase();
+        let status = null;
+        if (label && plotStatusByLabel[label]) {
+            status = plotStatusByLabel[label];
+        } else {
+            const mapped = mapTileNumberToPlotNumber(tileNum);
+            status = (mapped && plotStatusByNumber[mapped]) ? plotStatusByNumber[mapped] : 'available';
+        }
+        el.style.backgroundImage = 'none';
         const clr = colorMap[status] || colorMap['available'];
-        parent.style.backgroundColor = clr;
-        parent.style.color = (['#212529', '#28A745', '#E53935', '#A0522D'].includes(clr)) ? '#fff' : '#000';
+        el.style.backgroundColor = clr;
+        el.style.color = (['#212529', '#28A745', '#E53935', '#A0522D'].includes(clr)) ? '#fff' : '#000';
     });
+
 });
 </script>
+
+
+
+<script>
+(function(){
+    var MAP_W = 1200, MAP_H = 1000;
+    var el = document.getElementById('map-scale');
+    var vp = document.getElementById('map-viewport');
+    function scale(){
+        if (window.innerWidth >= 993) {
+            el.style.transform = '';
+            el.style.margin = '0';
+            vp.style.height = 'auto';
+        } else {
+            var s = window.innerWidth / MAP_W;
+            el.style.transform = 'scale(' + s + ')';
+            el.style.margin = '0';
+            vp.style.height = Math.ceil(MAP_H * s) + 'px';
+        }
+    }
+    window.addEventListener('load', scale);
+    window.addEventListener('resize', scale);
+    scale();
+})();
+</script>
 </body></html>
+<script src="../plot-click-popup.js"></script>

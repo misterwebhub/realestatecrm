@@ -556,7 +556,7 @@
     vertical-align: middle;
     top: 45.9%;
     left: 56.1%;
-"><span>10</span></div>
+"><span>10A</span></div>
 <div style="
     width: 100px;
     height: 50px;
@@ -567,7 +567,7 @@
     vertical-align: middle;
     top: 51.9%;
     left: 56.1%;
-"><span>10A</span></div>
+"><span>10</span></div>
 
 <div style="
     width: 100px;
@@ -1206,6 +1206,7 @@ document.addEventListener('DOMContentLoaded', function(){
             console.log('detected plot_number offset:', detectedOffset);
         }
     }
+    
 
     function mapTileNumberToPlotNumber(tileNumStr) {
         if (!tileNumStr) return tileNumStr;
@@ -1237,3 +1238,4 @@ document.addEventListener('DOMContentLoaded', function(){
 });
 </script>
 </body></html>
+<script src="../plot-click-popup.js"></script>

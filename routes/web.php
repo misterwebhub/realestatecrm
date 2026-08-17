@@ -98,6 +98,7 @@ Route::middleware(['auth', 'office-hours'])->group(function () {
     Route::get('registries/deeds-by-arazi', [RegistryController::class, 'deedsByArazi'])->name('registries.deeds-by-arazi');
     Route::get('registries/arazi-group-options', [RegistryController::class, 'araziGroupOptions'])->name('registries.arazi-group-options');
     Route::get('registries/partners-by-arazi', [RegistryController::class, 'partnersByArazi'])->name('registries.partners-by-arazi');
+    Route::get('registries/plot-stock-check', [RegistryController::class, 'plotStockCheck'])->name('registries.plot-stock-check');
     Route::get('kisan-payment/print', [PaymentController::class, 'printReceipt'])->name('kisan-payment.print');
     Route::get('kisan-payment/receipt-pdf', [PaymentController::class, 'receiptPdf'])->name('kisan-payment.receipt-pdf');
     // Kisan-scoped payment routes (list/create for a specific kisan)
@@ -235,6 +236,13 @@ Route::middleware(['auth', 'office-hours'])->group(function () {
     Route::get('reports/deed-merge-breakdown', [\App\Http\Controllers\ReportsController::class, 'deedMergeBreakdown'])->name('reports.deed-merge-breakdown');
     Route::get('reports/deed-report', [\App\Http\Controllers\ReportsController::class, 'deedReport'])->name('reports.deed-report');
     Route::get('reports/emi-detail/{customer_bond}', [\App\Http\Controllers\ReportsController::class, 'emiDetail'])->name('reports.emi-detail');
+
+    // Plot buyer/broker details popup for the legacy arazi map pages — gated to
+    // super admin only (see ArazisMapPlotDetailsController for why the check
+    // has to live server-side here rather than in the static map JS).
+    Route::get('arazis-map/plot-details/{plotId}', [\App\Http\Controllers\ArazisMapPlotDetailsController::class, 'show'])
+        ->whereNumber('plotId')
+        ->name('arazis.map.plot-details');
 
     // Arazis Map index: list folders under project root `arazis-map` and link to their index.php
     // Serve legacy map PHP files through Laravel to ensure environment variables (DB_*) are available.

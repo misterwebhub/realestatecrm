@@ -21,7 +21,7 @@
       background-size:cover;
     }
     .marker.split{display:flex; flex-direction:row; padding:0;}
-    .marker.split .half{flex:1 1 50%; display:flex; align-items:center; justify-content:center; border-right:1px solid #000;}
+    .marker.split .half{flex:1 1 50%; height:90px;   display:flex; align-items:center; justify-content:center; border-right:1px solid #000;}
     .marker.split .half:last-child{border-right:none;}
     .side-col table.grid td{height:44px;}
     @media (max-width:480px){ .marker{font-size:11px;} }
@@ -37,7 +37,7 @@
       <!-- top strip: 18 (label), 37, 38, 39 -->
       <table class="grid">
         <tr>
-          <td style="width:14%;"><div class="marker" style="background:#eee;">18</div></td>
+          <td style="width:14%;"><div class="marker" style="background:#eee;"> </div></td>
           <td style="width:14%;"></td>
           <td colspan="3"><div class="marker" data-plot="37" style="background-image:url(amar.gif);">37</div></td>
           <td style="width:14%;"><div class="marker" data-plot="38" style="background-image:url(amar.gif);">38</div></td>
@@ -193,8 +193,11 @@ try {
         }
 
         $plots[] = [
+            'id' => $plotId,
             // plot title behaves like the plot number; exact key, never LIKE-matched
             'plot_number' => trim((string) $r['title']),
+            'title' => trim((string) $r['title']),
+            'area' => $r['area'],
             'status' => $status ?: 'available'
         ];
     }
@@ -240,3 +243,5 @@ document.addEventListener('DOMContentLoaded', function () {
 </form>
 </body>
 </html>
+
+<script src="../plot-click-popup.js"></script>

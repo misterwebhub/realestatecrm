@@ -151,7 +151,10 @@ try {
         }
 
         $plots[] = [
+            'id' => $plotId,
             'title' => trim($r['title']),           // Using title as requested
+            'plot_number' => trim((string) ($r['plot_number'] ?? '')),
+            'area' => $r['area'],
             'status' => $status ?: 'available'
         ];
     }
@@ -206,3 +209,4 @@ document.addEventListener('DOMContentLoaded', function(){
 </script>
 </body>
 </html>
+<script src="../plot-click-popup.js"></script>

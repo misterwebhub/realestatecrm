@@ -793,7 +793,7 @@
     top: 2.5px;
     left: 27.1%;
     border: 1px solid;
-    "><span>30</span></div>
+    "><span>30A</span></div>
     
       <div style="
     width: 60px;
@@ -806,7 +806,7 @@
     top: 55.5px;
     left: 27.1%;
     border: 1px solid;
-    "><span>30A</span></div>
+    "><span>30</span></div>
     
           <div style="
     width: 80px;
@@ -1147,3 +1147,4 @@ document.addEventListener('DOMContentLoaded', function(){
 });
 </script>
 </body></html>
+<script src="../plot-click-popup.js"></script>

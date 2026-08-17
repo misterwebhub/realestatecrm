@@ -6,6 +6,7 @@ use App\Models\AuditLog;
 use App\Models\Agent;
 use App\Models\CustomerBond;
 use App\Models\CustomerBondPayment;
+use App\Models\Plot;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 
@@ -17,6 +18,7 @@ class AuditLogController extends Controller
     protected array $typeMap = [
         'bond'    => CustomerBond::class,
         'payment' => CustomerBondPayment::class,
+        'plot'    => Plot::class,
     ];
 
     /**
@@ -57,6 +59,10 @@ class AuditLogController extends Controller
             });
 
             $heading = 'Bond ' . ($bond?->bond_no ?: ('#' . $id));
+        } elseif ($type === 'plot') {
+            $plot = Plot::find($id);
+            $query->where('auditable_type', $modelClass)->where('auditable_id', $id);
+            $heading = 'Plot ' . ($plot?->title ?: ('#' . $id));
         } else {
             $payment = CustomerBondPayment::find($id);
             $query->where('auditable_type', $modelClass)->where('auditable_id', $id);
@@ -87,6 +93,27 @@ class AuditLogController extends Controller
                         'new' => $this->displayValue($field, $val),
                     ];
                 }
+            } elseif ($log->action === 'plot_size_updated') {
+                // Explicit entries written from the Registry "Plot Sizes" edit
+                // flow (see RegistryController::syncBondLandSizeAndLog). Bond
+                // entries carry a batch of plots in meta.changes; Plot entries
+                // carry a single old_area/new_area plus which bond drove it.
+                if (isset($meta['changes']) && is_array($meta['changes'])) {
+                    foreach ($meta['changes'] as $c) {
+                        $changes[] = [
+                            'field' => 'Plot Size — ' . ($c['plot_title'] ?? ('#' . ($c['plot_id'] ?? ''))),
+                            'old' => ($c['old_area'] ?? '-') . ' gaz',
+                            'new' => ($c['new_area'] ?? '-') . ' gaz',
+                        ];
+                    }
+                } elseif (array_key_exists('old_area', $meta)) {
+                    $bondLabel = $meta['bond_no'] ?? ($meta['bond_id'] ? ('#' . $meta['bond_id']) : null);
+                    $changes[] = [
+                        'field' => 'Plot Size' . ($bondLabel ? ' (Bond ' . $bondLabel . ')' : ''),
+                        'old' => ($meta['old_area'] ?? '-') . ' gaz',
+                        'new' => ($meta['new_area'] ?? '-') . ' gaz',
+                    ];
+                }
             }
 
             return [
@@ -97,7 +124,7 @@ class AuditLogController extends Controller
                 'record_id' => $log->auditable_id,
                 'ip' => $meta['ip'] ?? null,
                 'changes' => $changes,
-                'field_count' => $log->action === 'created' ? count($new) : ($log->action === 'deleted' ? count($old) : count($changes)),
+                'field_count' => $log->action === 'created' ? count($new) : ($log->action === 'deleted' ? count($old) : (count($changes) ?: (int) ($log->action === 'plot_size_updated'))),
             ];
         })
         // Only keep entries that represent an actual field change.

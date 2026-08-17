@@ -187,6 +187,8 @@
                 <td>
                    <div class="marker" data-plot="34" style="background-image:url(blue.gif);height:100%;width:100%;border:1px solid black;text-align:center;">34</div></td>
             </tr>
+            
+            
             <tr>
                 <td>
                    <div class="marker" data-plot="35" style="height:100%;width:100%;border:1px solid black;text-align:center;">35</div></td>
@@ -331,8 +333,11 @@
                <td>
                    <table style="height:100%;width:100%;">
                        <tr>
-                           <td colspan="2">
-                   <div class="marker" data-plot="235" style="background-image:url(blue.gif);height:100%;width:100%;border:1px solid black;text-align:center;">235</div></td>
+                               <td style="height:100px;">
+                   <div class="marker" data-plot="235" style="height:100%;width:100%;border:1px solid black;text-align:center;">235</div></td>
+                           <td>
+                   <div class="marker" data-plot="235A" style="height:100%;width:100%;border:1px solid black;text-align:center;">235A</div></td>
+                         
                            <td rowspan="3">
                    <div class="marker" data-plot="234" style="height:100%;width:100%;border:1px solid black;text-align:center;">234</div></td>
                            <td rowspan="3">
@@ -938,8 +943,11 @@ try {
         if ($status === null || $status === 'issue') $status = 'available';
 
         $plots[] = [
+            'id' => $plotId,
             // plot title behaves like the plot number; exact key, never LIKE-matched
             'plot_number' => trim((string) $r['title']),
+            'title' => trim((string) $r['title']),
+            'area' => $r['area'],
             'status' => $status
         ];
     }
@@ -985,3 +993,5 @@ document.addEventListener('DOMContentLoaded', function () {
 </script>
 </body>
 </html>
+
+<script src="../plot-click-popup.js"></script>

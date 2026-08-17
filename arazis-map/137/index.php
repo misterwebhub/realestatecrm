@@ -562,8 +562,11 @@ try {
         if ($status === null || $status === 'issue') $status = 'available';
 
         $plots[] = [
+            'id' => $plotId,
             // plot title behaves like the plot number; exact key, never LIKE-matched
             'plot_number' => trim((string) $r['title']),
+            'title' => trim((string) $r['title']),
+            'area' => $r['area'],
             'status' => $status
         ];
     }
@@ -609,3 +612,5 @@ document.addEventListener('DOMContentLoaded', function () {
 </script>
 </body>
 </html>
+
+<script src="../plot-click-popup.js"></script>

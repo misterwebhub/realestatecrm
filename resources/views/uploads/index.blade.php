@@ -69,8 +69,8 @@
                             <th>Kisan</th>
                             <th>Partner</th>
                             <th>Attachment</th>
-                            <th>Reason</th>
                             <th>Uploaded</th>
+                            <th style="min-width:260px;">Reason</th>
                             <th class="text-end">Actions</th>
                         </tr>
                     </thead>
@@ -100,19 +100,21 @@
                                     <strong title="{{ basename($u->file_path) }}">{{ $u->label ?: 'Attachment' }}</strong>
                                     <div class="text-muted small">{{ $typeLabel }}</div>
                                 </td>
-                                <td class="small" style="max-width:220px;white-space:normal;">{{ $u->reason ?: '—' }}</td>
                                 <td class="text-nowrap">{{ $u->created_at->format('M d, Y H:i') }}</td>
+                                <td class="small" style="min-width:260px;white-space:normal;">{{ $u->reason ?: '—' }}</td>
                                 <td class="text-end" style="white-space:nowrap;">
-                                    @if(in_array($ext, $previewable))
-                                        <a href="{{ route('uploads.view', $u) }}" target="_blank" class="btn btn-sm btn-outline-secondary" title="View"><i class="bi bi-eye"></i> View</a>
-                                    @endif
-                                    <a href="{{ route('uploads.download', $u) }}" class="btn btn-sm btn-primary" title="Download"><i class="bi bi-download"></i> Download</a>
-                                    <a href="{{ route('uploads.edit', $u) }}" class="btn btn-sm btn-outline-secondary" title="Edit"><i class="bi bi-pencil"></i> Edit</a>
-                                    <form action="{{ route('uploads.destroy', $u) }}" method="POST" class="d-inline-block" onsubmit="return confirm('Delete this upload?');">
-                                        @csrf
-                                        @method('DELETE')
-                                        <button type="submit" class="btn btn-sm btn-outline-danger" title="Delete"><i class="bi bi-trash"></i> Delete</button>
-                                    </form>
+                                    <div class="btn-group btn-group-sm" role="group">
+                                        @if(in_array($ext, $previewable))
+                                            <a href="{{ route('uploads.view', $u) }}" target="_blank" class="btn btn-outline-secondary" title="View" data-bs-toggle="tooltip"><i class="bi bi-eye"></i></a>
+                                        @endif
+                                        <a href="{{ route('uploads.download', $u) }}" class="btn btn-primary" title="Download" data-bs-toggle="tooltip"><i class="bi bi-download"></i></a>
+                                        <a href="{{ route('uploads.edit', $u) }}" class="btn btn-outline-secondary" title="Edit" data-bs-toggle="tooltip"><i class="bi bi-pencil"></i></a>
+                                        <form action="{{ route('uploads.destroy', $u) }}" method="POST" class="d-inline-block" onsubmit="return confirm('Delete this upload?');">
+                                            @csrf
+                                            @method('DELETE')
+                                            <button type="submit" class="btn btn-outline-danger" title="Delete" data-bs-toggle="tooltip"><i class="bi bi-trash"></i></button>
+                                        </form>
+                                    </div>
                                 </td>
                             </tr>
                         @endforeach
@@ -133,4 +135,14 @@
     .badge { font-size: 0.85rem; padding: 0.45em 0.6em; }
     .table td { vertical-align: middle; }
 </style>
+@endpush
+
+@push('scripts')
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach(function (el) {
+            new bootstrap.Tooltip(el);
+        });
+    });
+</script>
 @endpush

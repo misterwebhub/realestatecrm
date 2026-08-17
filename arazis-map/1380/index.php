@@ -1335,7 +1335,7 @@
                     <td>
                      <div id="p92" style="background-color: rgb(255, 193, 7); height: 100%; width: 100%; text-align: center; border: 1px solid black; background-image: none; color: rgb(0, 0, 0);">
 	
-                         94
+                         92
                      
 </div>
                             </td>
@@ -2303,3 +2303,4 @@ document.addEventListener('DOMContentLoaded', function(){
 })();
 </script>
 </body></html>
+<script src="../plot-click-popup.js"></script>

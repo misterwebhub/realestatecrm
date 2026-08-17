@@ -273,6 +273,16 @@ class PlotController extends Controller
                 $item->longitude ?? '-',
                 ucfirst(str_replace('_', ' ', (string) ($item->status ?? 'available'))),
             ],
+            'action_buttons' => [
+                [
+                    'url' => route('change-log.record', ['type' => 'plot', 'id' => $item->id]),
+                    'label' => 'Log',
+                    'class' => 'btn-outline-dark',
+                    'data_modal' => true,
+                    'data_toggle' => 'modal',
+                    'data_target' => 'changeLogModal',
+                ],
+            ],
         ];
     }
 }

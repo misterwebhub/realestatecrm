@@ -687,6 +687,7 @@ class RegistryController extends Controller
             $plotsForSize[] = [
                 'id' => $plot->id,
                 'title' => $plot->title ?? ('Plot-' . $plot->id),
+                'arazi_code' => $plot->arazi_code,
                 'area' => $pivotArea !== null ? (float) $pivotArea : ($plot->area !== null ? (float) $plot->area : null),
                 'locked' => $plot->status === 'registry'
                     || Registry::forPlot($plot->id)->where('id', '!=', $item->id)->exists(),
@@ -921,6 +922,7 @@ class RegistryController extends Controller
 
         $skipped = [];
         $changes = [];
+        $plotModels = [];
 
         foreach ($sizes as $plotId => $rawValue) {
             if ($rawValue === null || $rawValue === '' || !is_numeric($rawValue)) {
@@ -969,8 +971,6 @@ class RegistryController extends Controller
                 }
             }
 
-            $plot->update(['area' => $value]);
-
             $changes[] = [
                 'plot_id'    => $plot->id,
                 'plot_title' => $plot->title ?? ('Plot-' . $plot->id),
@@ -978,15 +978,87 @@ class RegistryController extends Controller
                 'old_area'   => $oldArea,
                 'new_area'   => $value,
             ];
+            $plotModels[$plot->id] = $plot;
         }
 
         if (!empty($skipped)) {
             session()->flash('error', 'Some plot sizes were not updated: ' . implode('; ', $skipped));
         }
 
-        if (!empty($changes)) {
-            $this->syncBondLandSizeAndLog($request, $changes);
+        if (empty($changes)) {
+            return;
         }
+
+        // The user must explicitly acknowledge the exact set of changes (shown
+        // in a confirmation modal client-side, listing old → new size per plot
+        // and the bond it belongs to) before anything is written. The modal
+        // sets this hidden flag right before re-submitting the form. If it's
+        // missing — JS didn't run, or someone bypassed the UI — none of the
+        // plot sizes are applied and the whole batch is reported back so the
+        // user can retry through the normal confirm flow.
+        if ($request->input('plot_sizes_confirmed') !== '1') {
+            session()->flash('error', 'Plot size changes were not saved — they must be reviewed and approved in the confirmation dialog first.');
+            return;
+        }
+
+        foreach ($changes as $change) {
+            // Update through the loaded Eloquent instance (not a bulk query-builder
+            // update) so the generic eloquent.updated listener still fires and
+            // records its own automatic before/after "area" entry on the Plot —
+            // on top of the explicit plot_size_updated entry written below.
+            $plotModel = $plotModels[$change['plot_id']] ?? \App\Models\Plot::find($change['plot_id']);
+            $plotModel?->update(['area' => $change['new_area']]);
+        }
+
+        $this->syncBondLandSizeAndLog($request, $changes);
+    }
+
+    /**
+     * Live "is this size available" check used by the Plot Sizes table while
+     * the user is typing, so oversized entries are flagged before Save is
+     * even clicked — not just rejected afterwards. Mirrors the same
+     * saleable-area math used at save time in applyPlotSizeUpdates().
+     */
+    public function plotStockCheck(Request $request)
+    {
+        $plotId = (int) $request->query('plot_id');
+        $value  = (float) $request->query('value');
+
+        $plot = \App\Models\Plot::find($plotId);
+        if (!$plot) {
+            return response()->json(['ok' => false, 'message' => 'Plot not found.']);
+        }
+
+        if ($plot->status === 'registry') {
+            return response()->json(['ok' => false, 'locked' => true, 'message' => 'This plot is locked — registry already done.']);
+        }
+
+        $arazi = $plot->arazi_code ? Arazi::where('legacy_arazi_code', $plot->arazi_code)->first() : null;
+        if (!$arazi) {
+            return response()->json(['ok' => true, 'message' => '']);
+        }
+
+        $existing = \App\Models\Plot::where('arazi_code', $plot->arazi_code)
+            ->where('id', '!=', $plot->id)
+            ->sum('area');
+        $allowed = (float) $arazi->saleable_area - (float) $existing;
+
+        if ($value > $allowed) {
+            return response()->json([
+                'ok'      => false,
+                'allowed' => round($allowed, 2),
+                'short_by' => round($value - $allowed, 2),
+                'edit_url' => route('arazis.edit', $arazi->id),
+                'message' => "Exceeds available stock for Arazi {$plot->arazi_code} by " . round($value - $allowed, 2) . ' gaz'
+                    . ' (only ' . round($allowed, 2) . ' gaz free). Reduce the Road Area on the arazi to release more saleable stock.',
+            ]);
+        }
+
+        return response()->json([
+            'ok'      => true,
+            'allowed' => round($allowed, 2),
+            'message' => round($allowed, 2) . ' gaz available for this arazi.',
+        ]);
     }
 
     /**
@@ -1001,26 +1073,53 @@ class RegistryController extends Controller
     private function syncBondLandSizeAndLog(Request $request, array $changes): void
     {
         $bondId = $request->input('customer_bond_id');
-        if (!$bondId) {
-            return;
+        $bond   = $bondId ? \App\Models\CustomerBond::with('plots')->find($bondId) : null;
+
+        // One explicit audit entry against the Bond (if we have one) so the
+        // bond's own history shows exactly which plots changed and by how
+        // much. This is in addition to — not instead of — the automatic
+        // generic audit entries the eloquent listener writes on the raw
+        // Plot::area / CustomerBond::land_size column changes.
+        if ($bond) {
+            \App\Models\AuditLog::create([
+                'user_id'        => auth()->id(),
+                'auditable_type' => \App\Models\CustomerBond::class,
+                'auditable_id'   => $bond->id,
+                'action'         => 'plot_size_updated',
+                'meta'           => [
+                    'bond_no' => $bond->bond_no,
+                    'changes' => $changes,
+                    'source'  => 'Registry plot size edit',
+                ],
+            ]);
         }
 
-        $bond = \App\Models\CustomerBond::with('plots')->find($bondId);
+        // One explicit, human-readable audit entry per plot — "qty updated
+        // from X to Y, for bond <bond_no>" — kept distinct from the generic
+        // before/after Plot::area entry the eloquent listener also writes,
+        // so the Plot's own history clearly shows *why* (which bond/registry
+        // edit) drove each size change, not just the raw column diff.
+        foreach ($changes as $change) {
+            \App\Models\AuditLog::create([
+                'user_id'        => auth()->id(),
+                'auditable_type' => \App\Models\Plot::class,
+                'auditable_id'   => $change['plot_id'],
+                'action'         => 'plot_size_updated',
+                'meta'           => [
+                    'plot_title' => $change['plot_title'],
+                    'arazi_code' => $change['arazi_code'],
+                    'old_area'   => $change['old_area'],
+                    'new_area'   => $change['new_area'],
+                    'bond_id'    => $bond?->id,
+                    'bond_no'    => $bond?->bond_no,
+                    'source'     => 'Registry plot size edit',
+                ],
+            ]);
+        }
+
         if (!$bond) {
             return;
         }
-
-        \App\Models\AuditLog::create([
-            'user_id'        => auth()->id(),
-            'auditable_type' => \App\Models\CustomerBond::class,
-            'auditable_id'   => $bond->id,
-            'action'         => 'plot_size_updated',
-            'meta'           => [
-                'bond_no' => $bond->bond_no,
-                'changes' => $changes,
-                'source'  => 'Registry plot size edit',
-            ],
-        ]);
 
         // Recompute the bond's own land_size from the plots' current, real
         // areas — keeps it from ever going stale after this edit. This save
@@ -1092,6 +1191,7 @@ class RegistryController extends Controller
                 'plots'            => $bond->plots->map(fn ($p) => [
                     'id' => $p->id,
                     'title' => $p->title ?? ('Plot-'.$p->id),
+                    'arazi_code' => $p->arazi_code,
                     'area' => $p->area !== null ? (float) $p->area : null,
                     'locked' => $p->status === 'registry' || \App\Models\Registry::forPlot($p->id)->exists(),
                 ])->values(),
