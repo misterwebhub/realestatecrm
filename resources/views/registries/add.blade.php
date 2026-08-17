@@ -263,6 +263,10 @@
                     </select>
                     @error('deed_no')<div class="invalid-feedback">{{ $message }}</div>@enderror
                 </div>
+                <div class="col-md-3 d-none" id="groupDeedsWrap">
+                    <label class="form-label small fw-semibold">Deed Nos (Grouped Arazis)</label>
+                    <div id="d_group_deeds" class="form-control form-control-sm bg-light" style="min-height:31px; height:auto; white-space:normal;"></div>
+                </div>
                 <div class="col-md-2">
                     <label class="form-label small fw-semibold">Circle Value</label>
                     <input type="number" name="circle_value" step="0.01" min="0"
@@ -695,6 +699,18 @@
         loadDeeds(b.arazi_code || '', b.customer_name || '');
         $('h_pending').value      = b.pending_amount || '';
 
+        // Informational summary of every deed no across this bond's Arazi Group
+        // (if it belongs to one) — shown just before Circle Value.
+        const groupDeedsWrap = $('groupDeedsWrap');
+        const groupDeedsEl   = $('d_group_deeds');
+        if (groupDeedsEl && b.deed_nos && b.deed_nos.length) {
+            groupDeedsEl.innerHTML = b.deed_nos.map(d => `<span class="badge bg-secondary me-1 mb-1">${d}</span>`).join('');
+            groupDeedsWrap?.classList.remove('d-none');
+        } else if (groupDeedsWrap) {
+            groupDeedsWrap.classList.add('d-none');
+            if (groupDeedsEl) groupDeedsEl.innerHTML = '';
+        }
+
         // "Bond History" — jump straight to this bond's audit log entries
         // (plot size edits, land_size syncs, etc.) filtered by model + id.
         const historyLink = $('bondHistoryLink');
@@ -858,6 +874,8 @@
         renderPlotsSizeTable([]);
         $('bondAppliedBanner').classList.add('d-none');
         $('bondHistoryLink')?.classList.add('d-none');
+        $('groupDeedsWrap')?.classList.add('d-none');
+        const groupDeedsEl = $('d_group_deeds'); if (groupDeedsEl) groupDeedsEl.innerHTML = '';
     });
 
     /* ── Witnesses ── */

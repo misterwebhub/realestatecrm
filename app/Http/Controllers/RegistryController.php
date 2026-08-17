@@ -1155,10 +1155,15 @@ class RegistryController extends Controller
             );
         }
         if ($araziQ) {
-            $query->whereHas('arazi', fn ($a) =>
-                $a->where('legacy_arazi_code', 'like', '%'.$araziQ.'%')
-                  ->orWhere('legacy_arazi_code', 'like', '%'.$araziQ.'%')
-            );
+            // If the typed code is (or belongs to) an Arazi Group, expand the search to
+            // every arazi code in that group so bonds recorded under any grouped/merged
+            // arazi code are found too — not just the exact code typed.
+            $groupCodes = $this->relatedAraziCodes($araziQ);
+
+            $query->whereHas('arazi', function ($a) use ($araziQ, $groupCodes) {
+                $a->whereIn('legacy_arazi_code', $groupCodes)
+                  ->orWhere('legacy_arazi_code', 'like', '%'.$araziQ.'%');
+            });
         }
         if ($plotQ) {
             $query->whereHas('plots', fn ($p) =>
@@ -1172,12 +1177,27 @@ class RegistryController extends Controller
             return response()->json(['found' => false, 'results' => []]);
         }
 
-        $results = $bonds->map(function ($bond) {
+        // Cache the grouped deed-no list per arazi code within this request so bonds
+        // sharing the same (or grouped) arazi code don't re-run the same lookup.
+        $deedNosCache = [];
+        $deedNosFor = function (string $code) use (&$deedNosCache) {
+            $code = trim($code);
+            if ($code === '') {
+                return [];
+            }
+            if (! array_key_exists($code, $deedNosCache)) {
+                $deedNosCache[$code] = $this->deedNosForCodes($this->relatedAraziCodes($code));
+            }
+            return $deedNosCache[$code];
+        };
+
+        $results = $bonds->map(function ($bond) use ($deedNosFor) {
             $paid    = (float) $bond->payments->whereNotIn('entry_type', ['return','discount'])->sum('amount');
             $debit   = (float) $bond->payments->whereIn('entry_type', ['return','discount'])->sum('amount');
             $netPaid = $paid - $debit;
             $total   = (float) ($bond->total_amount ?? $bond->bond_amount ?? 0);
             $pending = max($total - $netPaid, 0);
+            $araziCode = $bond->arazi_code ?: ($bond->arazi?->legacy_arazi_code ?? '');
 
             return [
                 'found'            => true,
@@ -1187,7 +1207,10 @@ class RegistryController extends Controller
                 'customer_name'    => $bond->customer?->name ?? '',
                 'mobile'           => $bond->customer?->mobile ?? '',
                 'secondary_mobile' => $bond->customer?->secondary_mobile ?? '',
-                'arazi_code'       => $bond->arazi_code ?: ($bond->arazi?->legacy_arazi_code ?? ''),
+                'arazi_code'       => $araziCode,
+                // Deed numbers available for this bond's arazi, expanded to every code
+                // in its Arazi Group (if any) so grouped/merged deed nos show up here too.
+                'deed_nos'         => $deedNosFor($araziCode),
                 'plots'            => $bond->plots->map(fn ($p) => [
                     'id' => $p->id,
                     'title' => $p->title ?? ('Plot-'.$p->id),
@@ -1485,6 +1508,62 @@ class RegistryController extends Controller
         return response()->json([
             'partners' => $partners,
         ]);
+    }
+
+    /**
+     * Lightweight deed-no list (values only, no labels) for a set of arazi codes —
+     * used to show which deed numbers are available for a bond in the Search Bond
+     * results, without pulling in the full deedsByArazi() label-building logic.
+     * A merge's consolidated merged_deed_no is preferred over its individual member
+     * deed nos (same "merged wins" rule deedsByArazi uses).
+     */
+    private function deedNosForCodes(array $codes): array
+    {
+        $codes = array_values(array_unique(array_filter($codes, fn ($c) => trim((string) $c) !== '')));
+        if (empty($codes)) {
+            return [];
+        }
+
+        $arazis = \App\Models\Arazi::whereIn('legacy_arazi_code', $codes)
+            ->with(['deedMapping', 'deedMergingItem.deedMerging'])
+            ->get();
+
+        $legacyDeedByArazi = \App\Models\KisanRegistry::whereIn('arazi_id', $arazis->pluck('id'))
+            ->whereNotNull('arazi_deed_no')
+            ->where('arazi_deed_no', '!=', '')
+            ->get(['arazi_id', 'arazi_deed_no'])
+            ->groupBy('arazi_id')
+            ->map(fn ($rows) => trim((string) $rows->first()->arazi_deed_no));
+
+        $deedNos = [];
+
+        foreach ($arazis as $arazi) {
+            $mapping = $arazi->deedMapping;
+
+            if (! $mapping) {
+                $legacyDeedNo = trim((string) ($legacyDeedByArazi[$arazi->id] ?? ''));
+                if ($legacyDeedNo !== '') {
+                    $deedNos[$legacyDeedNo] = true;
+                }
+                continue;
+            }
+
+            $item = $arazi->deedMergingItem;
+            if ($item && $item->deedMerging) {
+                $mergedNo = trim((string) $item->deedMerging->merged_deed_no);
+                if ($mergedNo !== '') {
+                    $deedNos[$mergedNo] = true;
+                    continue;
+                }
+            }
+
+            $deedNo = trim((string) $mapping->deed_no);
+            if ($deedNo !== '') {
+                $deedNos[$deedNo] = true;
+            }
+        }
+
+        return array_keys($deedNos);
     }
 
     /**
