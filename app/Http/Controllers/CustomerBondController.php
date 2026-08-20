@@ -529,12 +529,10 @@ class CustomerBondController extends Controller
     {
         $customer_bond->loadMissing(['customer', 'cheques.connectedAccount', 'arazi', 'plots', 'payments']);
 
-        // balance
-        $totalAmount = (float) ($customer_bond->total_amount ?? $customer_bond->bond_amount ?? 0);
-        $paidAmount  = (float) $customer_bond->payments
-            ->whereNotIn('entry_type', ['return', 'discount'])->sum('amount')
-            - (float) $customer_bond->payments
-            ->whereIn('entry_type', ['return', 'discount'])->sum('amount');
+        // Match the listing row calculation: bond_amount is the visible base,
+        // and paid is the raw sum of payments shown in the table.
+        $totalAmount = (float) ($customer_bond->bond_amount ?? $customer_bond->total_amount ?? 0);
+        $paidAmount  = (float) $customer_bond->payments->sum('amount');
         $balance = max($totalAmount - $paidAmount, 0);
 
         // last installment paid
@@ -692,9 +690,10 @@ class CustomerBondController extends Controller
             'area'  => $p->area,
         ])->values();
 
-        $totalAmount  = (float) ($bond->total_amount ?? $bond->bond_amount ?? 0);
-        $paidAmount   = (float) $bond->payments->whereNotIn('entry_type', ['return', 'discount'])->sum('amount')
-                      - (float) $bond->payments->whereIn('entry_type', ['return', 'discount'])->sum('amount');
+        // Keep the modal in sync with the bond listing: use the bond amount
+        // shown in the table, and the same raw payment sum.
+        $totalAmount  = (float) ($bond->bond_amount ?? $bond->total_amount ?? 0);
+        $paidAmount   = (float) $bond->payments->sum('amount');
         $balance      = max($totalAmount - $paidAmount, 0);
         $paymentCount = $bond->payments->count();
         $nextInstNo   = $paymentCount + 1;

@@ -2,14 +2,52 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Booking;
 use App\Models\CustomerBond;
 use App\Models\Plot;
 use App\Models\Registry;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use NumberFormatter;
 
 class ArazisMapPlotDetailsController extends Controller
 {
+    private function amountWords(float $amount): string
+    {
+        if ($amount <= 0) {
+            return 'zero rupees only';
+        }
+
+        if (class_exists(NumberFormatter::class)) {
+            foreach (['hi_IN', 'en_IN'] as $locale) {
+                try {
+                    $formatter = new NumberFormatter($locale, NumberFormatter::SPELLOUT);
+                    $whole = (int) floor($amount);
+                    $paise = (int) round(($amount - $whole) * 100);
+
+                    $words = trim((string) $formatter->format($whole));
+                    if ($words === '') {
+                        continue;
+                    }
+
+                    $result = ucfirst($words) . ' rupees';
+                    if ($paise > 0) {
+                        $paiseWords = trim((string) $formatter->format($paise));
+                        if ($paiseWords !== '') {
+                            $result .= ' and ' . ucfirst($paiseWords) . ' paise';
+                        }
+                    }
+
+                    return $result . ' only';
+                } catch (\Throwable $e) {
+                    continue;
+                }
+            }
+        }
+
+        return (string) $amount;
+    }
+
     /**
      * Customer/broker/gaz details for a single plot, shown in the click
      * popup on the legacy arazi map pages (arazis-map/<folder>/index.php).
@@ -32,7 +70,7 @@ class ArazisMapPlotDetailsController extends Controller
             ], 403);
         }
 
-        $plot = Plot::with('arazi')->find($plotId);
+        $plot = Plot::with(['arazi', 'activeHold.agent', 'activeHold.customer', 'activeHold.creator'])->find($plotId);
 
         if (! $plot) {
             return response()->json(['ok' => false, 'message' => 'Plot not found.'], 404);
@@ -46,6 +84,40 @@ class ArazisMapPlotDetailsController extends Controller
             'status' => $plot->status,
             'area' => $plot->area,
         ];
+
+        $booking = Booking::with('customer')
+            ->where('plot_id', $plot->id)
+            ->where(function ($q) {
+                $q->whereNull('status')->orWhere('status', '!=', 'expired');
+            })
+            ->latest('id')
+            ->first();
+
+        if ($booking) {
+            $data['booking_id'] = $booking->id;
+            $data['booking_url'] = route('bookings.edit', $booking->id);
+            $data['booking_date'] = optional($booking->booking_date)->format('d-m-Y');
+            $data['booking_expiry_date'] = optional($booking->expiry_date)->format('d-m-Y');
+            $data['advance_amount'] = $booking->advance_amount;
+            $data['booking_status'] = $booking->status;
+            $data['booking_customer_name'] = $booking->customer?->name;
+        }
+
+        $activeHold = $plot->activeHold;
+        if ($activeHold) {
+            $data['hold_id'] = $activeHold->id;
+            $data['hold_url'] = route('plot-holds.index', ['status' => 'active', 'arazi_code' => $plot->arazi_code, 'q' => $plot->title]);
+            $data['hold_days'] = $activeHold->days;
+            $data['hold_start_date'] = optional($activeHold->start_date)->format('d-m-Y');
+            $data['hold_end_date'] = optional($activeHold->end_date)->format('d-m-Y');
+            $data['hold_customer_id'] = $activeHold->customer_id;
+            $data['hold_customer_name'] = $activeHold->customer_name ?: $activeHold->customer?->name;
+            $data['hold_customer_phone'] = $activeHold->customer_phone ?: $activeHold->customer?->mobile ?: $activeHold->customer?->phone;
+            $data['hold_agent_name'] = $activeHold->agent?->name;
+            $data['hold_notes'] = $activeHold->notes;
+            $data['hold_created_by'] = $activeHold->creator?->name;
+            $data['hold_created_at'] = optional($activeHold->created_at)->format('d-m-Y H:i');
+        }
 
         // Registry done — pull customer/broker/gaz from the registry (and its
         // pivot area for this specific plot, if it's a multi-plot registry).
@@ -78,6 +150,9 @@ class ArazisMapPlotDetailsController extends Controller
 
         if ($bond) {
             $pivotArea = $bond->plots()->where('plots.id', $plot->id)->first()?->pivot?->sale_amount;
+            $totalAmount = (float) ($bond->bond_amount ?? $bond->total_amount ?? 0);
+            $paidAmount = (float) $bond->payments()->sum('amount');
+            $balanceAmount = max($totalAmount - $paidAmount, 0);
 
             $data['source'] = 'bond';
             $data['bond_id'] = $bond->id;
@@ -90,7 +165,40 @@ class ArazisMapPlotDetailsController extends Controller
             $data['broker_name'] = $bond->broker?->name;
             $data['gaz'] = $plot->area;
             $data['sale_amount'] = $pivotArea;
+            $data['bond_date'] = optional($bond->bond_date)->format('d-m-Y');
+            $data['booking_date'] = optional($bond->bond_date)->format('d-m-Y');
+            $data['bond_amount'] = $totalAmount;
+            $data['bond_amount_words'] = $this->amountWords($totalAmount);
+            $data['advance_amount'] = $paidAmount;
+            $data['advance_amount_words'] = $this->amountWords($paidAmount);
+            $data['paid_amount'] = $paidAmount;
+            $data['balance_amount'] = $balanceAmount;
+            $data['balance_amount_words'] = $this->amountWords($balanceAmount);
+            $data['balance'] = $balanceAmount;
+            $data['last_date'] = optional($bond->last_date)->format('d-m-Y');
 
+            return response()->json($data);
+        }
+
+        if ($booking) {
+            $advanceAmount = (float) ($booking->advance_amount ?? 0);
+            $data['source'] = 'booking';
+            $data['customer_url'] = $booking->customer ? route('customer.dashboard', $booking->customer->id) : null;
+            $data['customer_name'] = $booking->customer?->name;
+            $data['customer_mobile'] = $booking->customer?->mobile ?? $booking->customer?->phone;
+            $data['booking_date'] = optional($booking->booking_date)->format('d-m-Y');
+            $data['booking_expiry_date'] = optional($booking->expiry_date)->format('d-m-Y');
+            $data['advance_amount'] = $advanceAmount;
+            $data['advance_amount_words'] = $this->amountWords($advanceAmount);
+            $data['paid_amount'] = $advanceAmount;
+            $data['balance_amount'] = 0;
+            $data['balance_amount_words'] = $this->amountWords(0);
+            $data['broker_name'] = null;
+            return response()->json($data);
+        }
+
+        if ($activeHold) {
+            $data['source'] = 'hold';
             return response()->json($data);
         }
 

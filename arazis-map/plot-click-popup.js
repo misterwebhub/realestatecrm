@@ -109,7 +109,7 @@
                     return res.json();
                 })
                 .then(function (data) {
-                    var hasDetails = data && data.ok && (data.source === 'registry' || data.source === 'bond');
+                    var hasDetails = data && data.ok && data.source !== 'none';
                     detailsCache[plotId] = hasDetails ? data : 'skip';
                     if (!hasDetails) {
                         closeOverlay(overlay);
@@ -128,6 +128,31 @@
             return '<div style="display:flex;justify-content:space-between;gap:12px;padding:6px 0;border-bottom:1px solid #f0f1f3;">' +
                 '<span style="color:#6b7280;">' + label + '</span>' +
                 '<strong style="text-align:right;color:#1f2937;">' + String(value) + '</strong>' +
+                '</div>';
+        }
+
+        function formatAmount(value) {
+            var num = Number(value);
+            if (!isFinite(num)) return '0.00';
+            return num.toLocaleString('en-IN', {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+            });
+        }
+
+        function amountRow(label, value, words) {
+            var display = formatAmount(value);
+            var title = words ? ' title="' + String(words).replace(/"/g, '&quot;') + '"' : '';
+            return '<div style="display:flex;justify-content:space-between;gap:12px;padding:6px 0;border-bottom:1px solid #f0f1f3;">' +
+                '<span style="color:#6b7280;">' + label + '</span>' +
+                '<strong style="text-align:right;color:#1f2937;cursor:help;"' + title + '>' + display + '</strong>' +
+                '</div>';
+        }
+
+        function rowOrZero(label, value) {
+            return '<div style="display:flex;justify-content:space-between;gap:12px;padding:6px 0;border-bottom:1px solid #f0f1f3;">' +
+                '<span style="color:#6b7280;">' + label + '</span>' +
+                '<strong style="text-align:right;color:#1f2937;">' + String(value === null || value === undefined || value === '' ? 0 : value) + '</strong>' +
                 '</div>';
         }
 
@@ -202,6 +227,14 @@
 
             html += '<div style="padding:4px 18px 16px;">';
             html += row('Area (gaz)', data.area);
+            if (data.source === 'bond' || data.source === 'booking') {
+                html += rowOrZero('Booking Date', data.booking_date);
+                html += amountRow('Advance Amount', data.advance_amount, data.advance_amount_words);
+                html += amountRow('Balance Amount', data.balance_amount !== undefined ? data.balance_amount : data.balance, data.balance_amount_words);
+            }
+            if (data.source === 'registry') {
+                html += rowOrZero('Registry Date', data.registry_date);
+            }
 
             if (data.bond_no) {
                 var bondNoValue = data.bond_url
@@ -209,7 +242,15 @@
                     : data.bond_no;
                 html += row('Bond No', bondNoValue);
             }
+            if (data.bond_date) html += row('Bond Date', data.bond_date);
+            if (data.bond_amount !== undefined) html += amountRow('Bond Amount', data.bond_amount, data.bond_amount_words);
+            if (data.last_date) html += row('Last Date', data.last_date);
             if (data.deed_no) html += row('Deed No', data.deed_no);
+            if (data.source === 'booking') {
+                html += '<div style="margin-top:8px;padding-top:10px;border-top:1px solid #eef0f3;font-size:12px;font-weight:bold;color:#111827;text-transform:uppercase;letter-spacing:0.04em;">Booking</div>';
+                html += rowOrZero('Expiry Date', data.booking_expiry_date);
+                html += rowOrZero('Booking Status', data.booking_status ? String(data.booking_status).replace(/_/g, ' ') : 0);
+            }
 
             var customerValue = data.customer_name
                 ? (data.customer_url
@@ -221,8 +262,20 @@
             html += row('Customer Mobile', data.customer_mobile);
             html += row('Broker', data.broker_name);
             if (data.gaz !== undefined) html += row('Gaz (' + (data.source === 'registry' ? 'Registry' : 'Booked') + ')', data.gaz);
-            if (data.registry_date) html += row('Registry Date', data.registry_date);
             if (data.sale_amount) html += row('Sale Amount', data.sale_amount);
+
+            if (data.source === 'hold' || data.hold_id) {
+                html += '<div style="margin-top:8px;padding-top:10px;border-top:1px solid #eef0f3;font-size:12px;font-weight:bold;color:#111827;text-transform:uppercase;letter-spacing:0.04em;">Hold Details</div>';
+                if (data.hold_days !== undefined) html += row('Hold Days', data.hold_days);
+                if (data.hold_start_date) html += row('Hold From', data.hold_start_date);
+                if (data.hold_end_date) html += row('Hold Till', data.hold_end_date);
+                if (data.hold_agent_name) html += row('Hold Broker', data.hold_agent_name);
+                if (data.hold_customer_name) html += row('Held For', data.hold_customer_name);
+                if (data.hold_customer_phone) html += row('Phone', data.hold_customer_phone);
+                if (data.hold_created_by) html += row('Held By', data.hold_created_by);
+                if (data.hold_created_at) html += row('Held On', data.hold_created_at);
+                if (data.hold_notes) html += row('Notes', data.hold_notes);
+            }
             html += '</div>';
 
             box.innerHTML = html;
