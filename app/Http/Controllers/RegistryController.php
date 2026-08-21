@@ -24,53 +24,257 @@ class RegistryController extends Controller
     {
     }
 
-    public function waitingPayments(): View
+    /**
+     * Waiting Payments — tabular report of pending registries with the
+     * arazi code, every plot (with its gaz), the broker and the amounts
+     * still outstanding. Same shape/filters as the Bond Cumulative report.
+     */
+    public function waitingPayments(Request $request)
     {
-        $records = $this->applyOwnershipScope(
-            Registry::with(['customer', 'arazi', 'agent'])
-                ->where('status', 'pending')
-                ->whereNotNull('due_date')
-                ->orderBy('due_date')
-        )->get();
+        $araziCode  = trim((string) $request->query('arazi_code', ''));
+        $customerId = trim((string) $request->query('customer_id', ''));
+        $brokerId   = trim((string) $request->query('broker_id', ''));
+        $plotTitle  = trim((string) $request->query('plot_title', ''));
+        $dueFrom    = trim((string) $request->query('due_from', ''));
+        $dueTo      = trim((string) $request->query('due_to', ''));
+        $overdue    = trim((string) $request->query('overdue', '')); // '', 'Y', 'N'
 
-        // Exclude registries where more than 50% of the linked bond amount is already paid.
-        $records = $records->reject(function (Registry $registry) {
-            return $this->registryPaymentProgress($registry) > 50.0;
-        })->values();
+        $query = Registry::with(['customer', 'arazi', 'agent', 'plots', 'plot'])
+            ->where('status', 'pending')
+            ->whereNotNull('due_date')
+            ->when($araziCode !== '',  fn ($q) => $q->where('arazi_code', $araziCode))
+            ->when($customerId !== '', fn ($q) => $q->where('customer_id', $customerId))
+            ->when($dueFrom !== '',    fn ($q) => $q->whereDate('due_date', '>=', $dueFrom))
+            ->when($dueTo !== '',      fn ($q) => $q->whereDate('due_date', '<=', $dueTo))
+            ->orderBy('due_date');
+
+        $records = $this->applyOwnershipScope($query)->get();
+
+        // Only registries where 50% or less of the linked bond amount is paid
+        // are genuinely "waiting" — the rest are substantially settled.
+        $records = $records->reject(
+            fn (Registry $registry) => $this->registryPaymentFigures($registry)['percent'] > 50.0
+        )->values();
+
+        // Brokers are resolved per-row (from registries.agent_id when set,
+        // otherwise off the linked bond), so the broker filter is applied to
+        // that resolved name rather than as a WHERE on the registry query.
+        $brokerName = $brokerId !== '' ? (string) (Agent::find($brokerId)?->name ?? '') : '';
+
+        $today = now()->startOfDay();
+        $rows = [];
+        $gGaz = $gAmount = $gPaid = $gBalance = 0.0;
+        $overdueCount = 0;
+
+        foreach ($records as $registry) {
+            $plots = $registry->allPlots();
+
+            // Plot title filter — exact match, scoped to this registry's plots
+            // (titles behave like plot numbers, so never a LIKE match).
+            if ($plotTitle !== '') {
+                $hit = $plots->first(fn ($p) => (string) ($p->title ?? '') === $plotTitle);
+                if (! $hit) {
+                    continue;
+                }
+            }
+
+            $daysLeft = (int) $today->diffInDays($registry->due_date, false);
+            $isOverdue = $daysLeft < 0;
+
+            if ($overdue === 'Y' && ! $isOverdue) continue;
+            if ($overdue === 'N' && $isOverdue) continue;
+
+            $plotsData = $plots->map(function ($p) use ($registry) {
+                // Prefer the per-plot pivot area on multi-plot registries,
+                // fall back to the plot's own area.
+                $pivotArea = $p->pivot->area ?? null;
+
+                return [
+                    'label' => $p->title ?: ('Plot-' . $p->id),
+                    'gaz'   => (float) ($pivotArea ?? $p->area ?? 0),
+                ];
+            })->values()->all();
+
+            $gaz = (float) collect($plotsData)->sum('gaz');
+            if ($gaz <= 0) {
+                $gaz = (float) ($registry->land_size ?? 0);
+            }
+
+            $figures = $this->registryPaymentFigures($registry);
+            $amount  = (float) ($registry->registry_amount ?? 0);
+            if ($amount <= 0) {
+                $amount = $figures['total'];
+            }
+            $balance = max($amount - $figures['paid'], 0);
+
+            $broker = $registry->agent?->name ?: ($figures['broker'] ?: '-');
+
+            if ($brokerName !== '' && $broker !== $brokerName) {
+                continue;
+            }
+
+            $rows[] = [
+                'registry_id'   => $registry->id,
+                'registry_code' => $registry->registry_code ?: ('REG-' . $registry->id),
+                'registry_url'  => route('registries.edit', $registry->id),
+                'customer'      => $registry->customer?->name ?: '-',
+                'customer_id'   => $registry->customer_id,
+                'arazi'         => $registry->arazi_code ?: ($registry->arazi?->legacy_arazi_code ?? '-'),
+                'plots'         => $plotsData,
+                'gaz'           => $gaz,
+                'broker'        => $broker,
+                'deed_no'       => $registry->deed_no ?: '-',
+                'amount'        => $amount,
+                'paid'          => $figures['paid'],
+                'balance'       => $balance,
+                'percent'       => $figures['percent'],
+                'due_date'      => optional($registry->due_date)->format('d-m-Y') ?: '-',
+                'days_left'     => $daysLeft,
+                'overdue'       => $isOverdue,
+                'status'        => $registry->status,
+            ];
+
+            $gGaz     += $gaz;
+            $gAmount  += $amount;
+            $gPaid    += $figures['paid'];
+            $gBalance += $balance;
+            if ($isOverdue) {
+                $overdueCount++;
+            }
+        }
+
+        if (strtolower((string) $request->query('export')) === 'csv') {
+            $filters = [
+                'Arazi'      => $araziCode !== '' ? $araziCode : 'All',
+                'Customer'   => $customerId !== '' ? optional(Customer::find($customerId))->name : 'All',
+                'Broker'     => $brokerId !== '' ? optional(Agent::find($brokerId))->name : 'All',
+                'Plot'       => $plotTitle !== '' ? $plotTitle : 'All',
+                'Due From'   => $dueFrom !== '' ? $dueFrom : 'All',
+                'Due To'     => $dueTo !== '' ? $dueTo : 'All',
+                'Overdue'    => $overdue !== '' ? ($overdue === 'Y' ? 'Overdue only' : 'Not overdue') : 'All',
+            ];
+
+            $filename = 'waiting-payments-' . now()->format('Ymd-His') . '.csv';
+
+            return response()->streamDownload(function () use ($rows, $filters, $gGaz, $gAmount, $gPaid, $gBalance) {
+                $out = fopen('php://output', 'w');
+                fwrite($out, "\xEF\xBB\xBF"); // UTF-8 BOM for Excel
+
+                fputcsv($out, ['Waiting Payments Report']);
+                fputcsv($out, ['Generated', now()->format('d-m-Y H:i')]);
+                fputcsv($out, []);
+                fputcsv($out, ['Filters Applied']);
+                foreach ($filters as $label => $value) {
+                    fputcsv($out, [$label, $value ?: 'All']);
+                }
+                fputcsv($out, []);
+
+                fputcsv($out, [
+                    '#', 'Registry', 'Customer', 'Arazi', 'Plots (gaz)', 'Total Gaz', 'Broker', 'Deed No',
+                    'Amount', 'Paid', 'Balance', 'Paid %', 'Due Date', 'Days Left', 'Status',
+                ]);
+
+                foreach ($rows as $i => $r) {
+                    $plots = collect($r['plots'])
+                        ->map(fn ($pl) => ($pl['label'] ?: '-') . ' (' . rtrim(rtrim(number_format($pl['gaz'], 2), '0'), '.') . ' gaz)')
+                        ->implode('; ');
+
+                    fputcsv($out, [
+                        $i + 1,
+                        $r['registry_code'],
+                        $r['customer'],
+                        $r['arazi'],
+                        $plots ?: '-',
+                        number_format($r['gaz'], 2, '.', ''),
+                        $r['broker'],
+                        $r['deed_no'],
+                        number_format($r['amount'], 2, '.', ''),
+                        number_format($r['paid'], 2, '.', ''),
+                        number_format($r['balance'], 2, '.', ''),
+                        number_format($r['percent'], 1, '.', ''),
+                        $r['due_date'],
+                        $r['overdue'] ? ('Overdue ' . abs($r['days_left']) . ' day(s)') : ($r['days_left'] . ' day(s)'),
+                        ucfirst((string) $r['status']),
+                    ]);
+                }
+
+                fputcsv($out, []);
+                fputcsv($out, [
+                    'GRAND TOTAL', '', '', '', '',
+                    number_format($gGaz, 2, '.', ''), '', '',
+                    number_format($gAmount, 2, '.', ''),
+                    number_format($gPaid, 2, '.', ''),
+                    number_format($gBalance, 2, '.', ''),
+                ]);
+
+                fclose($out);
+            }, $filename, ['Content-Type' => 'text/csv; charset=UTF-8']);
+        }
 
         return view('registries.waiting', [
-            'title' => 'Waiting Payments',
-            'records' => $records,
+            'title'        => 'Waiting Payments',
+            'rows'         => $rows,
+            'araziCodes'   => Arazi::whereNotNull('legacy_arazi_code')->where('legacy_arazi_code', '<>', '')
+                                ->orderBy('legacy_arazi_code')->pluck('legacy_arazi_code')
+                                ->unique(fn ($c) => (string) $c)->values(),
+            'customers'    => Customer::orderBy('name')->get(['id', 'name']),
+            'brokers'      => Agent::orderBy('name')->get(['id', 'name']),
+            'araziCode'    => $araziCode,
+            'customerId'   => $customerId,
+            'brokerId'     => $brokerId,
+            'plotTitle'    => $plotTitle,
+            'dueFrom'      => $dueFrom,
+            'dueTo'        => $dueTo,
+            'overdue'      => $overdue,
+            'g_gaz'        => $gGaz,
+            'g_amount'     => $gAmount,
+            'g_paid'       => $gPaid,
+            'g_balance'    => $gBalance,
+            'overdueCount' => $overdueCount,
         ]);
     }
 
     /**
-     * Percentage of the linked bond amount that has already been paid for a registry.
+     * Total / paid / percent of the bond amount linked to a registry.
      * Bonds are matched by the registry's customer + arazi code.
      */
-    protected function registryPaymentProgress(Registry $registry): float
+    protected function registryPaymentFigures(Registry $registry): array
     {
+        $empty = ['total' => 0.0, 'paid' => 0.0, 'percent' => 0.0, 'broker' => null];
+
         if (! $registry->customer_id || ! $registry->arazi_code) {
-            return 0.0;
+            return $empty;
         }
 
-        $bonds = \App\Models\CustomerBond::where('customer_id', $registry->customer_id)
+        $bonds = \App\Models\CustomerBond::with('broker')
+            ->where('customer_id', $registry->customer_id)
             ->where('arazi_code', $registry->arazi_code)
             ->withSum('payments as paid_amount', 'amount')
-            ->get(['id', 'total_amount', 'bond_amount']);
+            ->get(['id', 'total_amount', 'bond_amount', 'broker_id']);
 
         if ($bonds->isEmpty()) {
-            return 0.0;
+            return $empty;
         }
 
         $total = (float) $bonds->sum(fn ($b) => (float) ($b->total_amount ?? $b->bond_amount ?? 0));
         $paid  = (float) $bonds->sum(fn ($b) => (float) ($b->paid_amount ?? 0));
 
-        if ($total <= 0) {
-            return 0.0;
-        }
+        return [
+            'total'   => $total,
+            'paid'    => $paid,
+            'percent' => $total > 0 ? ($paid / $total) * 100.0 : 0.0,
+            // registries.agent_id is never populated in this data set, so the
+            // broker actually comes off the linked bond.
+            'broker'  => $bonds->firstWhere('broker_id', '!=', null)?->broker?->name,
+        ];
+    }
 
-        return ($paid / $total) * 100.0;
+    /**
+     * Percentage of the linked bond amount that has already been paid for a registry.
+     */
+    protected function registryPaymentProgress(Registry $registry): float
+    {
+        return $this->registryPaymentFigures($registry)['percent'];
     }
 
     protected function resourceTitle(): string

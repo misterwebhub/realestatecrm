@@ -119,51 +119,53 @@ class ArazisMapPlotDetailsController extends Controller
             $data['hold_created_at'] = optional($activeHold->created_at)->format('d-m-Y H:i');
         }
 
-        // Registry done — pull customer/broker/gaz from the registry (and its
-        // pivot area for this specific plot, if it's a multi-plot registry).
+        // Pull whatever records actually exist for this plot — registry,
+        // bond, booking, hold — and merge all of them into one response.
+        // A plot can have more than one (e.g. registered AND bonded), so we
+        // no longer stop at the first match; every found record's fields
+        // are shown, nothing is hidden because a different record "won".
+        $sources = [];
+
         $registry = Registry::with(['customer', 'agent'])
             ->forPlot($plot->id)
             ->latest('id')
             ->first();
 
         if ($registry) {
+            $sources[] = 'registry';
             $pivotArea = $registry->plots()->where('plots.id', $plot->id)->first()?->pivot?->area;
 
-            $data['source'] = 'registry';
-            $data['customer_id'] = $registry->customer?->id;
-            $data['customer_url'] = $registry->customer ? route('customer.dashboard', $registry->customer->id) : null;
-            $data['customer_name'] = $registry->customer?->name;
-            $data['customer_mobile'] = $registry->customer?->mobile ?? $registry->customer?->phone;
-            $data['broker_name'] = $registry->agent?->name;
+            $data['customer_id'] = $data['customer_id'] ?? $registry->customer?->id;
+            $data['customer_url'] = $data['customer_url'] ?? ($registry->customer ? route('customer.dashboard', $registry->customer->id) : null);
+            $data['customer_name'] = $data['customer_name'] ?? $registry->customer?->name;
+            $data['customer_mobile'] = $data['customer_mobile'] ?? ($registry->customer?->mobile ?? $registry->customer?->phone);
+            $data['broker_name'] = $data['broker_name'] ?? $registry->agent?->name;
             $data['gaz'] = $pivotArea ?? $registry->land_size ?? $plot->area;
             $data['deed_no'] = $registry->deed_no;
             $data['registry_date'] = optional($registry->registry_date)->format('d-m-Y');
-
-            return response()->json($data);
         }
 
-        // Not registered yet — look for a bond that includes this plot.
         $bond = CustomerBond::with(['customer', 'broker'])
             ->whereHas('plots', fn ($q) => $q->where('plots.id', $plot->id))
             ->latest('id')
             ->first();
 
         if ($bond) {
+            $sources[] = 'bond';
             $pivotArea = $bond->plots()->where('plots.id', $plot->id)->first()?->pivot?->sale_amount;
             $totalAmount = (float) ($bond->bond_amount ?? $bond->total_amount ?? 0);
             $paidAmount = (float) $bond->payments()->sum('amount');
             $balanceAmount = max($totalAmount - $paidAmount, 0);
 
-            $data['source'] = 'bond';
             $data['bond_id'] = $bond->id;
             $data['bond_no'] = $bond->bond_no;
             $data['bond_url'] = route('customer-bonds.edit', $bond->id);
-            $data['customer_id'] = $bond->customer?->id;
-            $data['customer_url'] = $bond->customer ? route('customer.dashboard', $bond->customer->id) : null;
-            $data['customer_name'] = $bond->customer?->name;
-            $data['customer_mobile'] = $bond->customer?->mobile ?? $bond->customer?->phone;
-            $data['broker_name'] = $bond->broker?->name;
-            $data['gaz'] = $plot->area;
+            $data['customer_id'] = $data['customer_id'] ?? $bond->customer?->id;
+            $data['customer_url'] = $data['customer_url'] ?? ($bond->customer ? route('customer.dashboard', $bond->customer->id) : null);
+            $data['customer_name'] = $data['customer_name'] ?? $bond->customer?->name;
+            $data['customer_mobile'] = $data['customer_mobile'] ?? ($bond->customer?->mobile ?? $bond->customer?->phone);
+            $data['broker_name'] = $data['broker_name'] ?? $bond->broker?->name;
+            $data['gaz'] = $data['gaz'] ?? $plot->area;
             $data['sale_amount'] = $pivotArea;
             $data['bond_date'] = optional($bond->bond_date)->format('d-m-Y');
             $data['booking_date'] = optional($bond->bond_date)->format('d-m-Y');
@@ -176,34 +178,54 @@ class ArazisMapPlotDetailsController extends Controller
             $data['balance_amount_words'] = $this->amountWords($balanceAmount);
             $data['balance'] = $balanceAmount;
             $data['last_date'] = optional($bond->last_date)->format('d-m-Y');
-
-            return response()->json($data);
         }
 
-        if ($booking) {
+        if ($booking && !$bond) {
+            // Booking numbers are already shown above unconditionally; here
+            // we only add the extra fields that are specific to a plain
+            // booking-only plot (no bond raised yet).
+            $sources[] = 'booking';
             $advanceAmount = (float) ($booking->advance_amount ?? 0);
-            $data['source'] = 'booking';
-            $data['customer_url'] = $booking->customer ? route('customer.dashboard', $booking->customer->id) : null;
-            $data['customer_name'] = $booking->customer?->name;
-            $data['customer_mobile'] = $booking->customer?->mobile ?? $booking->customer?->phone;
-            $data['booking_date'] = optional($booking->booking_date)->format('d-m-Y');
-            $data['booking_expiry_date'] = optional($booking->expiry_date)->format('d-m-Y');
-            $data['advance_amount'] = $advanceAmount;
-            $data['advance_amount_words'] = $this->amountWords($advanceAmount);
-            $data['paid_amount'] = $advanceAmount;
-            $data['balance_amount'] = 0;
-            $data['balance_amount_words'] = $this->amountWords(0);
-            $data['broker_name'] = null;
-            return response()->json($data);
+            $data['customer_url'] = $data['customer_url'] ?? ($booking->customer ? route('customer.dashboard', $booking->customer->id) : null);
+            $data['customer_name'] = $data['customer_name'] ?? $booking->customer?->name;
+            $data['customer_mobile'] = $data['customer_mobile'] ?? ($booking->customer?->mobile ?? $booking->customer?->phone);
+            $data['advance_amount'] = $data['advance_amount'] ?? $advanceAmount;
+            $data['advance_amount_words'] = $data['advance_amount_words'] ?? $this->amountWords($advanceAmount);
+            $data['paid_amount'] = $data['paid_amount'] ?? $advanceAmount;
+            $data['balance_amount'] = $data['balance_amount'] ?? 0;
+            $data['balance_amount_words'] = $data['balance_amount_words'] ?? $this->amountWords(0);
         }
 
         if ($activeHold) {
-            $data['source'] = 'hold';
-            return response()->json($data);
+            $sources[] = 'hold';
         }
 
-        $data['source'] = 'none';
-        $data['message'] = 'No customer/broker on record for this plot yet.';
+        if (empty($sources)) {
+            $data['source'] = 'none';
+
+            // Nothing is linked to this plot. If its status nonetheless
+            // claims it's sold/booked/held, the status is stale — say so
+            // explicitly rather than showing a vague "no records" note,
+            // so it's obvious this is a data problem and not an empty plot.
+            $status = strtolower((string) $plot->status);
+            $claimsOccupied = in_array($status, ['booked', 'booked_advance', 'registry', 'sold', 'hold'], true);
+
+            if ($claimsOccupied) {
+                $data['data_issue'] = true;
+                $data['message'] = 'Data issue: this plot is marked "'
+                    . str_replace('_', ' ', $status)
+                    . '" but has no bond, registry, booking or hold linked to it. The status is stale and needs correcting.';
+            } else {
+                $data['data_issue'] = false;
+                $data['message'] = $status === 'available'
+                    ? 'This plot is available — no customer or broker on record.'
+                    : 'No customer/broker on record for this plot yet.';
+            }
+        } else {
+            // Primary source drives the popup's status badge/label; the
+            // rest of the fields above are already merged in regardless.
+            $data['source'] = $sources[0];
+        }
 
         return response()->json($data);
     }

@@ -64,21 +64,28 @@
             return null;
         }
 
-        var tiles = Array.from(document.querySelectorAll('.marker[data-plot], div[id^="p"]'));
+        // Every .marker tile is clickable, whether or not it carries a
+        // data-plot attribute (e.g. map 35 labels its tiles with a bare
+        // <span> inside the .marker instead).
+        var tiles = Array.from(document.querySelectorAll('.marker, div[id^="p"]'));
 
         // A few layouts (e.g. 319, 385) mark plot numbers with a bare
         // <span>NNN</span> inside the colored parent div instead of an id
         // or data-plot attribute — same pattern their status-coloring
-        // script already matches on.
+        // script already matches on. Plot titles are not always numeric
+        // ("42A", "208D1"), so match anything we actually know as a plot
+        // label rather than digits only.
         Array.from(document.querySelectorAll('form span')).forEach(function (sp) {
-            var txt = (sp.textContent || '').trim();
-            if (!/^\d+$/.test(txt)) return;
+            var txt = (sp.textContent || '').trim().toUpperCase();
+            if (!txt || !byLabel[txt]) return;
             var parent = sp.closest('div');
             if (parent && tiles.indexOf(parent) === -1) tiles.push(parent);
         });
 
         tiles.forEach(function (el) {
-            el.style.cursor = 'pointer';
+            // Only hint clickability on tiles that actually map to a plot —
+            // some layouts have blank/decorative .marker boxes.
+            if (resolvePlot(el)) el.style.cursor = 'pointer';
             el.addEventListener('click', function (ev) {
                 ev.preventDefault();
                 var plot = resolvePlot(el);
@@ -90,7 +97,9 @@
         function fetchAndShow(plotId, ev) {
             // Cached — render instantly, no round trip, no loading flash.
             if (detailsCache[plotId]) {
-                if (detailsCache[plotId] !== 'skip') showPopup(detailsCache[plotId]);
+                if (detailsCache[plotId] !== 'skip') {
+                    renderPopup(overlayShell(), detailsCache[plotId]);
+                }
                 return;
             }
 
@@ -109,12 +118,16 @@
                     return res.json();
                 })
                 .then(function (data) {
-                    var hasDetails = data && data.ok && data.source !== 'none';
-                    detailsCache[plotId] = hasDetails ? data : 'skip';
-                    if (!hasDetails) {
+                    // Show the popup for every plot we got a valid response
+                    // for — including plots with no bond/registry/booking
+                    // behind them, so an available plot reads "Available"
+                    // instead of the click doing nothing at all.
+                    if (!data || !data.ok) {
+                        detailsCache[plotId] = 'skip';
                         closeOverlay(overlay);
                         return;
                     }
+                    detailsCache[plotId] = data;
                     renderPopup(overlay, data);
                 })
                 .catch(function () {
@@ -124,10 +137,10 @@
         }
 
         function row(label, value) {
-            if (value === null || value === undefined || value === '') return '';
+            var display = (value === null || value === undefined || value === '') ? '-' : String(value);
             return '<div style="display:flex;justify-content:space-between;gap:12px;padding:6px 0;border-bottom:1px solid #f0f1f3;">' +
                 '<span style="color:#6b7280;">' + label + '</span>' +
-                '<strong style="text-align:right;color:#1f2937;">' + String(value) + '</strong>' +
+                '<strong style="text-align:right;color:#1f2937;">' + display + '</strong>' +
                 '</div>';
         }
 
@@ -141,7 +154,7 @@
         }
 
         function amountRow(label, value, words) {
-            var display = formatAmount(value);
+            var display = (value === null || value === undefined || value === '') ? '-' : formatAmount(value);
             var title = words ? ' title="' + String(words).replace(/"/g, '&quot;') + '"' : '';
             return '<div style="display:flex;justify-content:space-between;gap:12px;padding:6px 0;border-bottom:1px solid #f0f1f3;">' +
                 '<span style="color:#6b7280;">' + label + '</span>' +
@@ -150,9 +163,10 @@
         }
 
         function rowOrZero(label, value) {
+            var display = (value === null || value === undefined || value === '') ? '-' : String(value);
             return '<div style="display:flex;justify-content:space-between;gap:12px;padding:6px 0;border-bottom:1px solid #f0f1f3;">' +
                 '<span style="color:#6b7280;">' + label + '</span>' +
-                '<strong style="text-align:right;color:#1f2937;">' + String(value === null || value === undefined || value === '' ? 0 : value) + '</strong>' +
+                '<strong style="text-align:right;color:#1f2937;">' + display + '</strong>' +
                 '</div>';
         }
 
@@ -210,7 +224,7 @@
 
             var statusKey = String(data.status || '').toLowerCase();
             var palette = STATUS_COLORS[statusKey] || STATUS_COLORS.available;
-            var statusLabel = String(data.status || '').replace(/_/g, ' ');
+            var statusLabel = String(data.status || 'available').replace(/_/g, ' ');
             statusLabel = statusLabel.charAt(0).toUpperCase() + statusLabel.slice(1);
 
             var html = '<div style="background:linear-gradient(135deg,#4285f4,#34a853);padding:16px 18px;display:flex;justify-content:space-between;align-items:center;color:#fff;">' +
@@ -227,6 +241,25 @@
 
             html += '<div style="padding:4px 18px 16px;">';
             html += row('Area (gaz)', data.area);
+
+            // No bond / registry / booking / hold on record — just show the
+            // plot's own info and say so, instead of a wall of empty rows.
+            if (data.source === 'none') {
+                var noteStyle = data.data_issue
+                    ? 'background:#fff4e5;border:1px solid #fb8c00;color:#8a4b00;'
+                    : 'background:#f8f9fa;border:1px solid #eef0f3;color:#6b7280;';
+                html += '<div style="margin-top:10px;padding:10px 12px;border-radius:8px;font-size:13px;line-height:1.5;text-align:left;' + noteStyle + '">' +
+                    (data.data_issue ? '<strong style="display:block;margin-bottom:4px;">&#9888; Data issue</strong>' : '') +
+                    (data.message || 'No customer/broker on record for this plot yet.') +
+                    '</div>';
+                html += '</div>';
+                box.innerHTML = html;
+                box.querySelector('#plot-popup-close').addEventListener('click', function () {
+                    closeOverlay(overlay);
+                });
+                return;
+            }
+
             if (data.source === 'bond' || data.source === 'booking') {
                 html += rowOrZero('Booking Date', data.booking_date);
                 html += amountRow('Advance Amount', data.advance_amount, data.advance_amount_words);
@@ -236,20 +269,20 @@
                 html += rowOrZero('Registry Date', data.registry_date);
             }
 
-            if (data.bond_no) {
-                var bondNoValue = data.bond_url
+            var bondNoValue = data.bond_no
+                ? (data.bond_url
                     ? '<a href="' + data.bond_url + '" target="_blank" rel="noopener" style="color:#1a73e8;text-decoration:underline;">' + data.bond_no + '</a>'
-                    : data.bond_no;
-                html += row('Bond No', bondNoValue);
-            }
-            if (data.bond_date) html += row('Bond Date', data.bond_date);
-            if (data.bond_amount !== undefined) html += amountRow('Bond Amount', data.bond_amount, data.bond_amount_words);
-            if (data.last_date) html += row('Last Date', data.last_date);
-            if (data.deed_no) html += row('Deed No', data.deed_no);
+                    : data.bond_no)
+                : null;
+            html += row('Bond No', bondNoValue);
+            html += row('Bond Date', data.bond_date);
+            html += amountRow('Bond Amount', data.bond_amount, data.bond_amount_words);
+            html += row('Last Date', data.last_date);
+            html += row('Deed No', data.deed_no);
             if (data.source === 'booking') {
                 html += '<div style="margin-top:8px;padding-top:10px;border-top:1px solid #eef0f3;font-size:12px;font-weight:bold;color:#111827;text-transform:uppercase;letter-spacing:0.04em;">Booking</div>';
                 html += rowOrZero('Expiry Date', data.booking_expiry_date);
-                html += rowOrZero('Booking Status', data.booking_status ? String(data.booking_status).replace(/_/g, ' ') : 0);
+                html += rowOrZero('Booking Status', data.booking_status ? String(data.booking_status).replace(/_/g, ' ') : null);
             }
 
             var customerValue = data.customer_name
@@ -261,8 +294,8 @@
 
             html += row('Customer Mobile', data.customer_mobile);
             html += row('Broker', data.broker_name);
-            if (data.gaz !== undefined) html += row('Gaz (' + (data.source === 'registry' ? 'Registry' : 'Booked') + ')', data.gaz);
-            if (data.sale_amount) html += row('Sale Amount', data.sale_amount);
+            html += row('Gaz (' + (data.source === 'registry' ? 'Registry' : 'Booked') + ')', data.gaz);
+            html += row('Sale Amount', data.sale_amount);
 
             if (data.source === 'hold' || data.hold_id) {
                 html += '<div style="margin-top:8px;padding-top:10px;border-top:1px solid #eef0f3;font-size:12px;font-weight:bold;color:#111827;text-transform:uppercase;letter-spacing:0.04em;">Hold Details</div>';
