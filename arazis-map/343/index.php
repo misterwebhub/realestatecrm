@@ -1,3 +1,4 @@
+<?php require_once __DIR__ . '/../no-cache.php'; ?>
 <html xmlns="http://www.w3.org/1999/xhtml"><head><title>Arazi Map 343</title>
 </head><body style="
     padding-top: 45%;">
@@ -1147,4 +1148,4 @@ document.addEventListener('DOMContentLoaded', function(){
 });
 </script>
 </body></html>
-<script src="../plot-click-popup.js?v=<?= @filemtime(__DIR__ . '/../plot-click-popup.js') ?: time() ?>"></script>
+<script><?php readfile(__DIR__ . '/../plot-click-popup.js'); ?></script>

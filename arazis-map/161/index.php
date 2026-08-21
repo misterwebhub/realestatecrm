@@ -1,3 +1,4 @@
+<?php require_once __DIR__ . '/../no-cache.php'; ?>
 <!doctype html>
 <html xmlns="http://www.w3.org/1999/xhtml">
 <head>
@@ -726,4 +727,4 @@ document.addEventListener('DOMContentLoaded', function(){
 </script>
 </body>
 </html>
-<script src="../plot-click-popup.js?v=<?= @filemtime(__DIR__ . '/../plot-click-popup.js') ?: time() ?>"></script>
+<script><?php readfile(__DIR__ . '/../plot-click-popup.js'); ?></script>
